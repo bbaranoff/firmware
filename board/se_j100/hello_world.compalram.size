@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  23322	    412	  23960	  47694	   ba4e	board/se_j100/hello_world.compalram.elf
+  23602	    416	  23736	  47754	   ba8a	board/se_j100/hello_world.compalram.elf

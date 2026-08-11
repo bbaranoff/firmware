@@ -1,0 +1,828 @@
+   1              		.file	"tpu_window.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.tpu_enq_at,"ax",%progbits
+  12              		.align	2
+  14              	tpu_enq_at:
+  15              	.LFB6:
+  16              		.file 1 "include/calypso/tpu.h"
+   1:include/calypso/tpu.h **** #ifndef _CALYPSO_TPU_H
+   2:include/calypso/tpu.h **** #define _CALYPSO_TPU_H
+   3:include/calypso/tpu.h **** 
+   4:include/calypso/tpu.h **** #define BITS_PER_TDMA		1250
+   5:include/calypso/tpu.h **** #define QBITS_PER_TDMA		(BITS_PER_TDMA * 4)	/* 5000 */
+   6:include/calypso/tpu.h **** #define TPU_RANGE		QBITS_PER_TDMA
+   7:include/calypso/tpu.h **** #define	SWITCH_TIME		(TPU_RANGE-10)
+   8:include/calypso/tpu.h **** 
+   9:include/calypso/tpu.h **** /* Assert or de-assert TPU reset */
+  10:include/calypso/tpu.h **** void tpu_reset(int active);
+  11:include/calypso/tpu.h **** /* Enable or Disable a new scenario loaded into the TPU */
+  12:include/calypso/tpu.h **** void tpu_enable(int active);
+  13:include/calypso/tpu.h **** /* Enable or Disable the clock of the TPU Module */
+  14:include/calypso/tpu.h **** void tpu_clk_enable(int active);
+  15:include/calypso/tpu.h **** /* Enable Frame Interrupt generation on next frame.  DSP will reset it */
+  16:include/calypso/tpu.h **** void tpu_dsp_frameirq_enable(void);
+  17:include/calypso/tpu.h **** /* Is a Frame interrupt still pending for the DSP ? */
+  18:include/calypso/tpu.h **** int tpu_dsp_fameirq_pending(void);
+  19:include/calypso/tpu.h **** /* Rewind the TPU, i.e. restart enqueueing instructions at the base addr */
+  20:include/calypso/tpu.h **** void tpu_rewind(void);
+  21:include/calypso/tpu.h **** /* Enqueue a raw TPU instruction */
+  22:include/calypso/tpu.h **** void tpu_enqueue(uint16_t instr);
+  23:include/calypso/tpu.h **** /* Initialize TPU and TPU driver */
+  24:include/calypso/tpu.h **** void tpu_init(void);
+  25:include/calypso/tpu.h **** /* (Busy)Wait until TPU is idle */
+  26:include/calypso/tpu.h **** void tpu_wait_idle(void);
+  27:include/calypso/tpu.h **** /* Enable FRAME interrupt generation */
+  28:include/calypso/tpu.h **** void tpu_frame_irq_en(int mcu, int dsp);
+  29:include/calypso/tpu.h **** /* Force the generation of a DSP interrupt */
+  30:include/calypso/tpu.h **** void tpu_force_dsp_frame_irq(void);
+  31:include/calypso/tpu.h **** 
+  32:include/calypso/tpu.h **** /* Get the current TPU SYNCHRO register */
+  33:include/calypso/tpu.h **** uint16_t tpu_get_synchro(void);
+  34:include/calypso/tpu.h **** /* Get the current TPU OFFSET register */
+  35:include/calypso/tpu.h **** uint16_t tpu_get_offset(void);
+  36:include/calypso/tpu.h **** 
+  37:include/calypso/tpu.h **** enum tpu_instr {
+  38:include/calypso/tpu.h **** 	TPU_INSTR_AT		= (1 << 13),
+  39:include/calypso/tpu.h **** 	TPU_INSTR_OFFSET	= (2 << 13),
+  40:include/calypso/tpu.h **** 	TPU_INSTR_SYNCHRO	= (3 << 13),	/* Loading delta synchro value in TPU synchro register */
+  41:include/calypso/tpu.h **** 	TPU_INSTR_WAIT		= (5 << 13),	/* Wait a certain period (in GSM qbits) */
+  42:include/calypso/tpu.h **** 	TPU_INSTR_SLEEP		= (0 << 13),	/* Stop the sequencer by disabling TPU ENABLE bit in ctrl reg */
+  43:include/calypso/tpu.h **** 	/* data processing */
+  44:include/calypso/tpu.h **** 	TPU_INSTR_MOVE		= (4 << 13),
+  45:include/calypso/tpu.h **** };
+  46:include/calypso/tpu.h **** 
+  47:include/calypso/tpu.h **** /* Addresses internal to the TPU, only accessible via MOVE */
+  48:include/calypso/tpu.h **** enum tpu_reg_int {
+  49:include/calypso/tpu.h **** 	TPUI_TSP_CTRL1	= 0x00,
+  50:include/calypso/tpu.h **** 	TPUI_TSP_CTRL2	= 0x01,
+  51:include/calypso/tpu.h **** 	TPUI_TX_1	= 0x04,
+  52:include/calypso/tpu.h **** 	TPUI_TX_2	= 0x03,
+  53:include/calypso/tpu.h **** 	TPUI_TX_3	= 0x02,
+  54:include/calypso/tpu.h **** 	TPUI_TX_4	= 0x05,
+  55:include/calypso/tpu.h **** 	TPUI_TSP_ACT_L	= 0x06,
+  56:include/calypso/tpu.h **** 	TPUI_TSP_ACT_U	= 0x07,
+  57:include/calypso/tpu.h **** 	TPUI_TSP_SET1	= 0x09,
+  58:include/calypso/tpu.h **** 	TPUI_TSP_SET2	= 0x0a,
+  59:include/calypso/tpu.h **** 	TPUI_TSP_SET3	= 0x0b,
+  60:include/calypso/tpu.h **** 	TPUI_DSP_INT_PG	= 0x10,
+  61:include/calypso/tpu.h **** 	TPUI_GAUGING_EN = 0x11,
+  62:include/calypso/tpu.h **** };
+  63:include/calypso/tpu.h **** 
+  64:include/calypso/tpu.h **** enum tpui_ctrl2_bits {
+  65:include/calypso/tpu.h **** 	TPUI_CTRL2_RD		= (1 << 0),
+  66:include/calypso/tpu.h **** 	TPUI_CTRL2_WR		= (1 << 1),
+  67:include/calypso/tpu.h **** };
+  68:include/calypso/tpu.h **** 
+  69:include/calypso/tpu.h **** static inline uint16_t tpu_mod5000(int16_t time)
+  70:include/calypso/tpu.h **** {
+  71:include/calypso/tpu.h **** 	if (time < 0)
+  72:include/calypso/tpu.h **** 		return time + 5000;
+  73:include/calypso/tpu.h **** 	if (time >= 5000)
+  74:include/calypso/tpu.h **** 		return time - 5000;
+  75:include/calypso/tpu.h **** 	return time;
+  76:include/calypso/tpu.h **** }
+  77:include/calypso/tpu.h **** 
+  78:include/calypso/tpu.h **** /* Enqueue a SLEEP operation (stop sequencer by disabling TPU ENABLE bit) */
+  79:include/calypso/tpu.h **** static inline void tpu_enq_sleep(void)
+  80:include/calypso/tpu.h **** {
+  81:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_SLEEP);
+  82:include/calypso/tpu.h **** }
+  83:include/calypso/tpu.h **** 
+  84:include/calypso/tpu.h **** /* Enqueue a MOVE operation */
+  85:include/calypso/tpu.h **** static inline void tpu_enq_move(uint8_t addr, uint8_t data)
+  86:include/calypso/tpu.h **** {
+  87:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_MOVE | (data << 5) | (addr & 0x1f));
+  88:include/calypso/tpu.h **** }
+  89:include/calypso/tpu.h **** 
+  90:include/calypso/tpu.h **** /* Enqueue an AT operation */
+  91:include/calypso/tpu.h **** static inline void tpu_enq_at(int16_t time)
+  92:include/calypso/tpu.h **** {
+  17              		.loc 1 92 0
+  18              		.cfi_startproc
+  19              		@ args = 0, pretend = 0, frame = 0
+  20              		@ frame_needed = 0, uses_anonymous_args = 0
+  21              		@ link register save eliminated.
+  22              	.LVL0:
+  23              	.LBB10:
+  24              	.LBB11:
+  71:include/calypso/tpu.h **** 	if (time < 0)
+  25              		.loc 1 71 0
+  26 0000 000050E3 		cmp	r0, #0
+  27              	.LVL1:
+  72:include/calypso/tpu.h **** 		return time + 5000;
+  28              		.loc 1 72 0
+  29 0004 4E0D80B2 		addlt	r0, r0, #4992
+  30 0008 080080B2 		addlt	r0, r0, #8
+  71:include/calypso/tpu.h **** 	if (time < 0)
+  31              		.loc 1 71 0
+  32 000c 030000BA 		blt	.L4
+  73:include/calypso/tpu.h **** 	if (time >= 5000)
+  33              		.loc 1 73 0
+  34 0010 18309FE5 		ldr	r3, .L5
+  35 0014 030050E1 		cmp	r0, r3
+  74:include/calypso/tpu.h **** 		return time - 5000;
+  36              		.loc 1 74 0
+  37 0018 4E0D40C2 		subgt	r0, r0, #4992
+  38 001c 080040C2 		subgt	r0, r0, #8
+  39              	.L4:
+  75:include/calypso/tpu.h **** 	return time;
+  40              		.loc 1 75 0
+  41 0020 0008A0E1 		mov	r0, r0, asl #16
+  42 0024 2008A0E1 		mov	r0, r0, lsr #16
+  43              	.LBE11:
+  44              	.LBE10:
+  93:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_AT | tpu_mod5000(time));
+  45              		.loc 1 93 0
+  46 0028 020A80E3 		orr	r0, r0, #8192
+  94:include/calypso/tpu.h **** }
+  47              		.loc 1 94 0
+  93:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_AT | tpu_mod5000(time));
+  48              		.loc 1 93 0
+  49 002c FEFFFFEA 		b	tpu_enqueue
+  50              	.L6:
+  51              		.align	2
+  52              	.L5:
+  53 0030 87130000 		.word	4999
+  54              		.cfi_endproc
+  55              	.LFE6:
+  57              		.global	__umodsi3
+  58              		.section	.text._win_cleanup,"ax",%progbits
+  59              		.align	2
+  61              	_win_cleanup:
+  62              	.LFB25:
+  63              		.file 2 "layer1/tpu_window.c"
+   1:layer1/tpu_window.c **** /* TPU window control routines for Layer 1 */
+   2:layer1/tpu_window.c **** 
+   3:layer1/tpu_window.c **** /* (C) 2010 by Harald Welte <laforge@gnumonks.org>
+   4:layer1/tpu_window.c ****  *
+   5:layer1/tpu_window.c ****  * All Rights Reserved
+   6:layer1/tpu_window.c ****  *
+   7:layer1/tpu_window.c ****  * This program is free software; you can redistribute it and/or modify
+   8:layer1/tpu_window.c ****  * it under the terms of the GNU General Public License as published by
+   9:layer1/tpu_window.c ****  * the Free Software Foundation; either version 2 of the License, or
+  10:layer1/tpu_window.c ****  * (at your option) any later version.
+  11:layer1/tpu_window.c ****  *
+  12:layer1/tpu_window.c ****  * This program is distributed in the hope that it will be useful,
+  13:layer1/tpu_window.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  14:layer1/tpu_window.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  15:layer1/tpu_window.c ****  * GNU General Public License for more details.
+  16:layer1/tpu_window.c ****  *
+  17:layer1/tpu_window.c ****  */
+  18:layer1/tpu_window.c **** 
+  19:layer1/tpu_window.c **** #include <stdint.h>
+  20:layer1/tpu_window.c **** #include <debug.h>
+  21:layer1/tpu_window.c **** #include <defines.h>
+  22:layer1/tpu_window.c **** #include <stdio.h>
+  23:layer1/tpu_window.c **** 
+  24:layer1/tpu_window.c **** #include <rffe.h>
+  25:layer1/tpu_window.c **** #include <calypso/tpu.h>
+  26:layer1/tpu_window.c **** #include <calypso/tsp.h>
+  27:layer1/tpu_window.c **** #include <abb/twl3025.h>
+  28:layer1/tpu_window.c **** #include <rf/trf6151.h>
+  29:layer1/tpu_window.c **** 
+  30:layer1/tpu_window.c **** #include <layer1/sync.h>
+  31:layer1/tpu_window.c **** #include <layer1/tpu_window.h>
+  32:layer1/tpu_window.c **** #include <layer1/rfch.h>
+  33:layer1/tpu_window.c **** 
+  34:layer1/tpu_window.c **** /* all units in GSM quarter-bits (923.1ns) */
+  35:layer1/tpu_window.c **** #define L1_TDMA_LENGTH_Q	5000
+  36:layer1/tpu_window.c **** #define L1_BURST_LENGTH_Q	625	/* L1_TDMA_LENGTH_Q/8 */
+  37:layer1/tpu_window.c **** 
+  38:layer1/tpu_window.c **** #define L1_NB_MARGIN_Q		(3 * 4)
+  39:layer1/tpu_window.c **** #define L1_SB_MARGIN_Q		(23 * 4)
+  40:layer1/tpu_window.c **** #define L1_TAIL_DURATION_Q	(3 * 4)
+  41:layer1/tpu_window.c **** 
+  42:layer1/tpu_window.c **** /* Sample length as required by the Calypso DSP */
+  43:layer1/tpu_window.c **** #define L1_NB_DURATION_Q	(L1_BURST_LENGTH_Q + 2 * L1_NB_MARGIN_Q - L1_TAIL_DURATION_Q)
+  44:layer1/tpu_window.c **** #define L1_SB_DURATION_Q	(L1_BURST_LENGTH_Q + 2 * L1_SB_MARGIN_Q - L1_TAIL_DURATION_Q)
+  45:layer1/tpu_window.c **** #define L1_FB_DURATION_Q	(11 * L1_TDMA_LENGTH_Q + 2057)	/* more than 11 full slots */
+  46:layer1/tpu_window.c **** #define L1_FB26_DURATION_Q	(L1_TDMA_LENGTH_Q + 798)
+  47:layer1/tpu_window.c **** #define	L1_PW_DURATION_Q	289
+  48:layer1/tpu_window.c **** 
+  49:layer1/tpu_window.c **** #define DSP_SETUP_TIME		66
+  50:layer1/tpu_window.c **** 
+  51:layer1/tpu_window.c **** static const uint16_t rx_burst_duration[_NUM_L1_RXWIN] = {
+  52:layer1/tpu_window.c **** 	[L1_RXWIN_PW]	= L1_PW_DURATION_Q,
+  53:layer1/tpu_window.c **** 	[L1_RXWIN_FB]	= L1_FB_DURATION_Q,
+  54:layer1/tpu_window.c **** 	[L1_RXWIN_SB]	= L1_SB_DURATION_Q,
+  55:layer1/tpu_window.c **** 	[L1_RXWIN_NB]	= L1_NB_DURATION_Q,
+  56:layer1/tpu_window.c **** };
+  57:layer1/tpu_window.c **** 
+  58:layer1/tpu_window.c **** #define L1_TX_NB_DURATION_Q	626
+  59:layer1/tpu_window.c **** #define L1_TX_AB_DURATION_Q	386
+  60:layer1/tpu_window.c **** 
+  61:layer1/tpu_window.c **** static const uint16_t tx_burst_duration[_NUM_L1_TXWIN] = {
+  62:layer1/tpu_window.c **** 	[L1_TXWIN_NB]	= L1_TX_NB_DURATION_Q,
+  63:layer1/tpu_window.c **** 	[L1_TXWIN_AB]	= L1_TX_AB_DURATION_Q,
+  64:layer1/tpu_window.c **** };
+  65:layer1/tpu_window.c **** 
+  66:layer1/tpu_window.c **** 
+  67:layer1/tpu_window.c **** static int _win_setup(__unused uint8_t p1, __unused uint8_t p2, __unused uint16_t p3)
+  68:layer1/tpu_window.c **** {
+  69:layer1/tpu_window.c **** 	uint8_t tn;
+  70:layer1/tpu_window.c **** 
+  71:layer1/tpu_window.c **** 	rfch_get_params(&l1s.next_time, NULL, NULL, &tn);
+  72:layer1/tpu_window.c **** 
+  73:layer1/tpu_window.c **** 	l1s.tpu_offset = (5000 + l1s.tpu_offset + l1s.tpu_offset_correction) % 5000;
+  74:layer1/tpu_window.c **** 	l1s.tpu_offset_correction = 0;
+  75:layer1/tpu_window.c **** 
+  76:layer1/tpu_window.c **** 	tpu_enq_at(4740);
+  77:layer1/tpu_window.c **** 	tpu_enq_sync((5000 + l1s.tpu_offset + (L1_BURST_LENGTH_Q * tn)) % 5000);
+  78:layer1/tpu_window.c **** 
+  79:layer1/tpu_window.c **** 	return 0;
+  80:layer1/tpu_window.c **** }
+  81:layer1/tpu_window.c **** 
+  82:layer1/tpu_window.c **** static int _win_cleanup(__unused uint8_t p1, __unused uint8_t p2, __unused uint16_t p3)
+  83:layer1/tpu_window.c **** {
+  64              		.loc 2 83 0
+  65              		.cfi_startproc
+  66              		@ args = 0, pretend = 0, frame = 4
+  67              		@ frame_needed = 0, uses_anonymous_args = 0
+  68              	.LVL2:
+  69 0000 01402DE9 		stmfd	sp!, {r0, lr}
+  70              	.LCFI0:
+  71              		.cfi_def_cfa_offset 8
+  84:layer1/tpu_window.c **** 	uint8_t tn;
+  85:layer1/tpu_window.c **** 
+  86:layer1/tpu_window.c **** 	rfch_get_params(&l1s.next_time, NULL, NULL, &tn);
+  72              		.loc 2 86 0
+  73 0004 0010A0E3 		mov	r1, #0
+  74              	.LVL3:
+  75 0008 0120A0E1 		mov	r2, r1
+  76              	.LVL4:
+  77 000c 03308DE2 		add	r3, sp, #3
+  78 0010 3C009FE5 		ldr	r0, .L8
+  79              		.cfi_offset 14, -4
+  80              		.cfi_offset 0, -8
+  81              	.LVL5:
+  82 0014 FEFFFFEB 		bl	rfch_get_params
+  83              	.LVL6:
+  87:layer1/tpu_window.c **** 
+  88:layer1/tpu_window.c **** 	/* restore offset */
+  89:layer1/tpu_window.c **** 	tpu_enq_offset((5000 + l1s.tpu_offset + (L1_BURST_LENGTH_Q * tn)) % 5000);
+  84              		.loc 2 89 0
+  85 0018 38309FE5 		ldr	r3, .L8+4
+  86 001c 403A93E5 		ldr	r3, [r3, #2624]
+  87 0020 0320DDE5 		ldrb	r2, [sp, #3]	@ zero_extendqisi2
+  88              	.LVL7:
+  89 0024 4E3D83E2 		add	r3, r3, #4992
+  90 0028 2C009FE5 		ldr	r0, .L8+8
+  91 002c 083083E2 		add	r3, r3, #8
+  92 0030 923020E0 		mla	r0, r2, r0, r3
+  93              	.LVL8:
+  94 0034 24109FE5 		ldr	r1, .L8+12
+  95 0038 FEFFFFEB 		bl	__umodsi3
+  96              	.LVL9:
+  97              	.LBB12:
+  98              	.LBB13:
+  95:include/calypso/tpu.h **** 
+  96:include/calypso/tpu.h **** /* Enqueue a SYNC operation */
+  97:include/calypso/tpu.h **** static inline void tpu_enq_sync(int16_t time)
+  98:include/calypso/tpu.h **** {
+  99:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_SYNCHRO | time);
+ 100:include/calypso/tpu.h **** }
+ 101:include/calypso/tpu.h **** 
+ 102:include/calypso/tpu.h **** /* Enqueue a WAIT operation */
+ 103:include/calypso/tpu.h **** static inline void tpu_enq_wait(int16_t time)
+ 104:include/calypso/tpu.h **** {
+ 105:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_WAIT | time);
+ 106:include/calypso/tpu.h **** }
+ 107:include/calypso/tpu.h **** 
+ 108:include/calypso/tpu.h **** /* Enqueue an OFFSET operation */
+ 109:include/calypso/tpu.h **** static inline void tpu_enq_offset(int16_t time)
+ 110:include/calypso/tpu.h **** {
+ 111:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_OFFSET | time);
+  99              		.loc 1 111 0
+ 100 003c 010980E3 		orr	r0, r0, #16384
+ 101 0040 0008A0E1 		mov	r0, r0, asl #16
+ 102 0044 2008A0E1 		mov	r0, r0, lsr #16
+ 103 0048 FEFFFFEB 		bl	tpu_enqueue
+ 104              	.LBE13:
+ 105              	.LBE12:
+  90:layer1/tpu_window.c **** 
+  91:layer1/tpu_window.c **** 	return 0;
+  92:layer1/tpu_window.c **** }
+ 106              		.loc 2 92 0
+ 107 004c 0000A0E3 		mov	r0, #0
+ 108 0050 0880BDE8 		ldmfd	sp!, {r3, pc}
+ 109              	.L9:
+ 110              		.align	2
+ 111              	.L8:
+ 112 0054 0C000000 		.word	l1s+12
+ 113 0058 00000000 		.word	l1s
+ 114 005c 71020000 		.word	625
+ 115 0060 88130000 		.word	5000
+ 116              		.cfi_endproc
+ 117              	.LFE25:
+ 119              		.section	.text._win_setup,"ax",%progbits
+ 120              		.align	2
+ 122              	_win_setup:
+ 123              	.LFB24:
+  68:layer1/tpu_window.c **** {
+ 124              		.loc 2 68 0
+ 125              		.cfi_startproc
+ 126              		@ args = 0, pretend = 0, frame = 4
+ 127              		@ frame_needed = 0, uses_anonymous_args = 0
+ 128              	.LVL10:
+ 129 0000 31402DE9 		stmfd	sp!, {r0, r4, r5, lr}
+ 130              	.LCFI1:
+ 131              		.cfi_def_cfa_offset 16
+  71:layer1/tpu_window.c **** 	rfch_get_params(&l1s.next_time, NULL, NULL, &tn);
+ 132              		.loc 2 71 0
+ 133 0004 0010A0E3 		mov	r1, #0
+ 134              	.LVL11:
+  73:layer1/tpu_window.c **** 	l1s.tpu_offset = (5000 + l1s.tpu_offset + l1s.tpu_offset_correction) % 5000;
+ 135              		.loc 2 73 0
+ 136 0008 74409FE5 		ldr	r4, .L11
+ 137              		.cfi_offset 14, -4
+ 138              		.cfi_offset 5, -8
+ 139              		.cfi_offset 4, -12
+ 140              		.cfi_offset 0, -16
+  71:layer1/tpu_window.c **** 	rfch_get_params(&l1s.next_time, NULL, NULL, &tn);
+ 141              		.loc 2 71 0
+ 142 000c 0120A0E1 		mov	r2, r1
+ 143              	.LVL12:
+ 144 0010 03308DE2 		add	r3, sp, #3
+ 145 0014 6C009FE5 		ldr	r0, .L11+4
+ 146              	.LVL13:
+ 147 0018 FEFFFFEB 		bl	rfch_get_params
+  73:layer1/tpu_window.c **** 	l1s.tpu_offset = (5000 + l1s.tpu_offset + l1s.tpu_offset_correction) % 5000;
+ 148              		.loc 2 73 0
+ 149 001c 290D84E2 		add	r0, r4, #2624
+ 150 0020 090090E8 		ldmia	r0, {r0, r3}	@ phole ldm
+ 151 0024 4E0D80E2 		add	r0, r0, #4992
+ 152 0028 080080E2 		add	r0, r0, #8
+ 153 002c 030080E0 		add	r0, r0, r3
+ 154 0030 54109FE5 		ldr	r1, .L11+8
+ 155 0034 FEFFFFEB 		bl	__umodsi3
+  74:layer1/tpu_window.c **** 	l1s.tpu_offset_correction = 0;
+ 156              		.loc 2 74 0
+ 157 0038 0050A0E3 		mov	r5, #0
+  73:layer1/tpu_window.c **** 	l1s.tpu_offset = (5000 + l1s.tpu_offset + l1s.tpu_offset_correction) % 5000;
+ 158              		.loc 2 73 0
+ 159 003c 400A84E5 		str	r0, [r4, #2624]
+  76:layer1/tpu_window.c **** 	tpu_enq_at(4740);
+ 160              		.loc 2 76 0
+ 161 0040 48009FE5 		ldr	r0, .L11+12
+  74:layer1/tpu_window.c **** 	l1s.tpu_offset_correction = 0;
+ 162              		.loc 2 74 0
+ 163 0044 445A84E5 		str	r5, [r4, #2628]
+  76:layer1/tpu_window.c **** 	tpu_enq_at(4740);
+ 164              		.loc 2 76 0
+ 165 0048 FEFFFFEB 		bl	tpu_enq_at
+ 166              	.LVL14:
+  77:layer1/tpu_window.c **** 	tpu_enq_sync((5000 + l1s.tpu_offset + (L1_BURST_LENGTH_Q * tn)) % 5000);
+ 167              		.loc 2 77 0
+ 168 004c 403A94E5 		ldr	r3, [r4, #2624]
+ 169 0050 0320DDE5 		ldrb	r2, [sp, #3]	@ zero_extendqisi2
+ 170              	.LVL15:
+ 171 0054 4E3D83E2 		add	r3, r3, #4992
+ 172 0058 34009FE5 		ldr	r0, .L11+16
+ 173 005c 083083E2 		add	r3, r3, #8
+ 174 0060 923020E0 		mla	r0, r2, r0, r3
+ 175              	.LVL16:
+ 176 0064 20109FE5 		ldr	r1, .L11+8
+ 177 0068 FEFFFFEB 		bl	__umodsi3
+ 178              	.LVL17:
+ 179              	.LBB14:
+ 180              	.LBB15:
+  99:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_SYNCHRO | time);
+ 181              		.loc 1 99 0
+ 182 006c 060A80E3 		orr	r0, r0, #24576
+ 183 0070 0008A0E1 		mov	r0, r0, asl #16
+ 184 0074 2008A0E1 		mov	r0, r0, lsr #16
+ 185 0078 FEFFFFEB 		bl	tpu_enqueue
+ 186              	.LBE15:
+ 187              	.LBE14:
+  80:layer1/tpu_window.c **** }
+ 188              		.loc 2 80 0
+ 189 007c 0500A0E1 		mov	r0, r5
+ 190 0080 3880BDE8 		ldmfd	sp!, {r3, r4, r5, pc}
+ 191              	.L12:
+ 192              		.align	2
+ 193              	.L11:
+ 194 0084 00000000 		.word	l1s
+ 195 0088 0C000000 		.word	l1s+12
+ 196 008c 88130000 		.word	5000
+ 197 0090 84120000 		.word	4740
+ 198 0094 71020000 		.word	625
+ 199              		.cfi_endproc
+ 200              	.LFE24:
+ 202              		.section	.text.l1s_win_init,"ax",%progbits
+ 203              		.align	2
+ 204              		.global	l1s_win_init
+ 206              	l1s_win_init:
+ 207              	.LFB26:
+  93:layer1/tpu_window.c **** 
+  94:layer1/tpu_window.c **** void l1s_win_init(void)
+  95:layer1/tpu_window.c **** {
+ 208              		.loc 2 95 0
+ 209              		.cfi_startproc
+ 210              		@ args = 0, pretend = 0, frame = 0
+ 211              		@ frame_needed = 0, uses_anonymous_args = 0
+ 212 0000 13402DE9 		stmfd	sp!, {r0, r1, r4, lr}
+ 213              	.LCFI2:
+ 214              		.cfi_def_cfa_offset 16
+  96:layer1/tpu_window.c **** 	tdma_schedule(0, _win_setup,   0, 0, 0, -2);
+ 215              		.loc 2 96 0
+ 216 0004 0130E0E3 		mvn	r3, #1
+ 217 0008 0040A0E3 		mov	r4, #0
+ 218              		.cfi_offset 14, -4
+ 219              		.cfi_offset 4, -8
+ 220              		.cfi_offset 1, -12
+ 221              		.cfi_offset 0, -16
+ 222 000c 04308DE5 		str	r3, [sp, #4]
+ 223 0010 0420A0E1 		mov	r2, r4
+ 224 0014 0430A0E1 		mov	r3, r4
+ 225 0018 0400A0E1 		mov	r0, r4
+ 226 001c 28109FE5 		ldr	r1, .L14
+ 227 0020 00408DE5 		str	r4, [sp, #0]
+ 228 0024 FEFFFFEB 		bl	tdma_schedule
+  97:layer1/tpu_window.c **** 	tdma_schedule(0, _win_cleanup, 0, 0, 0,  9);
+ 229              		.loc 2 97 0
+ 230 0028 0930A0E3 		mov	r3, #9
+ 231 002c 04308DE5 		str	r3, [sp, #4]
+ 232 0030 0400A0E1 		mov	r0, r4
+ 233 0034 14109FE5 		ldr	r1, .L14+4
+ 234 0038 0420A0E1 		mov	r2, r4
+ 235 003c 0430A0E1 		mov	r3, r4
+ 236 0040 00408DE5 		str	r4, [sp, #0]
+ 237 0044 FEFFFFEB 		bl	tdma_schedule
+  98:layer1/tpu_window.c **** }
+ 238              		.loc 2 98 0
+ 239 0048 1C80BDE8 		ldmfd	sp!, {r2, r3, r4, pc}
+ 240              	.L15:
+ 241              		.align	2
+ 242              	.L14:
+ 243 004c 00000000 		.word	_win_setup
+ 244 0050 00000000 		.word	_win_cleanup
+ 245              		.cfi_endproc
+ 246              	.LFE26:
+ 248              		.section	.text.l1s_rx_win_ctrl,"ax",%progbits
+ 249              		.align	2
+ 250              		.global	l1s_rx_win_ctrl
+ 252              	l1s_rx_win_ctrl:
+ 253              	.LFB27:
+  99:layer1/tpu_window.c **** 
+ 100:layer1/tpu_window.c **** void l1s_rx_win_ctrl(uint16_t arfcn, enum l1_rxwin_type wtype, uint8_t tn_ofs)
+ 101:layer1/tpu_window.c **** {
+ 254              		.loc 2 101 0
+ 255              		.cfi_startproc
+ 256              		@ args = 0, pretend = 0, frame = 0
+ 257              		@ frame_needed = 0, uses_anonymous_args = 0
+ 258              	.LVL18:
+ 259 0000 F0412DE9 		stmfd	sp!, {r4, r5, r6, r7, r8, lr}
+ 260              	.LCFI3:
+ 261              		.cfi_def_cfa_offset 24
+ 102:layer1/tpu_window.c **** 	int16_t start;
+ 103:layer1/tpu_window.c **** 	int32_t stop;	/* prevent overflow of int16_t in L1_RXWIN_FB */
+ 104:layer1/tpu_window.c **** 
+ 105:layer1/tpu_window.c **** 	/* TN offset & TA adjust */
+ 106:layer1/tpu_window.c **** 	start = DSP_SETUP_TIME;
+ 107:layer1/tpu_window.c **** 	start += L1_BURST_LENGTH_Q * tn_ofs;
+ 262              		.loc 2 107 0
+ 263 0004 A8609FE5 		ldr	r6, .L20
+ 264              		.cfi_offset 14, -4
+ 265              		.cfi_offset 8, -8
+ 266              		.cfi_offset 7, -12
+ 267              		.cfi_offset 6, -16
+ 268              		.cfi_offset 5, -20
+ 269              		.cfi_offset 4, -24
+ 101:layer1/tpu_window.c **** {
+ 270              		.loc 2 101 0
+ 271 0008 FF2002E2 		and	r2, r2, #255
+ 272              	.LVL19:
+ 273              		.loc 2 107 0
+ 274 000c 920606E0 		mul	r6, r2, r6
+ 101:layer1/tpu_window.c **** {
+ 275              		.loc 2 101 0
+ 276 0010 0008A0E1 		mov	r0, r0, asl #16
+ 277              	.LVL20:
+ 278              		.loc 2 107 0
+ 279 0014 426086E2 		add	r6, r6, #66
+ 108:layer1/tpu_window.c **** 
+ 109:layer1/tpu_window.c **** 	stop = start + rx_burst_duration[wtype] - 1;
+ 280              		.loc 2 109 0
+ 281 0018 98209FE5 		ldr	r2, .L20+4
+ 101:layer1/tpu_window.c **** {
+ 282              		.loc 2 101 0
+ 283 001c 2078A0E1 		mov	r7, r0, lsr #16
+ 107:layer1/tpu_window.c **** 	start += L1_BURST_LENGTH_Q * tn_ofs;
+ 284              		.loc 2 107 0
+ 285 0020 0668A0E1 		mov	r6, r6, asl #16
+ 286              	.LVL21:
+ 287              		.loc 2 109 0
+ 288 0024 8130A0E1 		mov	r3, r1, asl #1
+ 289 0028 2688A0E1 		mov	r8, r6, lsr #16
+ 110:layer1/tpu_window.c **** 
+ 111:layer1/tpu_window.c **** 	/* window open for TRF6151 */
+ 112:layer1/tpu_window.c **** 	/* FIXME: why do we need the magic value 100 ? */
+ 113:layer1/tpu_window.c **** 	rffe_mode(gsm_arfcn2band(arfcn), 0);
+ 290              		.loc 2 113 0
+ 291 002c 0700A0E1 		mov	r0, r7
+ 109:layer1/tpu_window.c **** 	stop = start + rx_burst_duration[wtype] - 1;
+ 292              		.loc 2 109 0
+ 293 0030 B35092E1 		ldrh	r5, [r2, r3]
+ 101:layer1/tpu_window.c **** {
+ 294              		.loc 2 101 0
+ 295 0034 0140A0E1 		mov	r4, r1
+ 114:layer1/tpu_window.c **** 	trf6151_rx_window(start - 100, arfcn);
+ 296              		.loc 2 114 0
+ 297 0038 648048E2 		sub	r8, r8, #100
+ 113:layer1/tpu_window.c **** 	rffe_mode(gsm_arfcn2band(arfcn), 0);
+ 298              		.loc 2 113 0
+ 299 003c FEFFFFEB 		bl	gsm_arfcn2band
+ 300              	.LVL22:
+ 301 0040 0010A0E3 		mov	r1, #0
+ 302 0044 FEFFFFEB 		bl	rffe_mode
+ 303              		.loc 2 114 0
+ 304 0048 0808A0E1 		mov	r0, r8, asl #16
+ 109:layer1/tpu_window.c **** 	stop = start + rx_burst_duration[wtype] - 1;
+ 305              		.loc 2 109 0
+ 306 004c 4668A0E1 		mov	r6, r6, asr #16
+ 307              	.LVL23:
+ 308              		.loc 2 114 0
+ 309 0050 4008A0E1 		mov	r0, r0, asr #16
+ 310 0054 0710A0E1 		mov	r1, r7
+ 311 0058 FEFFFFEB 		bl	trf6151_rx_window
+ 115:layer1/tpu_window.c **** 
+ 116:layer1/tpu_window.c **** 	/* Window open for ABB */
+ 117:layer1/tpu_window.c **** 	twl3025_downlink(1, start);
+ 312              		.loc 2 117 0
+ 313 005c 0100A0E3 		mov	r0, #1
+ 314 0060 0610A0E1 		mov	r1, r6
+ 109:layer1/tpu_window.c **** 	stop = start + rx_burst_duration[wtype] - 1;
+ 315              		.loc 2 109 0
+ 316 0064 015045E2 		sub	r5, r5, #1
+ 317              		.loc 2 117 0
+ 318 0068 FEFFFFEB 		bl	twl3025_downlink
+ 118:layer1/tpu_window.c **** 
+ 119:layer1/tpu_window.c **** 	/* Delay 11 full TDMA frames */
+ 120:layer1/tpu_window.c **** 	if (wtype == L1_RXWIN_FB) {
+ 319              		.loc 2 120 0
+ 320 006c 010054E3 		cmp	r4, #1
+ 109:layer1/tpu_window.c **** 	stop = start + rx_burst_duration[wtype] - 1;
+ 321              		.loc 2 109 0
+ 322 0070 065085E0 		add	r5, r5, r6
+ 323              	.LVL24:
+ 324              		.loc 2 120 0
+ 325 0074 0700001A 		bne	.L17
+ 326              		.loc 2 120 0 is_stmt 0 discriminator 2
+ 327 0078 0A4084E2 		add	r4, r4, #10
+ 328              	.LVL25:
+ 329              	.L18:
+ 330              	.LBB16:
+ 121:layer1/tpu_window.c **** 		uint8_t i;
+ 122:layer1/tpu_window.c **** 		for (i = 0; i < 11; i++)
+ 123:layer1/tpu_window.c **** 			tpu_enq_at(0);
+ 331              		.loc 2 123 0 is_stmt 1 discriminator 2
+ 332 007c 0000A0E3 		mov	r0, #0
+ 333 0080 014044E2 		sub	r4, r4, #1
+ 334 0084 FEFFFFEB 		bl	tpu_enq_at
+ 122:layer1/tpu_window.c **** 		for (i = 0; i < 11; i++)
+ 335              		.loc 2 122 0 discriminator 2
+ 336 0088 FF4014E2 		ands	r4, r4, #255
+ 337 008c FAFFFF1A 		bne	.L18
+ 124:layer1/tpu_window.c **** 
+ 125:layer1/tpu_window.c **** 		stop -= 11 * L1_TDMA_LENGTH_Q;
+ 338              		.loc 2 125 0
+ 339 0090 D65C45E2 		sub	r5, r5, #54784
+ 340              	.LVL26:
+ 341 0094 D85045E2 		sub	r5, r5, #216
+ 342              	.LVL27:
+ 343              	.L17:
+ 344              	.LBE16:
+ 126:layer1/tpu_window.c **** 	}
+ 127:layer1/tpu_window.c **** 
+ 128:layer1/tpu_window.c **** 	/* Window close for ABB */
+ 129:layer1/tpu_window.c **** 	twl3025_downlink(0, stop & 0xffff);
+ 345              		.loc 2 129 0
+ 346 0098 0518A0E1 		mov	r1, r5, asl #16
+ 347 009c 0000A0E3 		mov	r0, #0
+ 348 00a0 4118A0E1 		mov	r1, r1, asr #16
+ 349 00a4 FEFFFFEB 		bl	twl3025_downlink
+ 130:layer1/tpu_window.c **** 
+ 131:layer1/tpu_window.c **** 	/* window close for TRF6151 */
+ 132:layer1/tpu_window.c **** 	trf6151_set_mode(TRF6151_IDLE);
+ 350              		.loc 2 132 0
+ 351 00a8 0000A0E3 		mov	r0, #0
+ 133:layer1/tpu_window.c **** }
+ 352              		.loc 2 133 0
+ 353 00ac F041BDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, lr}
+ 132:layer1/tpu_window.c **** 	trf6151_set_mode(TRF6151_IDLE);
+ 354              		.loc 2 132 0
+ 355 00b0 FEFFFFEA 		b	trf6151_set_mode
+ 356              	.L21:
+ 357              		.align	2
+ 358              	.L20:
+ 359 00b4 71020000 		.word	625
+ 360 00b8 00000000 		.word	.LANCHOR0
+ 361              		.cfi_endproc
+ 362              	.LFE27:
+ 364              		.section	.text.l1s_tx_win_ctrl,"ax",%progbits
+ 365              		.align	2
+ 366              		.global	l1s_tx_win_ctrl
+ 368              	l1s_tx_win_ctrl:
+ 369              	.LFB28:
+ 134:layer1/tpu_window.c **** 
+ 135:layer1/tpu_window.c **** void l1s_tx_win_ctrl(uint16_t arfcn, enum l1_txwin_type wtype, uint8_t pwr, uint8_t tn_ofs)
+ 136:layer1/tpu_window.c **** {
+ 370              		.loc 2 136 0
+ 371              		.cfi_startproc
+ 372              		@ args = 0, pretend = 0, frame = 0
+ 373              		@ frame_needed = 0, uses_anonymous_args = 0
+ 374              	.LVL28:
+ 375 0000 70402DE9 		stmfd	sp!, {r4, r5, r6, lr}
+ 376              	.LCFI4:
+ 377              		.cfi_def_cfa_offset 16
+ 137:layer1/tpu_window.c **** 	uint16_t offset;
+ 138:layer1/tpu_window.c **** 
+ 139:layer1/tpu_window.c **** 	/* TN offset & TA adjust */
+ 140:layer1/tpu_window.c **** 	offset = 28; /* ("+ 32" gives a TA of 1) */
+ 141:layer1/tpu_window.c **** 	offset += L1_BURST_LENGTH_Q * tn_ofs;
+ 142:layer1/tpu_window.c **** 	offset -= l1s.ta << 2;
+ 378              		.loc 2 142 0
+ 379 0004 78209FE5 		ldr	r2, .L23
+ 380              	.LVL29:
+ 381 0008 482AD2E5 		ldrb	r2, [r2, #2632]	@ zero_extendqisi2
+ 382 000c 022CA0E1 		mov	r2, r2, asl #24
+ 136:layer1/tpu_window.c **** {
+ 383              		.loc 2 136 0
+ 384 0010 0140A0E1 		mov	r4, r1
+ 385              		.cfi_offset 14, -4
+ 386              		.cfi_offset 6, -8
+ 387              		.cfi_offset 5, -12
+ 388              		.cfi_offset 4, -16
+ 389              		.loc 2 142 0
+ 390 0014 422BA0E1 		mov	r2, r2, asr #22
+ 391 0018 68109FE5 		ldr	r1, .L23+4
+ 392              	.LVL30:
+ 141:layer1/tpu_window.c **** 	offset += L1_BURST_LENGTH_Q * tn_ofs;
+ 393              		.loc 2 141 0
+ 394 001c 1C2062E2 		rsb	r2, r2, #28
+ 136:layer1/tpu_window.c **** {
+ 395              		.loc 2 136 0
+ 396 0020 FF3003E2 		and	r3, r3, #255
+ 397              	.LVL31:
+ 398              		.loc 2 142 0
+ 399 0024 932121E0 		mla	r1, r3, r1, r2
+ 136:layer1/tpu_window.c **** {
+ 400              		.loc 2 136 0
+ 401 0028 0008A0E1 		mov	r0, r0, asl #16
+ 402              	.LVL32:
+ 403              		.loc 2 142 0
+ 404 002c 0118A0E1 		mov	r1, r1, asl #16
+ 405              	.LVL33:
+ 136:layer1/tpu_window.c **** {
+ 406              		.loc 2 136 0
+ 407 0030 2058A0E1 		mov	r5, r0, lsr #16
+ 143:layer1/tpu_window.c **** 
+ 144:layer1/tpu_window.c **** #ifdef CONFIG_TX_ENABLE
+ 145:layer1/tpu_window.c **** 	/* window open for TRF6151 */
+ 146:layer1/tpu_window.c **** 	trf6151_tx_window(offset, arfcn);
+ 147:layer1/tpu_window.c **** #endif
+ 148:layer1/tpu_window.c **** 
+ 149:layer1/tpu_window.c **** 	/* Window open for ABB */
+ 150:layer1/tpu_window.c **** 	twl3025_uplink(1, offset);
+ 408              		.loc 2 150 0
+ 409 0034 2168A0E1 		mov	r6, r1, lsr #16
+ 410 0038 0100A0E3 		mov	r0, #1
+ 411 003c 4118A0E1 		mov	r1, r1, asr #16
+ 412              	.LVL34:
+ 413 0040 FEFFFFEB 		bl	twl3025_uplink
+ 151:layer1/tpu_window.c **** 
+ 152:layer1/tpu_window.c **** #ifdef CONFIG_TX_ENABLE
+ 153:layer1/tpu_window.c **** 	/* Window open for RFFE */
+ 154:layer1/tpu_window.c **** 	rffe_mode(gsm_arfcn2band(arfcn), 1);
+ 155:layer1/tpu_window.c **** #endif
+ 156:layer1/tpu_window.c **** 
+ 157:layer1/tpu_window.c **** 	/* Window close for ABB */
+ 158:layer1/tpu_window.c **** 	twl3025_uplink(0, tx_burst_duration[wtype] + offset + 2); // TODO: "+ 2"
+ 414              		.loc 2 158 0
+ 415 0044 40309FE5 		ldr	r3, .L23+8
+ 416 0048 844083E0 		add	r4, r3, r4, asl #1
+ 417              	.LVL35:
+ 418 004c B810D4E1 		ldrh	r1, [r4, #8]
+ 419 0050 021081E2 		add	r1, r1, #2
+ 420 0054 016086E0 		add	r6, r6, r1
+ 421 0058 0618A0E1 		mov	r1, r6, asl #16
+ 422 005c 4118A0E1 		mov	r1, r1, asr #16
+ 423 0060 0000A0E3 		mov	r0, #0
+ 424 0064 FEFFFFEB 		bl	twl3025_uplink
+ 159:layer1/tpu_window.c **** 
+ 160:layer1/tpu_window.c **** 	/* window close for TRF6151 */
+ 161:layer1/tpu_window.c **** 	trf6151_set_mode(TRF6151_IDLE);
+ 425              		.loc 2 161 0
+ 426 0068 0000A0E3 		mov	r0, #0
+ 427 006c FEFFFFEB 		bl	trf6151_set_mode
+ 162:layer1/tpu_window.c **** 
+ 163:layer1/tpu_window.c **** 	/* Window close for RFFE */
+ 164:layer1/tpu_window.c **** 	rffe_mode(gsm_arfcn2band(arfcn), 0);
+ 428              		.loc 2 164 0
+ 429 0070 0500A0E1 		mov	r0, r5
+ 430 0074 FEFFFFEB 		bl	gsm_arfcn2band
+ 431 0078 0010A0E3 		mov	r1, #0
+ 165:layer1/tpu_window.c **** }
+ 432              		.loc 2 165 0
+ 433 007c 7040BDE8 		ldmfd	sp!, {r4, r5, r6, lr}
+ 164:layer1/tpu_window.c **** 	rffe_mode(gsm_arfcn2band(arfcn), 0);
+ 434              		.loc 2 164 0
+ 435 0080 FEFFFFEA 		b	rffe_mode
+ 436              	.L24:
+ 437              		.align	2
+ 438              	.L23:
+ 439 0084 00000000 		.word	l1s
+ 440 0088 71020000 		.word	625
+ 441 008c 00000000 		.word	.LANCHOR0
+ 442              		.cfi_endproc
+ 443              	.LFE28:
+ 445              		.section	.text.tpu_end_scenario,"ax",%progbits
+ 446              		.align	2
+ 447              		.global	tpu_end_scenario
+ 449              	tpu_end_scenario:
+ 450              	.LFB29:
+ 166:layer1/tpu_window.c **** 
+ 167:layer1/tpu_window.c **** void tpu_end_scenario(void)
+ 168:layer1/tpu_window.c **** {
+ 451              		.loc 2 168 0
+ 452              		.cfi_startproc
+ 453              		@ args = 0, pretend = 0, frame = 0
+ 454              		@ frame_needed = 0, uses_anonymous_args = 0
+ 455 0000 04E02DE5 		str	lr, [sp, #-4]!
+ 456              	.LCFI5:
+ 457              		.cfi_def_cfa_offset 4
+ 458              	.LBB17:
+ 459              	.LBB18:
+  81:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_SLEEP);
+ 460              		.loc 1 81 0
+ 461 0004 0000A0E3 		mov	r0, #0
+ 462              		.cfi_offset 14, -4
+ 463 0008 FEFFFFEB 		bl	tpu_enqueue
+ 464              	.LBE18:
+ 465              	.LBE17:
+ 169:layer1/tpu_window.c **** 	tpu_enq_sleep();
+ 170:layer1/tpu_window.c **** 	tpu_enable(1);
+ 466              		.loc 2 170 0
+ 467 000c 0100A0E3 		mov	r0, #1
+ 171:layer1/tpu_window.c **** }
+ 468              		.loc 2 171 0
+ 469 0010 04E09DE4 		ldr	lr, [sp], #4
+ 170:layer1/tpu_window.c **** 	tpu_enable(1);
+ 470              		.loc 2 170 0
+ 471 0014 FEFFFFEA 		b	tpu_enable
+ 472              		.cfi_endproc
+ 473              	.LFE29:
+ 475              		.section	.rodata
+ 476              		.align	2
+ 477              		.set	.LANCHOR0,. + 0
+ 480              	rx_burst_duration:
+ 481 0000 2101     		.short	289
+ 482 0002 E1DE     		.short	-8479
+ 483 0004 1D03     		.short	797
+ 484 0006 7D02     		.short	637
+ 487              	tx_burst_duration:
+ 488 0008 7202     		.short	626
+ 489 000a 8201     		.short	386
+ 490              		.text
+ 491              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 tpu_window.c
+     /tmp/ccf9caVs.s:12     .text.tpu_enq_at:0000000000000000 $a
+     /tmp/ccf9caVs.s:14     .text.tpu_enq_at:0000000000000000 tpu_enq_at
+     /tmp/ccf9caVs.s:53     .text.tpu_enq_at:0000000000000030 $d
+     /tmp/ccf9caVs.s:59     .text._win_cleanup:0000000000000000 $a
+     /tmp/ccf9caVs.s:61     .text._win_cleanup:0000000000000000 _win_cleanup
+     /tmp/ccf9caVs.s:112    .text._win_cleanup:0000000000000054 $d
+     /tmp/ccf9caVs.s:120    .text._win_setup:0000000000000000 $a
+     /tmp/ccf9caVs.s:122    .text._win_setup:0000000000000000 _win_setup
+     /tmp/ccf9caVs.s:194    .text._win_setup:0000000000000084 $d
+     /tmp/ccf9caVs.s:203    .text.l1s_win_init:0000000000000000 $a
+     /tmp/ccf9caVs.s:206    .text.l1s_win_init:0000000000000000 l1s_win_init
+     /tmp/ccf9caVs.s:243    .text.l1s_win_init:000000000000004c $d
+     /tmp/ccf9caVs.s:249    .text.l1s_rx_win_ctrl:0000000000000000 $a
+     /tmp/ccf9caVs.s:252    .text.l1s_rx_win_ctrl:0000000000000000 l1s_rx_win_ctrl
+     /tmp/ccf9caVs.s:359    .text.l1s_rx_win_ctrl:00000000000000b4 $d
+     /tmp/ccf9caVs.s:365    .text.l1s_tx_win_ctrl:0000000000000000 $a
+     /tmp/ccf9caVs.s:368    .text.l1s_tx_win_ctrl:0000000000000000 l1s_tx_win_ctrl
+     /tmp/ccf9caVs.s:439    .text.l1s_tx_win_ctrl:0000000000000084 $d
+     /tmp/ccf9caVs.s:446    .text.tpu_end_scenario:0000000000000000 $a
+     /tmp/ccf9caVs.s:449    .text.tpu_end_scenario:0000000000000000 tpu_end_scenario
+     /tmp/ccf9caVs.s:476    .rodata:0000000000000000 $d
+     /tmp/ccf9caVs.s:480    .rodata:0000000000000000 rx_burst_duration
+     /tmp/ccf9caVs.s:487    .rodata:0000000000000008 tx_burst_duration
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+tpu_enqueue
+__umodsi3
+rfch_get_params
+l1s
+tdma_schedule
+gsm_arfcn2band
+rffe_mode
+trf6151_rx_window
+twl3025_downlink
+trf6151_set_mode
+twl3025_uplink
+tpu_enable

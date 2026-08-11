@@ -1,0 +1,2 @@
+   text	   data	    bss	    dec	    hex	filename
+  25885	    404	  34016	  60305	   eb91	board/se_k2xx/loader.highram.elf

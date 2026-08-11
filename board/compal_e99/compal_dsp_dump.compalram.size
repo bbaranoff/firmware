@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  23626	   2248	  24364	  50238	   c43e	board/compal_e99/compal_dsp_dump.compalram.elf
+  23882	    900	  24140	  48922	   bf1a	board/compal_e99/compal_dsp_dump.compalram.elf

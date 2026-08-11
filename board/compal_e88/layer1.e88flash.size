@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  63462	   2424	  29231	  95117	  1738d	board/compal_e88/layer1.e88flash.elf
+  61085	   4144	  27267	  92496	  16950	board/compal_e88/layer1.e88flash.elf

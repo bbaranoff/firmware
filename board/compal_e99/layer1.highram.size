@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  61782	   2400	  34636	  98818	  18202	board/compal_e99/layer1.highram.elf
+  58339	   4120	  32704	  95163	  173bb	board/compal_e99/layer1.highram.elf

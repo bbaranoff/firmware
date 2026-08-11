@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  24570	    436	  26891	  51897	   cab9	board/compal_e88/hello_world.e88loader.elf
+  25918	    440	  26919	  53277	   d01d	board/compal_e88/hello_world.e88loader.elf

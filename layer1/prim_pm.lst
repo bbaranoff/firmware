@@ -1,0 +1,1307 @@
+   1              		.file	"prim_pm.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.l1s_neigh_pm_resp,"ax",%progbits
+  12              		.align	2
+  14              	l1s_neigh_pm_resp:
+  15              	.LFB70:
+  16              		.file 1 "layer1/prim_pm.c"
+   1:layer1/prim_pm.c **** /* Layer 1 Power Measurement */
+   2:layer1/prim_pm.c **** 
+   3:layer1/prim_pm.c **** /* (C) 2010 by Harald Welte <laforge@gnumonks.org>
+   4:layer1/prim_pm.c ****  *
+   5:layer1/prim_pm.c ****  * All Rights Reserved
+   6:layer1/prim_pm.c ****  *
+   7:layer1/prim_pm.c ****  * This program is free software; you can redistribute it and/or modify
+   8:layer1/prim_pm.c ****  * it under the terms of the GNU General Public License as published by
+   9:layer1/prim_pm.c ****  * the Free Software Foundation; either version 2 of the License, or
+  10:layer1/prim_pm.c ****  * (at your option) any later version.
+  11:layer1/prim_pm.c ****  *
+  12:layer1/prim_pm.c ****  * This program is distributed in the hope that it will be useful,
+  13:layer1/prim_pm.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  14:layer1/prim_pm.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  15:layer1/prim_pm.c ****  * GNU General Public License for more details.
+  16:layer1/prim_pm.c ****  *
+  17:layer1/prim_pm.c ****  */
+  18:layer1/prim_pm.c **** 
+  19:layer1/prim_pm.c **** #include <stdint.h>
+  20:layer1/prim_pm.c **** #include <stdio.h>
+  21:layer1/prim_pm.c **** #include <string.h>
+  22:layer1/prim_pm.c **** #include <stdlib.h>
+  23:layer1/prim_pm.c **** 
+  24:layer1/prim_pm.c **** #include <defines.h>
+  25:layer1/prim_pm.c **** #include <debug.h>
+  26:layer1/prim_pm.c **** #include <memory.h>
+  27:layer1/prim_pm.c **** #include <byteorder.h>
+  28:layer1/prim_pm.c **** #include <osmocom/gsm/gsm_utils.h>
+  29:layer1/prim_pm.c **** #include <osmocom/core/msgb.h>
+  30:layer1/prim_pm.c **** #include <calypso/dsp_api.h>
+  31:layer1/prim_pm.c **** #include <calypso/irq.h>
+  32:layer1/prim_pm.c **** #include <calypso/tpu.h>
+  33:layer1/prim_pm.c **** #include <calypso/tsp.h>
+  34:layer1/prim_pm.c **** #include <calypso/dsp.h>
+  35:layer1/prim_pm.c **** #include <calypso/timer.h>
+  36:layer1/prim_pm.c **** #include <comm/sercomm.h>
+  37:layer1/prim_pm.c **** #include <asm/system.h>
+  38:layer1/prim_pm.c **** 
+  39:layer1/prim_pm.c **** #include <layer1/sync.h>
+  40:layer1/prim_pm.c **** #include <layer1/agc.h>
+  41:layer1/prim_pm.c **** #include <layer1/tdma_sched.h>
+  42:layer1/prim_pm.c **** #include <layer1/tpu_window.h>
+  43:layer1/prim_pm.c **** #include <layer1/l23_api.h>
+  44:layer1/prim_pm.c **** #include <layer1/prim.h>
+  45:layer1/prim_pm.c **** #include <rffe.h>
+  46:layer1/prim_pm.c **** 
+  47:layer1/prim_pm.c **** #include <l1ctl_proto.h>
+  48:layer1/prim_pm.c **** 
+  49:layer1/prim_pm.c **** static void l1ddsp_meas_read(uint8_t nbmeas, uint16_t *pm)
+  50:layer1/prim_pm.c **** {
+  51:layer1/prim_pm.c **** 	uint8_t i;
+  52:layer1/prim_pm.c **** 
+  53:layer1/prim_pm.c **** 	for (i = 0; i < nbmeas; i++)
+  54:layer1/prim_pm.c **** 		pm[i] = (uint16_t) ((dsp_api.db_r->a_pm[i] & 0xffff) >> 3);
+  55:layer1/prim_pm.c **** 	dsp_api.r_page_used = 1;
+  56:layer1/prim_pm.c **** }
+  57:layer1/prim_pm.c **** 
+  58:layer1/prim_pm.c **** /* scheduler callback to issue a power measurement task to the DSP */
+  59:layer1/prim_pm.c **** static int l1s_pm_cmd(uint8_t num_meas,
+  60:layer1/prim_pm.c **** 		      __unused uint8_t p2, uint16_t arfcn)
+  61:layer1/prim_pm.c **** {
+  62:layer1/prim_pm.c **** 	putchart('P');
+  63:layer1/prim_pm.c **** 
+  64:layer1/prim_pm.c **** 	dsp_api.db_w->d_task_md = num_meas; /* number of measurements */
+  65:layer1/prim_pm.c **** 	dsp_api.ndb->d_fb_mode = 0; /* wideband search */
+  66:layer1/prim_pm.c **** 
+  67:layer1/prim_pm.c **** 	/* Tell the RF frontend to set the gain appropriately */
+  68:layer1/prim_pm.c **** 	rffe_compute_gain(-85, CAL_DSP_TGT_BB_LVL);
+  69:layer1/prim_pm.c **** 
+  70:layer1/prim_pm.c **** 	/* Program TPU */
+  71:layer1/prim_pm.c **** 	/* FIXME: RXWIN_PW needs to set up multiple times in case
+  72:layer1/prim_pm.c **** 	 * num_meas > 1 */
+  73:layer1/prim_pm.c **** 	l1s_rx_win_ctrl(arfcn, L1_RXWIN_PW, 0);
+  74:layer1/prim_pm.c **** 	//l1s_rx_win_ctrl(arfcn, L1_RXWIN_NB);
+  75:layer1/prim_pm.c **** 
+  76:layer1/prim_pm.c **** 	return 0;
+  77:layer1/prim_pm.c **** }
+  78:layer1/prim_pm.c **** 
+  79:layer1/prim_pm.c **** /* scheduler callback to read power measurement resposnse from the DSP */
+  80:layer1/prim_pm.c **** static int l1s_pm_resp(uint8_t num_meas, __unused uint8_t p2,
+  81:layer1/prim_pm.c **** 		       uint16_t arfcn)
+  82:layer1/prim_pm.c **** {
+  83:layer1/prim_pm.c **** 	struct l1ctl_pm_conf *pmr;
+  84:layer1/prim_pm.c **** 	uint16_t pm_level[2];
+  85:layer1/prim_pm.c **** 
+  86:layer1/prim_pm.c **** 	putchart('p');
+  87:layer1/prim_pm.c **** 
+  88:layer1/prim_pm.c **** 	l1ddsp_meas_read(num_meas, pm_level);
+  89:layer1/prim_pm.c **** 
+  90:layer1/prim_pm.c **** 	printf("PM MEAS: ARFCN=%u, %-4d dBm at baseband, %-4d dBm at RF\n",
+  91:layer1/prim_pm.c **** 		arfcn, pm_level[0]/8, agc_inp_dbm8_by_pm(pm_level[0])/8);
+  92:layer1/prim_pm.c **** 
+  93:layer1/prim_pm.c **** 	printd("PM MEAS: %-4d dBm, %-4d dBm ARFCN=%u\n",
+  94:layer1/prim_pm.c **** 		agc_inp_dbm8_by_pm(pm_level[0])/8,
+  95:layer1/prim_pm.c **** 		agc_inp_dbm8_by_pm(pm_level[1])/8, arfcn);
+  96:layer1/prim_pm.c **** 
+  97:layer1/prim_pm.c **** 	if (!l1s.pm.msg)
+  98:layer1/prim_pm.c **** 		l1s.pm.msg = l1ctl_msgb_alloc(L1CTL_PM_CONF);
+  99:layer1/prim_pm.c **** 
+ 100:layer1/prim_pm.c **** 	if (msgb_tailroom(l1s.pm.msg) < sizeof(*pmr)) {
+ 101:layer1/prim_pm.c **** 		/* flush current msgb */
+ 102:layer1/prim_pm.c **** 		l1_queue_for_l2(l1s.pm.msg);
+ 103:layer1/prim_pm.c **** 		/* allocate a new msgb and initialize header */
+ 104:layer1/prim_pm.c **** 		l1s.pm.msg = l1ctl_msgb_alloc(L1CTL_PM_CONF);
+ 105:layer1/prim_pm.c **** 	}
+ 106:layer1/prim_pm.c **** 
+ 107:layer1/prim_pm.c **** 	pmr = (struct l1ctl_pm_conf *) msgb_put(l1s.pm.msg, sizeof(*pmr));
+ 108:layer1/prim_pm.c **** 	pmr->band_arfcn = htons(arfcn);
+ 109:layer1/prim_pm.c **** 	/* FIXME: do this as RxLev rather than DBM8 ? */
+ 110:layer1/prim_pm.c **** 	pmr->pm[0] = dbm2rxlev(agc_inp_dbm8_by_pm(pm_level[0])/8);
+ 111:layer1/prim_pm.c **** 	if (num_meas > 1)
+ 112:layer1/prim_pm.c **** 		pmr->pm[1] = dbm2rxlev(agc_inp_dbm8_by_pm(pm_level[1])/8);
+ 113:layer1/prim_pm.c **** 	else
+ 114:layer1/prim_pm.c **** 		pmr->pm[1] = 0;
+ 115:layer1/prim_pm.c **** 
+ 116:layer1/prim_pm.c **** 	if (l1s.pm.mode == 1) {
+ 117:layer1/prim_pm.c **** 		if (l1s.pm.range.arfcn_next != l1s.pm.range.arfcn_end) {
+ 118:layer1/prim_pm.c **** 			/* schedule PM for next ARFCN in range */
+ 119:layer1/prim_pm.c **** 			l1s.pm.range.arfcn_next =
+ 120:layer1/prim_pm.c **** 				(l1s.pm.range.arfcn_next+1) & 0xfbff;
+ 121:layer1/prim_pm.c **** 			l1s_pm_test(1, l1s.pm.range.arfcn_next);
+ 122:layer1/prim_pm.c **** 		} else {
+ 123:layer1/prim_pm.c **** 			/* we have finished, flush the msgb to L2 */
+ 124:layer1/prim_pm.c **** 			struct l1ctl_hdr *l1h;
+ 125:layer1/prim_pm.c **** 			l1h = (struct l1ctl_hdr *) l1s.pm.msg->l1h;
+ 126:layer1/prim_pm.c **** 			l1h->flags |= L1CTL_F_DONE;
+ 127:layer1/prim_pm.c **** 			l1_queue_for_l2(l1s.pm.msg);
+ 128:layer1/prim_pm.c **** 			l1s.pm.msg = NULL;
+ 129:layer1/prim_pm.c **** 		}
+ 130:layer1/prim_pm.c **** 	}
+ 131:layer1/prim_pm.c **** 
+ 132:layer1/prim_pm.c **** 	return 0;
+ 133:layer1/prim_pm.c **** }
+ 134:layer1/prim_pm.c **** 
+ 135:layer1/prim_pm.c **** static const struct tdma_sched_item pm_sched_set[] = {
+ 136:layer1/prim_pm.c **** 	SCHED_ITEM_DT(l1s_pm_cmd, 0, 1, 0),	SCHED_END_FRAME(),
+ 137:layer1/prim_pm.c **** 						SCHED_END_FRAME(),
+ 138:layer1/prim_pm.c **** 	SCHED_ITEM(l1s_pm_resp, -4, 1, 0),	SCHED_END_FRAME(),
+ 139:layer1/prim_pm.c **** 	SCHED_END_SET()
+ 140:layer1/prim_pm.c **** };
+ 141:layer1/prim_pm.c **** 
+ 142:layer1/prim_pm.c **** /* Schedule a power measurement test */
+ 143:layer1/prim_pm.c **** void l1s_pm_test(uint8_t base_fn, uint16_t arfcn)
+ 144:layer1/prim_pm.c **** {
+ 145:layer1/prim_pm.c **** 	unsigned long flags;
+ 146:layer1/prim_pm.c **** 
+ 147:layer1/prim_pm.c **** 	printd("l1s_pm_test(%u, %u)\n", base_fn, arfcn);
+ 148:layer1/prim_pm.c **** 
+ 149:layer1/prim_pm.c **** 	local_firq_save(flags);
+ 150:layer1/prim_pm.c **** 	tdma_schedule_set(base_fn, pm_sched_set, arfcn);
+ 151:layer1/prim_pm.c **** 	local_irq_restore(flags);
+ 152:layer1/prim_pm.c **** }
+ 153:layer1/prim_pm.c **** 
+ 154:layer1/prim_pm.c **** /*
+ 155:layer1/prim_pm.c ****  * perform measurements of neighbour cells
+ 156:layer1/prim_pm.c ****  */
+ 157:layer1/prim_pm.c **** 
+ 158:layer1/prim_pm.c **** /* scheduler callback to issue a power measurement task to the DSP */
+ 159:layer1/prim_pm.c **** static int l1s_neigh_pm_cmd(uint8_t num_meas,
+ 160:layer1/prim_pm.c **** 		      __unused uint8_t p2, __unused uint16_t p3)
+ 161:layer1/prim_pm.c **** {
+ 162:layer1/prim_pm.c **** 	uint8_t last_gain = rffe_get_gain();
+ 163:layer1/prim_pm.c **** 
+ 164:layer1/prim_pm.c **** 	dsp_api.db_w->d_task_md = num_meas; /* number of measurements */
+ 165:layer1/prim_pm.c **** //	dsp_api.ndb->d_fb_mode = 0; /* wideband search */
+ 166:layer1/prim_pm.c **** 
+ 167:layer1/prim_pm.c **** 	/* Tell the RF frontend to set the gain appropriately (keep last) */
+ 168:layer1/prim_pm.c **** 	rffe_compute_gain(-85, CAL_DSP_TGT_BB_LVL);
+ 169:layer1/prim_pm.c **** 
+ 170:layer1/prim_pm.c **** 	/* Program TPU */
+ 171:layer1/prim_pm.c **** 	/* FIXME: RXWIN_PW needs to set up multiple times in case
+ 172:layer1/prim_pm.c **** 	 * num_meas > 1 */
+ 173:layer1/prim_pm.c **** 	/* do measurement dummy, in case l1s.neigh_pm.n == 0 */
+ 174:layer1/prim_pm.c **** 	l1s_rx_win_ctrl((l1s.neigh_pm.n) ?
+ 175:layer1/prim_pm.c **** 			l1s.neigh_pm.band_arfcn[l1s.neigh_pm.pos] : 0,
+ 176:layer1/prim_pm.c **** 		L1_RXWIN_PW, l1s.neigh_pm.tn[l1s.neigh_pm.pos]);
+ 177:layer1/prim_pm.c **** 
+ 178:layer1/prim_pm.c **** 	/* restore last gain */
+ 179:layer1/prim_pm.c **** 	rffe_set_gain(last_gain);
+ 180:layer1/prim_pm.c **** 
+ 181:layer1/prim_pm.c **** 	l1s.neigh_pm.running = 1;
+ 182:layer1/prim_pm.c **** 
+ 183:layer1/prim_pm.c **** 	return 0;
+ 184:layer1/prim_pm.c **** }
+ 185:layer1/prim_pm.c **** 
+ 186:layer1/prim_pm.c **** /* scheduler callback to read power measurement resposnse from the DSP */
+ 187:layer1/prim_pm.c **** static int l1s_neigh_pm_resp(__unused uint8_t p1, __unused uint8_t p2,
+ 188:layer1/prim_pm.c **** 		       __unused uint16_t p3)
+ 189:layer1/prim_pm.c **** {
+  17              		.loc 1 189 0
+  18              		.cfi_startproc
+  19              		@ args = 0, pretend = 0, frame = 0
+  20              		@ frame_needed = 0, uses_anonymous_args = 0
+  21              	.LVL0:
+  22 0000 F0472DE9 		stmfd	sp!, {r4, r5, r6, r7, r8, r9, sl, lr}
+  23              	.LCFI0:
+  24              		.cfi_def_cfa_offset 32
+ 190:layer1/prim_pm.c **** 	uint16_t dbm;
+ 191:layer1/prim_pm.c **** 	uint8_t level;
+ 192:layer1/prim_pm.c **** 
+ 193:layer1/prim_pm.c **** 	dsp_api.r_page_used = 1;
+  25              		.loc 1 193 0
+  26 0004 58319FE5 		ldr	r3, .L7
+ 194:layer1/prim_pm.c **** 
+ 195:layer1/prim_pm.c **** 	if (l1s.neigh_pm.n == 0 || !l1s.neigh_pm.running)
+  27              		.loc 1 195 0
+  28 0008 58A19FE5 		ldr	sl, .L7+4
+  29              		.cfi_offset 14, -4
+  30              		.cfi_offset 10, -8
+  31              		.cfi_offset 9, -12
+  32              		.cfi_offset 8, -16
+  33              		.cfi_offset 7, -20
+  34              		.cfi_offset 6, -24
+  35              		.cfi_offset 5, -28
+  36              		.cfi_offset 4, -32
+ 193:layer1/prim_pm.c **** 	dsp_api.r_page_used = 1;
+  37              		.loc 1 193 0
+  38 000c 0120A0E3 		mov	r2, #1
+  39              	.LVL1:
+  40 0010 182083E5 		str	r2, [r3, #24]
+  41              		.loc 1 195 0
+  42 0014 202CDAE5 		ldrb	r2, [sl, #3104]	@ zero_extendqisi2
+  43 0018 000052E3 		cmp	r2, #0
+  44 001c 4C00000A 		beq	.L2
+  45              		.loc 1 195 0 is_stmt 0 discriminator 1
+  46 0020 232CDAE5 		ldrb	r2, [sl, #3107]	@ zero_extendqisi2
+  47 0024 000052E3 		cmp	r2, #0
+  48 0028 4900000A 		beq	.L2
+  49              	.LVL2:
+ 196:layer1/prim_pm.c **** 		goto out;
+ 197:layer1/prim_pm.c **** 
+ 198:layer1/prim_pm.c **** 	dbm = (uint16_t) ((dsp_api.db_r->a_pm[0] & 0xffff) >> 3);
+  50              		.loc 1 198 0 is_stmt 1
+  51 002c 043093E5 		ldr	r3, [r3, #4]
+  52 0030 B801D3E1 		ldrh	r0, [r3, #24]
+  53              	.LVL3:
+ 199:layer1/prim_pm.c **** 	level = dbm2rxlev(agc_inp_dbm8_by_pm(dbm)/8);
+  54              		.loc 1 199 0
+  55 0034 A001A0E1 		mov	r0, r0, lsr #3
+  56 0038 FEFFFFEB 		bl	agc_inp_dbm8_by_pm
+  57              	.LVL4:
+  58 003c 0008A0E1 		mov	r0, r0, asl #16
+  59 0040 4008A0E1 		mov	r0, r0, asr #16
+  60 0044 073080E2 		add	r3, r0, #7
+  61 0048 000050E3 		cmp	r0, #0
+  62 004c 0300A0B1 		movlt	r0, r3
+  63 0050 C001A0E1 		mov	r0, r0, asr #3
+  64 0054 FEFFFFEB 		bl	dbm2rxlev
+  65              	.LVL5:
+ 200:layer1/prim_pm.c **** 
+ 201:layer1/prim_pm.c **** 	l1s.neigh_pm.level[l1s.neigh_pm.pos] = level;
+  66              		.loc 1 201 0
+  67 0058 223CDAE5 		ldrb	r3, [sl, #3106]	@ zero_extendqisi2
+  68 005c 03208AE0 		add	r2, sl, r3
+  69 0060 E40CC2E5 		strb	r0, [r2, #3300]
+ 202:layer1/prim_pm.c **** 
+ 203:layer1/prim_pm.c **** 	if (++l1s.neigh_pm.pos >= l1s.neigh_pm.n) {
+  70              		.loc 1 203 0
+  71 0064 013083E2 		add	r3, r3, #1
+  72 0068 202CDAE5 		ldrb	r2, [sl, #3104]	@ zero_extendqisi2
+  73 006c FF3003E2 		and	r3, r3, #255
+  74 0070 030052E1 		cmp	r2, r3
+  75 0074 223CCAE5 		strb	r3, [sl, #3106]
+  76 0078 3500008A 		bhi	.L2
+  77              	.LBB30:
+ 204:layer1/prim_pm.c **** 		struct msgb *msg;
+ 205:layer1/prim_pm.c **** 		struct l1ctl_neigh_pm_ind *mi;
+ 206:layer1/prim_pm.c **** 		int i;
+ 207:layer1/prim_pm.c **** 
+ 208:layer1/prim_pm.c **** 		l1s.neigh_pm.pos = 0;
+  78              		.loc 1 208 0
+  79 007c 0060A0E3 		mov	r6, #0
+ 209:layer1/prim_pm.c **** 		/* return result */
+ 210:layer1/prim_pm.c **** 		msg = l1ctl_msgb_alloc(L1CTL_NEIGH_PM_IND);
+  80              		.loc 1 210 0
+  81 0080 1B00A0E3 		mov	r0, #27
+  82              	.LVL6:
+ 208:layer1/prim_pm.c **** 		l1s.neigh_pm.pos = 0;
+  83              		.loc 1 208 0
+  84 0084 226CCAE5 		strb	r6, [sl, #3106]
+  85              		.loc 1 210 0
+  86 0088 FEFFFFEB 		bl	l1ctl_msgb_alloc
+  87 008c D8809FE5 		ldr	r8, .L7+8
+  88 0090 0040A0E1 		mov	r4, r0
+  89              	.LVL7:
+  90 0094 D4709FE5 		ldr	r7, .L7+12
+ 211:layer1/prim_pm.c **** 		for (i = 0; i < l1s.neigh_pm.n; i++) {
+ 212:layer1/prim_pm.c **** 			if (msgb_tailroom(msg) < (int) sizeof(*mi)) {
+ 213:layer1/prim_pm.c **** 				l1_queue_for_l2(msg);
+ 214:layer1/prim_pm.c **** 				msg = l1ctl_msgb_alloc(L1CTL_NEIGH_PM_IND);
+ 215:layer1/prim_pm.c **** 			}
+ 216:layer1/prim_pm.c **** 			mi = (struct l1ctl_neigh_pm_ind *)
+ 217:layer1/prim_pm.c **** 				msgb_put(msg, sizeof(*mi));
+ 218:layer1/prim_pm.c **** 			mi->band_arfcn = htons(l1s.neigh_pm.band_arfcn[i]);
+  91              		.loc 1 218 0
+  92 0098 0690A0E1 		mov	r9, r6
+ 211:layer1/prim_pm.c **** 		for (i = 0; i < l1s.neigh_pm.n; i++) {
+  93              		.loc 1 211 0
+  94 009c 270000EA 		b	.L3
+  95              	.LVL8:
+  96              	.L6:
+  97              	.LBB31:
+  98              	.LBB32:
+  99              		.file 2 "../../shared/libosmocore/include/osmocom/core/msgb.h"
+   1:../../shared/libosmocore/include/osmocom/core/msgb.h **** #ifndef _MSGB_H
+   2:../../shared/libosmocore/include/osmocom/core/msgb.h **** #define _MSGB_H
+   3:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+   4:../../shared/libosmocore/include/osmocom/core/msgb.h **** /* (C) 2008 by Harald Welte <laforge@gnumonks.org>
+   5:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * All Rights Reserved
+   6:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *
+   7:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * This program is free software; you can redistribute it and/or modify
+   8:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * it under the terms of the GNU General Public License as published by
+   9:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * the Free Software Foundation; either version 2 of the License, or
+  10:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * (at your option) any later version.
+  11:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *
+  12:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * This program is distributed in the hope that it will be useful,
+  13:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  14:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  15:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * GNU General Public License for more details.
+  16:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *
+  17:../../shared/libosmocore/include/osmocom/core/msgb.h ****  */
+  18:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  19:../../shared/libosmocore/include/osmocom/core/msgb.h **** #include <stdint.h>
+  20:../../shared/libosmocore/include/osmocom/core/msgb.h **** #include <osmocom/core/linuxlist.h>
+  21:../../shared/libosmocore/include/osmocom/core/msgb.h **** #include <osmocom/core/utils.h>
+  22:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  23:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \defgroup msgb Message buffers
+  24:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  @{
+  25:../../shared/libosmocore/include/osmocom/core/msgb.h ****  */
+  26:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  27:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \file msgb.h
+  28:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \brief Osmocom message buffers
+  29:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * The Osmocom message buffers are modelled after the 'struct skb'
+  30:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * inside the Linux kernel network stack.  As they exist in userspace,
+  31:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * they are much simplified.  However, terminology such as headroom,
+  32:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * tailroom, push/pull/put etc. remains the same.
+  33:../../shared/libosmocore/include/osmocom/core/msgb.h ****  */
+  34:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  35:../../shared/libosmocore/include/osmocom/core/msgb.h **** #define MSGB_DEBUG
+  36:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  37:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \brief Osmocom message buffer */
+  38:../../shared/libosmocore/include/osmocom/core/msgb.h **** struct msgb {
+  39:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	struct llist_head list; /*!< \brief linked list header */
+  40:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  41:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  42:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	/* Part of which TRX logical channel we were received / transmitted */
+  43:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	/* FIXME: move them into the control buffer */
+  44:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	union {
+  45:../../shared/libosmocore/include/osmocom/core/msgb.h **** 		void *dst; /*!< \brief reference of origin/destination */
+  46:../../shared/libosmocore/include/osmocom/core/msgb.h **** 		struct gsm_bts_trx *trx;
+  47:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	};
+  48:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	struct gsm_lchan *lchan; /*!< \brief logical channel */
+  49:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  50:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	unsigned char *l1h; /*!< \brief pointer to Layer1 header (if any) */
+  51:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	unsigned char *l2h; /*!< \brief pointer to A-bis layer 2 header: OML, RSL(RLL), NS */
+  52:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	unsigned char *l3h; /*!< \brief pointer to Layer 3 header. For OML: FOM; RSL: 04.08; GPRS: BSSGP *
+  53:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	unsigned char *l4h; /*!< \brief pointer to layer 4 header */
+  54:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  55:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	unsigned long cb[5]; /*!< \brief control buffer */
+  56:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  57:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	uint16_t data_len;   /*!< \brief length of underlying data array */
+  58:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	uint16_t len;	     /*!< \brief length of bytes used in msgb */
+  59:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  60:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	unsigned char *head;	/*!< \brief start of underlying memory buffer */
+  61:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	unsigned char *tail;	/*!< \brief end of message in buffer */
+  62:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	unsigned char *data;	/*!< \brief start of message in buffer */
+  63:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	unsigned char _data[0]; /*!< \brief optional immediate data array */
+  64:../../shared/libosmocore/include/osmocom/core/msgb.h **** };
+  65:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  66:../../shared/libosmocore/include/osmocom/core/msgb.h **** extern struct msgb *msgb_alloc(uint16_t size, const char *name);
+  67:../../shared/libosmocore/include/osmocom/core/msgb.h **** extern void msgb_free(struct msgb *m);
+  68:../../shared/libosmocore/include/osmocom/core/msgb.h **** extern void msgb_enqueue(struct llist_head *queue, struct msgb *msg);
+  69:../../shared/libosmocore/include/osmocom/core/msgb.h **** extern struct msgb *msgb_dequeue(struct llist_head *queue);
+  70:../../shared/libosmocore/include/osmocom/core/msgb.h **** extern void msgb_reset(struct msgb *m);
+  71:../../shared/libosmocore/include/osmocom/core/msgb.h **** uint16_t msgb_length(const struct msgb *msg);
+  72:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  73:../../shared/libosmocore/include/osmocom/core/msgb.h **** #ifdef MSGB_DEBUG
+  74:../../shared/libosmocore/include/osmocom/core/msgb.h **** #include <osmocom/core/panic.h>
+  75:../../shared/libosmocore/include/osmocom/core/msgb.h **** #define MSGB_ABORT(msg, fmt, args ...) do {		\
+  76:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	osmo_panic("msgb(%p): " fmt, msg, ## args);	\
+  77:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	} while(0)
+  78:../../shared/libosmocore/include/osmocom/core/msgb.h **** #else
+  79:../../shared/libosmocore/include/osmocom/core/msgb.h **** #define MSGB_ABORT(msg, fmt, args ...)
+  80:../../shared/libosmocore/include/osmocom/core/msgb.h **** #endif
+  81:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  82:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \brief obtain L1 header of msgb */
+  83:../../shared/libosmocore/include/osmocom/core/msgb.h **** #define msgb_l1(m)	((void *)(m->l1h))
+  84:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \brief obtain L2 header of msgb */
+  85:../../shared/libosmocore/include/osmocom/core/msgb.h **** #define msgb_l2(m)	((void *)(m->l2h))
+  86:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \brief obtain L3 header of msgb */
+  87:../../shared/libosmocore/include/osmocom/core/msgb.h **** #define msgb_l3(m)	((void *)(m->l3h))
+  88:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \brief obtain SMS header of msgb */
+  89:../../shared/libosmocore/include/osmocom/core/msgb.h **** #define msgb_sms(m)	((void *)(m->l4h))
+  90:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+  91:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \brief determine length of L1 message
+  92:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \param[in] msgb message buffer
+  93:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \returns size of L1 message in bytes
+  94:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *
+  95:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * This function computes the number of bytes between the tail of the
+  96:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * message and the layer 1 header.
+  97:../../shared/libosmocore/include/osmocom/core/msgb.h ****  */
+  98:../../shared/libosmocore/include/osmocom/core/msgb.h **** static inline unsigned int msgb_l1len(const struct msgb *msgb)
+  99:../../shared/libosmocore/include/osmocom/core/msgb.h **** {
+ 100:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	return msgb->tail - (uint8_t *)msgb_l1(msgb);
+ 101:../../shared/libosmocore/include/osmocom/core/msgb.h **** }
+ 102:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+ 103:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \brief determine length of L2 message
+ 104:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \param[in] msgb message buffer
+ 105:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \returns size of L2 message in bytes
+ 106:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *
+ 107:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * This function computes the number of bytes between the tail of the
+ 108:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * message and the layer 2 header.
+ 109:../../shared/libosmocore/include/osmocom/core/msgb.h ****  */
+ 110:../../shared/libosmocore/include/osmocom/core/msgb.h **** static inline unsigned int msgb_l2len(const struct msgb *msgb)
+ 111:../../shared/libosmocore/include/osmocom/core/msgb.h **** {
+ 112:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	return msgb->tail - (uint8_t *)msgb_l2(msgb);
+ 113:../../shared/libosmocore/include/osmocom/core/msgb.h **** }
+ 114:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+ 115:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \brief determine length of L3 message
+ 116:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \param[in] msgb message buffer
+ 117:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \returns size of L3 message in bytes
+ 118:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *
+ 119:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * This function computes the number of bytes between the tail of the
+ 120:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * message and the layer 3 header.
+ 121:../../shared/libosmocore/include/osmocom/core/msgb.h ****  */
+ 122:../../shared/libosmocore/include/osmocom/core/msgb.h **** static inline unsigned int msgb_l3len(const struct msgb *msgb)
+ 123:../../shared/libosmocore/include/osmocom/core/msgb.h **** {
+ 124:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	return msgb->tail - (uint8_t *)msgb_l3(msgb);
+ 125:../../shared/libosmocore/include/osmocom/core/msgb.h **** }
+ 126:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+ 127:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \brief determine the length of the header
+ 128:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \param[in] msgb message buffer
+ 129:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \returns number of bytes between start of buffer and start of msg
+ 130:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *
+ 131:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * This function computes the length difference between the underlying
+ 132:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * data buffer and the used section of the \a msgb.
+ 133:../../shared/libosmocore/include/osmocom/core/msgb.h ****  */
+ 134:../../shared/libosmocore/include/osmocom/core/msgb.h **** static inline unsigned int msgb_headlen(const struct msgb *msgb)
+ 135:../../shared/libosmocore/include/osmocom/core/msgb.h **** {
+ 136:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	return msgb->len - msgb->data_len;
+ 137:../../shared/libosmocore/include/osmocom/core/msgb.h **** }
+ 138:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+ 139:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \brief determine how much tail room is left in msgb
+ 140:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \param[in] msgb message buffer
+ 141:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \returns number of bytes remaining at end of msgb
+ 142:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *
+ 143:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * This function computes the amount of octets left in the underlying
+ 144:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * data buffer after the end of the message.
+ 145:../../shared/libosmocore/include/osmocom/core/msgb.h ****  */
+ 146:../../shared/libosmocore/include/osmocom/core/msgb.h **** static inline int msgb_tailroom(const struct msgb *msgb)
+ 147:../../shared/libosmocore/include/osmocom/core/msgb.h **** {
+ 148:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	return (msgb->head + msgb->data_len) - msgb->tail;
+ 100              		.loc 2 148 0
+ 101 00a0 382094E5 		ldr	r2, [r4, #56]
+ 102 00a4 B433D4E1 		ldrh	r3, [r4, #52]
+ 103 00a8 033082E0 		add	r3, r2, r3
+ 104 00ac 3C2094E5 		ldr	r2, [r4, #60]
+ 105 00b0 033062E0 		rsb	r3, r2, r3
+ 106              	.LBE32:
+ 107              	.LBE31:
+ 212:layer1/prim_pm.c **** 			if (msgb_tailroom(msg) < (int) sizeof(*mi)) {
+ 108              		.loc 1 212 0
+ 109 00b4 050053E3 		cmp	r3, #5
+ 110 00b8 040000CA 		bgt	.L4
+ 111              	.LVL9:
+ 213:layer1/prim_pm.c **** 				l1_queue_for_l2(msg);
+ 112              		.loc 1 213 0
+ 113 00bc 0400A0E1 		mov	r0, r4
+ 114 00c0 FEFFFFEB 		bl	l1_queue_for_l2
+ 214:layer1/prim_pm.c **** 				msg = l1ctl_msgb_alloc(L1CTL_NEIGH_PM_IND);
+ 115              		.loc 1 214 0
+ 116 00c4 1B00A0E3 		mov	r0, #27
+ 117 00c8 FEFFFFEB 		bl	l1ctl_msgb_alloc
+ 118 00cc 0040A0E1 		mov	r4, r0
+ 119              	.LVL10:
+ 120              	.L4:
+ 121              	.LBB33:
+ 122              	.LBB34:
+ 123              	.LBB35:
+ 124              	.LBB36:
+ 125              		.loc 2 148 0
+ 126 00d0 B433D4E1 		ldrh	r3, [r4, #52]
+ 127              	.LBE36:
+ 128              	.LBE35:
+ 129 00d4 382084E2 		add	r2, r4, #56
+ 130 00d8 240092E8 		ldmia	r2, {r2, r5}	@ phole ldm
+ 131              	.LVL11:
+ 132              	.LBB38:
+ 133              	.LBB37:
+ 134 00dc 032082E0 		add	r2, r2, r3
+ 135 00e0 022065E0 		rsb	r2, r5, r2
+ 136              	.LBE37:
+ 137              	.LBE38:
+ 149:../../shared/libosmocore/include/osmocom/core/msgb.h **** }
+ 150:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+ 151:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \brief determine the amount of headroom in msgb
+ 152:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \param[in] msgb message buffer
+ 153:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \returns number of bytes left ahead of message start in msgb
+ 154:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *
+ 155:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * This function computes the amount of bytes left in the underlying
+ 156:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * data buffer before the start of the actual message.
+ 157:../../shared/libosmocore/include/osmocom/core/msgb.h ****  */
+ 158:../../shared/libosmocore/include/osmocom/core/msgb.h **** static inline int msgb_headroom(const struct msgb *msgb)
+ 159:../../shared/libosmocore/include/osmocom/core/msgb.h **** {
+ 160:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	return (msgb->data - msgb->head);
+ 161:../../shared/libosmocore/include/osmocom/core/msgb.h **** }
+ 162:../../shared/libosmocore/include/osmocom/core/msgb.h **** 
+ 163:../../shared/libosmocore/include/osmocom/core/msgb.h **** /*! \brief append data to end of message buffer
+ 164:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \param[in] msgb message buffer
+ 165:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \param[in] len number of bytes to append to message
+ 166:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *  \returns pointer to start of newly-appended data
+ 167:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *
+ 168:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * This function will move the \a tail pointer of the message buffer \a
+ 169:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * len bytes further, thus enlarging the message by \a len bytes.
+ 170:../../shared/libosmocore/include/osmocom/core/msgb.h ****  *
+ 171:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * The return value is a pointer to start of the newly added section at
+ 172:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * the end of the message and can be used for actually filling/copying
+ 173:../../shared/libosmocore/include/osmocom/core/msgb.h ****  * data into it.
+ 174:../../shared/libosmocore/include/osmocom/core/msgb.h ****  */
+ 175:../../shared/libosmocore/include/osmocom/core/msgb.h **** static inline unsigned char *msgb_put(struct msgb *msgb, unsigned int len)
+ 176:../../shared/libosmocore/include/osmocom/core/msgb.h **** {
+ 177:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	unsigned char *tmp = msgb->tail;
+ 178:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	if (msgb_tailroom(msgb) < (int) len)
+ 138              		.loc 2 178 0
+ 139 00e4 050052E3 		cmp	r2, #5
+ 140              	.LVL12:
+ 179:../../shared/libosmocore/include/osmocom/core/msgb.h **** 		MSGB_ABORT(msgb, "Not enough tailroom msgb_push (%u < %u)\n",
+ 141              		.loc 2 179 0
+ 142 00e8 84009FD5 		ldrle	r0, .L7+16
+ 143 00ec 0410A0D1 		movle	r1, r4
+ 144 00f0 0630A0D3 		movle	r3, #6
+ 145 00f4 FEFFFFDB 		blle	osmo_panic
+ 146              	.LVL13:
+ 147              	.L5:
+ 180:../../shared/libosmocore/include/osmocom/core/msgb.h **** 			   msgb_tailroom(msgb), len);
+ 181:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	msgb->tail += len;
+ 148              		.loc 2 181 0
+ 149 00f8 3C3094E5 		ldr	r3, [r4, #60]
+ 150 00fc 063083E2 		add	r3, r3, #6
+ 151 0100 3C3084E5 		str	r3, [r4, #60]
+ 182:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	msgb->len += len;
+ 152              		.loc 2 182 0
+ 153 0104 B633D4E1 		ldrh	r3, [r4, #54]
+ 154 0108 063083E2 		add	r3, r3, #6
+ 155 010c B633C4E1 		strh	r3, [r4, #54]	@ movhi
+ 156              	.LVL14:
+ 157              	.LBE34:
+ 158              	.LBE33:
+ 159              		.loc 1 218 0
+ 160 0110 B230F8E1 		ldrh	r3, [r8, #2]!
+ 161              	.LVL15:
+ 162              	.LBB39:
+ 163              	.LBB40:
+ 164              		.file 3 "include/swab.h"
+   1:include/swab.h **** #ifndef _LINUX_SWAB_H
+   2:include/swab.h **** #define _LINUX_SWAB_H
+   3:include/swab.h **** 
+   4:include/swab.h **** #include <stdint.h>
+   5:include/swab.h **** #include <defines.h>
+   6:include/swab.h **** #include <asm/swab.h>
+   7:include/swab.h **** 
+   8:include/swab.h **** /*
+   9:include/swab.h ****  * casts are necessary for constants, because we never know how for sure
+  10:include/swab.h ****  * how U/UL/ULL map to uint16_t, uint32_t, uint64_t. At least not in a portable way.
+  11:include/swab.h ****  */
+  12:include/swab.h **** #define ___constant_swab16(x) ((uint16_t)(				\
+  13:include/swab.h **** 	(((uint16_t)(x) & (uint16_t)0x00ffU) << 8) |			\
+  14:include/swab.h **** 	(((uint16_t)(x) & (uint16_t)0xff00U) >> 8)))
+  15:include/swab.h **** 
+  16:include/swab.h **** #define ___constant_swab32(x) ((uint32_t)(				\
+  17:include/swab.h **** 	(((uint32_t)(x) & (uint32_t)0x000000ffUL) << 24) |		\
+  18:include/swab.h **** 	(((uint32_t)(x) & (uint32_t)0x0000ff00UL) <<  8) |		\
+  19:include/swab.h **** 	(((uint32_t)(x) & (uint32_t)0x00ff0000UL) >>  8) |		\
+  20:include/swab.h **** 	(((uint32_t)(x) & (uint32_t)0xff000000UL) >> 24)))
+  21:include/swab.h **** 
+  22:include/swab.h **** #define ___constant_swab64(x) ((uint64_t)(				\
+  23:include/swab.h **** 	(((uint64_t)(x) & (uint64_t)0x00000000000000ffULL) << 56) |	\
+  24:include/swab.h **** 	(((uint64_t)(x) & (uint64_t)0x000000000000ff00ULL) << 40) |	\
+  25:include/swab.h **** 	(((uint64_t)(x) & (uint64_t)0x0000000000ff0000ULL) << 24) |	\
+  26:include/swab.h **** 	(((uint64_t)(x) & (uint64_t)0x00000000ff000000ULL) <<  8) |	\
+  27:include/swab.h **** 	(((uint64_t)(x) & (uint64_t)0x000000ff00000000ULL) >>  8) |	\
+  28:include/swab.h **** 	(((uint64_t)(x) & (uint64_t)0x0000ff0000000000ULL) >> 24) |	\
+  29:include/swab.h **** 	(((uint64_t)(x) & (uint64_t)0x00ff000000000000ULL) >> 40) |	\
+  30:include/swab.h **** 	(((uint64_t)(x) & (uint64_t)0xff00000000000000ULL) >> 56)))
+  31:include/swab.h **** 
+  32:include/swab.h **** #define ___constant_swahw32(x) ((uint32_t)(			\
+  33:include/swab.h **** 	(((uint32_t)(x) & (uint32_t)0x0000ffffUL) << 16) |		\
+  34:include/swab.h **** 	(((uint32_t)(x) & (uint32_t)0xffff0000UL) >> 16)))
+  35:include/swab.h **** 
+  36:include/swab.h **** #define ___constant_swahb32(x) ((uint32_t)(			\
+  37:include/swab.h **** 	(((uint32_t)(x) & (uint32_t)0x00ff00ffUL) << 8) |		\
+  38:include/swab.h **** 	(((uint32_t)(x) & (uint32_t)0xff00ff00UL) >> 8)))
+  39:include/swab.h **** 
+  40:include/swab.h **** /*
+  41:include/swab.h ****  * Implement the following as inlines, but define the interface using
+  42:include/swab.h ****  * macros to allow constant folding when possible:
+  43:include/swab.h ****  * ___swab16, ___swab32, ___swab64, ___swahw32, ___swahb32
+  44:include/swab.h ****  */
+  45:include/swab.h **** 
+  46:include/swab.h **** static inline __attribute_const__ uint16_t __fswab16(uint16_t val)
+  47:include/swab.h **** {
+  48:include/swab.h **** #ifdef __arch_swab16
+  49:include/swab.h **** 	return __arch_swab16(val);
+  50:include/swab.h **** #else
+  51:include/swab.h **** 	return ___constant_swab16(val);
+ 165              		.loc 3 51 0
+ 166 0114 2324A0E1 		mov	r2, r3, lsr #8
+ 167 0118 033482E1 		orr	r3, r2, r3, asl #8
+ 168              	.LVL16:
+ 169              	.LBE40:
+ 170              	.LBE39:
+ 171              		.loc 1 218 0
+ 172 011c 0030C5E5 		strb	r3, [r5, #0]
+ 173 0120 2334A0E1 		mov	r3, r3, lsr #8
+ 174 0124 0130C5E5 		strb	r3, [r5, #1]
+ 219:layer1/prim_pm.c **** 			mi->tn = l1s.neigh_pm.tn[i];
+ 175              		.loc 1 219 0
+ 176 0128 0130F7E5 		ldrb	r3, [r7, #1]!	@ zero_extendqisi2
+ 177 012c 0430C5E5 		strb	r3, [r5, #4]
+ 220:layer1/prim_pm.c **** 			mi->pm[0] = l1s.neigh_pm.level[i];
+ 178              		.loc 1 220 0
+ 179 0130 4030D7E5 		ldrb	r3, [r7, #64]	@ zero_extendqisi2
+ 221:layer1/prim_pm.c **** 			mi->pm[1] = 0;
+ 180              		.loc 1 221 0
+ 181 0134 0390C5E5 		strb	r9, [r5, #3]
+ 220:layer1/prim_pm.c **** 			mi->pm[0] = l1s.neigh_pm.level[i];
+ 182              		.loc 1 220 0
+ 183 0138 0230C5E5 		strb	r3, [r5, #2]
+ 211:layer1/prim_pm.c **** 		for (i = 0; i < l1s.neigh_pm.n; i++) {
+ 184              		.loc 1 211 0
+ 185 013c 016086E2 		add	r6, r6, #1
+ 186              	.LVL17:
+ 187              	.L3:
+ 211:layer1/prim_pm.c **** 		for (i = 0; i < l1s.neigh_pm.n; i++) {
+ 188              		.loc 1 211 0 is_stmt 0 discriminator 1
+ 189 0140 203CDAE5 		ldrb	r3, [sl, #3104]	@ zero_extendqisi2
+ 190 0144 030056E1 		cmp	r6, r3
+ 191 0148 D4FFFFBA 		blt	.L6
+ 222:layer1/prim_pm.c **** 		}
+ 223:layer1/prim_pm.c **** 		l1_queue_for_l2(msg);
+ 192              		.loc 1 223 0 is_stmt 1
+ 193 014c 0400A0E1 		mov	r0, r4
+ 194 0150 FEFFFFEB 		bl	l1_queue_for_l2
+ 195              	.LVL18:
+ 196              	.L2:
+ 197              	.LBE30:
+ 224:layer1/prim_pm.c **** 	}
+ 225:layer1/prim_pm.c **** 
+ 226:layer1/prim_pm.c **** out:
+ 227:layer1/prim_pm.c **** 	l1s.neigh_pm.running = 0;
+ 198              		.loc 1 227 0
+ 199 0154 0C309FE5 		ldr	r3, .L7+4
+ 200 0158 0000A0E3 		mov	r0, #0
+ 201 015c 230CC3E5 		strb	r0, [r3, #3107]
+ 228:layer1/prim_pm.c **** 
+ 229:layer1/prim_pm.c **** 	return 0;
+ 230:layer1/prim_pm.c **** }
+ 202              		.loc 1 230 0
+ 203 0160 F087BDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, r9, sl, pc}
+ 204              	.L8:
+ 205              		.align	2
+ 206              	.L7:
+ 207 0164 00000000 		.word	dsp_api
+ 208 0168 00000000 		.word	l1s
+ 209 016c 220C0000 		.word	l1s+3106
+ 210 0170 A30C0000 		.word	l1s+3235
+ 211 0174 00000000 		.word	.LC0
+ 212              		.cfi_endproc
+ 213              	.LFE70:
+ 215              		.section	.text.l1s_pm_cmd,"ax",%progbits
+ 216              		.align	2
+ 218              	l1s_pm_cmd:
+ 219              	.LFB66:
+  61:layer1/prim_pm.c **** {
+ 220              		.loc 1 61 0
+ 221              		.cfi_startproc
+ 222              		@ args = 0, pretend = 0, frame = 0
+ 223              		@ frame_needed = 0, uses_anonymous_args = 0
+ 224              	.LVL19:
+  64:layer1/prim_pm.c **** 	dsp_api.db_w->d_task_md = num_meas; /* number of measurements */
+ 225              		.loc 1 64 0
+ 226 0000 44309FE5 		ldr	r3, .L10
+  61:layer1/prim_pm.c **** {
+ 227              		.loc 1 61 0
+ 228 0004 0228A0E1 		mov	r2, r2, asl #16
+ 229              	.LVL20:
+ 230 0008 30402DE9 		stmfd	sp!, {r4, r5, lr}
+ 231              	.LCFI1:
+ 232              		.cfi_def_cfa_offset 12
+  61:layer1/prim_pm.c **** {
+ 233              		.loc 1 61 0
+ 234 000c 2258A0E1 		mov	r5, r2, lsr #16
+ 235              		.cfi_offset 14, -4
+ 236              		.cfi_offset 5, -8
+ 237              		.cfi_offset 4, -12
+  64:layer1/prim_pm.c **** 	dsp_api.db_w->d_task_md = num_meas; /* number of measurements */
+ 238              		.loc 1 64 0
+ 239 0010 082093E5 		ldr	r2, [r3, #8]
+  65:layer1/prim_pm.c **** 	dsp_api.ndb->d_fb_mode = 0; /* wideband search */
+ 240              		.loc 1 65 0
+ 241 0014 003093E5 		ldr	r3, [r3, #0]
+ 242 0018 0040A0E3 		mov	r4, #0
+  61:layer1/prim_pm.c **** {
+ 243              		.loc 1 61 0
+ 244 001c FF0000E2 		and	r0, r0, #255
+ 245              	.LVL21:
+  64:layer1/prim_pm.c **** 	dsp_api.db_w->d_task_md = num_meas; /* number of measurements */
+ 246              		.loc 1 64 0
+ 247 0020 B800C2E1 		strh	r0, [r2, #8]	@ movhi
+  68:layer1/prim_pm.c **** 	rffe_compute_gain(-85, CAL_DSP_TGT_BB_LVL);
+ 248              		.loc 1 68 0
+ 249 0024 5010A0E3 		mov	r1, #80
+ 250              	.LVL22:
+  65:layer1/prim_pm.c **** 	dsp_api.ndb->d_fb_mode = 0; /* wideband search */
+ 251              		.loc 1 65 0
+ 252 0028 BA44C3E1 		strh	r4, [r3, #74]	@ movhi
+  68:layer1/prim_pm.c **** 	rffe_compute_gain(-85, CAL_DSP_TGT_BB_LVL);
+ 253              		.loc 1 68 0
+ 254 002c 5400E0E3 		mvn	r0, #84
+ 255 0030 FEFFFFEB 		bl	rffe_compute_gain
+  73:layer1/prim_pm.c **** 	l1s_rx_win_ctrl(arfcn, L1_RXWIN_PW, 0);
+ 256              		.loc 1 73 0
+ 257 0034 0500A0E1 		mov	r0, r5
+ 258 0038 0410A0E1 		mov	r1, r4
+ 259 003c 0420A0E1 		mov	r2, r4
+ 260 0040 FEFFFFEB 		bl	l1s_rx_win_ctrl
+  77:layer1/prim_pm.c **** }
+ 261              		.loc 1 77 0
+ 262 0044 0400A0E1 		mov	r0, r4
+ 263 0048 3080BDE8 		ldmfd	sp!, {r4, r5, pc}
+ 264              	.L11:
+ 265              		.align	2
+ 266              	.L10:
+ 267 004c 00000000 		.word	dsp_api
+ 268              		.cfi_endproc
+ 269              	.LFE66:
+ 271              		.section	.text.l1s_neigh_pm_cmd,"ax",%progbits
+ 272              		.align	2
+ 274              	l1s_neigh_pm_cmd:
+ 275              	.LFB69:
+ 161:layer1/prim_pm.c **** {
+ 276              		.loc 1 161 0
+ 277              		.cfi_startproc
+ 278              		@ args = 0, pretend = 0, frame = 0
+ 279              		@ frame_needed = 0, uses_anonymous_args = 0
+ 280              	.LVL23:
+ 281 0000 30402DE9 		stmfd	sp!, {r4, r5, lr}
+ 282              	.LCFI2:
+ 283              		.cfi_def_cfa_offset 12
+ 161:layer1/prim_pm.c **** {
+ 284              		.loc 1 161 0
+ 285 0004 FF4000E2 		and	r4, r0, #255
+ 286              		.cfi_offset 14, -4
+ 287              		.cfi_offset 5, -8
+ 288              		.cfi_offset 4, -12
+ 162:layer1/prim_pm.c **** 	uint8_t last_gain = rffe_get_gain();
+ 289              		.loc 1 162 0
+ 290 0008 FEFFFFEB 		bl	rffe_get_gain
+ 291              	.LVL24:
+ 164:layer1/prim_pm.c **** 	dsp_api.db_w->d_task_md = num_meas; /* number of measurements */
+ 292              		.loc 1 164 0
+ 293 000c 60309FE5 		ldr	r3, .L15
+ 294 0010 083093E5 		ldr	r3, [r3, #8]
+ 162:layer1/prim_pm.c **** 	uint8_t last_gain = rffe_get_gain();
+ 295              		.loc 1 162 0
+ 296 0014 0050A0E1 		mov	r5, r0
+ 297              	.LVL25:
+ 164:layer1/prim_pm.c **** 	dsp_api.db_w->d_task_md = num_meas; /* number of measurements */
+ 298              		.loc 1 164 0
+ 299 0018 B840C3E1 		strh	r4, [r3, #8]	@ movhi
+ 168:layer1/prim_pm.c **** 	rffe_compute_gain(-85, CAL_DSP_TGT_BB_LVL);
+ 300              		.loc 1 168 0
+ 301 001c 5400E0E3 		mvn	r0, #84
+ 302              	.LVL26:
+ 303 0020 5010A0E3 		mov	r1, #80
+ 304 0024 FEFFFFEB 		bl	rffe_compute_gain
+ 174:layer1/prim_pm.c **** 	l1s_rx_win_ctrl((l1s.neigh_pm.n) ?
+ 305              		.loc 1 174 0
+ 306 0028 48309FE5 		ldr	r3, .L15+4
+ 307 002c 200CD3E5 		ldrb	r0, [r3, #3104]	@ zero_extendqisi2
+ 308 0030 000050E3 		cmp	r0, #0
+ 175:layer1/prim_pm.c **** 			l1s.neigh_pm.band_arfcn[l1s.neigh_pm.pos] : 0,
+ 309              		.loc 1 175 0
+ 310 0034 222CD315 		ldrneb	r2, [r3, #3106]	@ zero_extendqisi2
+ 176:layer1/prim_pm.c **** 		L1_RXWIN_PW, l1s.neigh_pm.tn[l1s.neigh_pm.pos]);
+ 311              		.loc 1 176 0
+ 312 0038 38409FE5 		ldr	r4, .L15+4
+ 175:layer1/prim_pm.c **** 			l1s.neigh_pm.band_arfcn[l1s.neigh_pm.pos] : 0,
+ 313              		.loc 1 175 0
+ 314 003c 612E8212 		addne	r2, r2, #1552
+ 315 0040 82308310 		addne	r3, r3, r2, asl #1
+ 174:layer1/prim_pm.c **** 	l1s_rx_win_ctrl((l1s.neigh_pm.n) ?
+ 316              		.loc 1 174 0
+ 317 0044 B400D311 		ldrneh	r0, [r3, #4]
+ 176:layer1/prim_pm.c **** 		L1_RXWIN_PW, l1s.neigh_pm.tn[l1s.neigh_pm.pos]);
+ 318              		.loc 1 176 0
+ 319 0048 223CD4E5 		ldrb	r3, [r4, #3106]	@ zero_extendqisi2
+ 320 004c 033084E0 		add	r3, r4, r3
+ 174:layer1/prim_pm.c **** 	l1s_rx_win_ctrl((l1s.neigh_pm.n) ?
+ 321              		.loc 1 174 0
+ 322 0050 A42CD3E5 		ldrb	r2, [r3, #3236]	@ zero_extendqisi2
+ 323 0054 0010A0E3 		mov	r1, #0
+ 324 0058 FEFFFFEB 		bl	l1s_rx_win_ctrl
+ 179:layer1/prim_pm.c **** 	rffe_set_gain(last_gain);
+ 325              		.loc 1 179 0
+ 326 005c 0500A0E1 		mov	r0, r5
+ 327 0060 FEFFFFEB 		bl	rffe_set_gain
+ 181:layer1/prim_pm.c **** 	l1s.neigh_pm.running = 1;
+ 328              		.loc 1 181 0
+ 329 0064 0130A0E3 		mov	r3, #1
+ 330 0068 233CC4E5 		strb	r3, [r4, #3107]
+ 184:layer1/prim_pm.c **** }
+ 331              		.loc 1 184 0
+ 332 006c 0000A0E3 		mov	r0, #0
+ 333 0070 3080BDE8 		ldmfd	sp!, {r4, r5, pc}
+ 334              	.L16:
+ 335              		.align	2
+ 336              	.L15:
+ 337 0074 00000000 		.word	dsp_api
+ 338 0078 00000000 		.word	l1s
+ 339              		.cfi_endproc
+ 340              	.LFE69:
+ 342              		.section	.text.l1s_pm_test,"ax",%progbits
+ 343              		.align	2
+ 344              		.global	l1s_pm_test
+ 346              	l1s_pm_test:
+ 347              	.LFB68:
+ 144:layer1/prim_pm.c **** {
+ 348              		.loc 1 144 0
+ 349              		.cfi_startproc
+ 350              		@ args = 0, pretend = 0, frame = 0
+ 351              		@ frame_needed = 0, uses_anonymous_args = 0
+ 352              	.LVL27:
+ 353 0000 0128A0E1 		mov	r2, r1, asl #16
+ 354 0004 10402DE9 		stmfd	sp!, {r4, lr}
+ 355              	.LCFI3:
+ 356              		.cfi_def_cfa_offset 8
+ 144:layer1/prim_pm.c **** {
+ 357              		.loc 1 144 0
+ 358 0008 FF0000E2 		and	r0, r0, #255
+ 359              	.LVL28:
+ 360 000c 2228A0E1 		mov	r2, r2, lsr #16
+ 361              	.LBB41:
+ 149:layer1/prim_pm.c **** 	local_firq_save(flags);
+ 362              		.loc 1 149 0
+ 363              	@ 149 "layer1/prim_pm.c" 1
+ 364 0010 00400FE1 		mrs	r4, cpsr		@ local_firq_save
+ 365 0014 C03084E3 		orr	r3, r4, #0xC0
+ 366 0018 03F021E1 		msr	cpsr_c, r3
+ 367              	@ 0 "" 2
+ 368              	.LBE41:
+ 150:layer1/prim_pm.c **** 	tdma_schedule_set(base_fn, pm_sched_set, arfcn);
+ 369              		.loc 1 150 0
+ 370 001c 08109FE5 		ldr	r1, .L18
+ 371              	.LVL29:
+ 372              		.cfi_offset 14, -4
+ 373              		.cfi_offset 4, -8
+ 374 0020 FEFFFFEB 		bl	tdma_schedule_set
+ 151:layer1/prim_pm.c **** 	local_irq_restore(flags);
+ 375              		.loc 1 151 0
+ 376              	@ 151 "layer1/prim_pm.c" 1
+ 377 0024 04F021E1 		msr	cpsr_c, r4		@ local_irq_restore
+ 378              	
+ 379              	@ 0 "" 2
+ 152:layer1/prim_pm.c **** }
+ 380              		.loc 1 152 0
+ 381 0028 1080BDE8 		ldmfd	sp!, {r4, pc}
+ 382              	.L19:
+ 383              		.align	2
+ 384              	.L18:
+ 385 002c 00000000 		.word	.LANCHOR0
+ 386              		.cfi_endproc
+ 387              	.LFE68:
+ 389              		.section	.text.l1s_pm_resp,"ax",%progbits
+ 390              		.align	2
+ 392              	l1s_pm_resp:
+ 393              	.LFB67:
+  82:layer1/prim_pm.c **** {
+ 394              		.loc 1 82 0
+ 395              		.cfi_startproc
+ 396              		@ args = 0, pretend = 0, frame = 4
+ 397              		@ frame_needed = 0, uses_anonymous_args = 0
+ 398              	.LVL30:
+ 399 0000 F1412DE9 		stmfd	sp!, {r0, r4, r5, r6, r7, r8, lr}
+ 400              	.LCFI4:
+ 401              		.cfi_def_cfa_offset 28
+ 402              	.LBB42:
+ 403              	.LBB44:
+  54:layer1/prim_pm.c **** 		pm[i] = (uint16_t) ((dsp_api.db_r->a_pm[i] & 0xffff) >> 3);
+ 404              		.loc 1 54 0
+ 405 0004 E8319FE5 		ldr	r3, .L30
+ 406              	.LBE44:
+ 407              	.LBE42:
+  82:layer1/prim_pm.c **** {
+ 408              		.loc 1 82 0
+ 409 0008 0228A0E1 		mov	r2, r2, asl #16
+ 410              	.LVL31:
+ 411 000c 2268A0E1 		mov	r6, r2, lsr #16
+ 412              		.cfi_offset 14, -4
+ 413              		.cfi_offset 8, -8
+ 414              		.cfi_offset 7, -12
+ 415              		.cfi_offset 6, -16
+ 416              		.cfi_offset 5, -20
+ 417              		.cfi_offset 4, -24
+ 418              		.cfi_offset 0, -28
+  80:layer1/prim_pm.c **** static int l1s_pm_resp(uint8_t num_meas, __unused uint8_t p2,
+ 419              		.loc 1 80 0
+ 420 0010 042093E5 		ldr	r2, [r3, #4]
+  82:layer1/prim_pm.c **** {
+ 421              		.loc 1 82 0
+ 422 0014 FF8000E2 		and	r8, r0, #255
+ 423              	.LVL32:
+ 424 0018 02304DE2 		sub	r3, sp, #2
+  80:layer1/prim_pm.c **** static int l1s_pm_resp(uint8_t num_meas, __unused uint8_t p2,
+ 425              		.loc 1 80 0
+ 426 001c 162082E2 		add	r2, r2, #22
+ 427 0020 881083E0 		add	r1, r3, r8, asl #1
+ 428              	.LVL33:
+ 429 0024 020000EA 		b	.L21
+ 430              	.LVL34:
+ 431              	.L22:
+ 432              	.LBB46:
+ 433              	.LBB43:
+  54:layer1/prim_pm.c **** 		pm[i] = (uint16_t) ((dsp_api.db_r->a_pm[i] & 0xffff) >> 3);
+ 434              		.loc 1 54 0
+ 435 0028 B200F2E1 		ldrh	r0, [r2, #2]!
+ 436 002c A001A0E1 		mov	r0, r0, lsr #3
+ 437 0030 B200E3E1 		strh	r0, [r3, #2]!	@ movhi
+ 438              	.L21:
+  53:layer1/prim_pm.c **** 	for (i = 0; i < nbmeas; i++)
+ 439              		.loc 1 53 0
+ 440 0034 010053E1 		cmp	r3, r1
+ 441 0038 FAFFFF1A 		bne	.L22
+  55:layer1/prim_pm.c **** 	dsp_api.r_page_used = 1;
+ 442              		.loc 1 55 0
+ 443 003c B0319FE5 		ldr	r3, .L30
+ 444              	.LBE43:
+ 445              	.LBE46:
+  91:layer1/prim_pm.c **** 		arfcn, pm_level[0]/8, agc_inp_dbm8_by_pm(pm_level[0])/8);
+ 446              		.loc 1 91 0
+ 447 0040 F070DDE1 		ldrsh	r7, [sp, #0]
+ 448              	.LBB47:
+ 449              	.LBB45:
+  55:layer1/prim_pm.c **** 	dsp_api.r_page_used = 1;
+ 450              		.loc 1 55 0
+ 451 0044 0120A0E3 		mov	r2, #1
+ 452 0048 182083E5 		str	r2, [r3, #24]
+ 453              	.LBE45:
+ 454              	.LBE47:
+  91:layer1/prim_pm.c **** 		arfcn, pm_level[0]/8, agc_inp_dbm8_by_pm(pm_level[0])/8);
+ 455              		.loc 1 91 0
+ 456 004c 0700A0E1 		mov	r0, r7
+ 457 0050 B040DDE1 		ldrh	r4, [sp, #0]
+ 458 0054 FEFFFFEB 		bl	agc_inp_dbm8_by_pm
+  90:layer1/prim_pm.c **** 	printf("PM MEAS: ARFCN=%u, %-4d dBm at baseband, %-4d dBm at RF\n",
+ 459              		.loc 1 90 0
+ 460 0058 0038A0E1 		mov	r3, r0, asl #16
+ 461 005c 4338A0E1 		mov	r3, r3, asr #16
+ 462 0060 000053E3 		cmp	r3, #0
+ 463 0064 072083E2 		add	r2, r3, #7
+ 464 0068 0230A0B1 		movlt	r3, r2
+ 465 006c A421A0E1 		mov	r2, r4, lsr #3
+  97:layer1/prim_pm.c **** 	if (!l1s.pm.msg)
+ 466              		.loc 1 97 0
+ 467 0070 80419FE5 		ldr	r4, .L30+4
+  90:layer1/prim_pm.c **** 	printf("PM MEAS: ARFCN=%u, %-4d dBm at baseband, %-4d dBm at RF\n",
+ 468              		.loc 1 90 0
+ 469 0074 C331A0E1 		mov	r3, r3, asr #3
+ 470 0078 7C019FE5 		ldr	r0, .L30+8
+ 471 007c 0610A0E1 		mov	r1, r6
+ 472 0080 FEFFFFEB 		bl	printf
+  97:layer1/prim_pm.c **** 	if (!l1s.pm.msg)
+ 473              		.loc 1 97 0
+ 474 0084 043B94E5 		ldr	r3, [r4, #2820]
+ 475 0088 000053E3 		cmp	r3, #0
+ 476 008c 0200001A 		bne	.L23
+  98:layer1/prim_pm.c **** 		l1s.pm.msg = l1ctl_msgb_alloc(L1CTL_PM_CONF);
+ 477              		.loc 1 98 0
+ 478 0090 0900A0E3 		mov	r0, #9
+ 479 0094 FEFFFFEB 		bl	l1ctl_msgb_alloc
+ 480 0098 040B84E5 		str	r0, [r4, #2820]
+ 481              	.L23:
+ 100:layer1/prim_pm.c **** 	if (msgb_tailroom(l1s.pm.msg) < sizeof(*pmr)) {
+ 482              		.loc 1 100 0
+ 483 009c 54419FE5 		ldr	r4, .L30+4
+ 484 00a0 040B94E5 		ldr	r0, [r4, #2820]
+ 485              	.LVL35:
+ 486              	.LBB48:
+ 487              	.LBB49:
+ 148:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	return (msgb->head + msgb->data_len) - msgb->tail;
+ 488              		.loc 2 148 0
+ 489 00a4 382090E5 		ldr	r2, [r0, #56]
+ 490 00a8 B433D0E1 		ldrh	r3, [r0, #52]
+ 491 00ac 033082E0 		add	r3, r2, r3
+ 492 00b0 3C2090E5 		ldr	r2, [r0, #60]
+ 493 00b4 033062E0 		rsb	r3, r2, r3
+ 494              	.LBE49:
+ 495              	.LBE48:
+ 100:layer1/prim_pm.c **** 	if (msgb_tailroom(l1s.pm.msg) < sizeof(*pmr)) {
+ 496              		.loc 1 100 0
+ 497 00b8 030053E3 		cmp	r3, #3
+ 498 00bc 0300008A 		bhi	.L24
+ 102:layer1/prim_pm.c **** 		l1_queue_for_l2(l1s.pm.msg);
+ 499              		.loc 1 102 0
+ 500 00c0 FEFFFFEB 		bl	l1_queue_for_l2
+ 501              	.LVL36:
+ 104:layer1/prim_pm.c **** 		l1s.pm.msg = l1ctl_msgb_alloc(L1CTL_PM_CONF);
+ 502              		.loc 1 104 0
+ 503 00c4 0900A0E3 		mov	r0, #9
+ 504 00c8 FEFFFFEB 		bl	l1ctl_msgb_alloc
+ 505 00cc 040B84E5 		str	r0, [r4, #2820]
+ 506              	.L24:
+ 107:layer1/prim_pm.c **** 	pmr = (struct l1ctl_pm_conf *) msgb_put(l1s.pm.msg, sizeof(*pmr));
+ 507              		.loc 1 107 0
+ 508 00d0 20319FE5 		ldr	r3, .L30+4
+ 509 00d4 044B93E5 		ldr	r4, [r3, #2820]
+ 510              	.LVL37:
+ 511              	.LBB50:
+ 512              	.LBB51:
+ 513              	.LBB52:
+ 514              	.LBB53:
+ 148:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	return (msgb->head + msgb->data_len) - msgb->tail;
+ 515              		.loc 2 148 0
+ 516 00d8 B433D4E1 		ldrh	r3, [r4, #52]
+ 517              	.LVL38:
+ 518              	.LBE53:
+ 519              	.LBE52:
+ 520 00dc 382084E2 		add	r2, r4, #56
+ 521 00e0 240092E8 		ldmia	r2, {r2, r5}	@ phole ldm
+ 522              	.LVL39:
+ 523              	.LBB55:
+ 524              	.LBB54:
+ 525 00e4 032082E0 		add	r2, r2, r3
+ 526 00e8 022065E0 		rsb	r2, r5, r2
+ 527              	.LBE54:
+ 528              	.LBE55:
+ 178:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	if (msgb_tailroom(msgb) < (int) len)
+ 529              		.loc 2 178 0
+ 530 00ec 030052E3 		cmp	r2, #3
+ 531              	.LVL40:
+ 179:../../shared/libosmocore/include/osmocom/core/msgb.h **** 		MSGB_ABORT(msgb, "Not enough tailroom msgb_push (%u < %u)\n",
+ 532              		.loc 2 179 0
+ 533 00f0 08019FD5 		ldrle	r0, .L30+12
+ 534 00f4 0410A0D1 		movle	r1, r4
+ 535 00f8 0430A0D3 		movle	r3, #4
+ 536 00fc FEFFFFDB 		blle	osmo_panic
+ 537              	.LVL41:
+ 538              	.L25:
+ 181:../../shared/libosmocore/include/osmocom/core/msgb.h **** 	msgb->tail += len;
+ 539              		.loc 2 181 0
+ 540 0100 3C3094E5 		ldr	r3, [r4, #60]
+ 541 0104 043083E2 		add	r3, r3, #4
+ 542 0108 3C3084E5 		str	r3, [r4, #60]
+ 543              		.loc 2 182 0
+ 544 010c B633D4E1 		ldrh	r3, [r4, #54]
+ 545 0110 043083E2 		add	r3, r3, #4
+ 546 0114 B633C4E1 		strh	r3, [r4, #54]	@ movhi
+ 547              	.LVL42:
+ 548              	.LBE51:
+ 549              	.LBE50:
+ 550              	.LBB56:
+ 551              	.LBB57:
+ 552              		.loc 3 51 0
+ 553 0118 2634A0E1 		mov	r3, r6, lsr #8
+ 554 011c 066483E1 		orr	r6, r3, r6, asl #8
+ 555              	.LVL43:
+ 556              	.LBE57:
+ 557              	.LBE56:
+ 108:layer1/prim_pm.c **** 	pmr->band_arfcn = htons(arfcn);
+ 558              		.loc 1 108 0
+ 559 0120 0060C5E5 		strb	r6, [r5, #0]
+ 560 0124 2664A0E1 		mov	r6, r6, lsr #8
+ 561 0128 0160C5E5 		strb	r6, [r5, #1]
+ 110:layer1/prim_pm.c **** 	pmr->pm[0] = dbm2rxlev(agc_inp_dbm8_by_pm(pm_level[0])/8);
+ 562              		.loc 1 110 0
+ 563 012c 0700A0E1 		mov	r0, r7
+ 564 0130 FEFFFFEB 		bl	agc_inp_dbm8_by_pm
+ 565 0134 0008A0E1 		mov	r0, r0, asl #16
+ 566 0138 4008A0E1 		mov	r0, r0, asr #16
+ 567 013c 073080E2 		add	r3, r0, #7
+ 568 0140 000050E3 		cmp	r0, #0
+ 569 0144 0300A0B1 		movlt	r0, r3
+ 570 0148 C001A0E1 		mov	r0, r0, asr #3
+ 571 014c FEFFFFEB 		bl	dbm2rxlev
+ 111:layer1/prim_pm.c **** 	if (num_meas > 1)
+ 572              		.loc 1 111 0
+ 573 0150 010058E3 		cmp	r8, #1
+ 114:layer1/prim_pm.c **** 		pmr->pm[1] = 0;
+ 574              		.loc 1 114 0
+ 575 0154 0030A093 		movls	r3, #0
+ 110:layer1/prim_pm.c **** 	pmr->pm[0] = dbm2rxlev(agc_inp_dbm8_by_pm(pm_level[0])/8);
+ 576              		.loc 1 110 0
+ 577 0158 0200C5E5 		strb	r0, [r5, #2]
+ 114:layer1/prim_pm.c **** 		pmr->pm[1] = 0;
+ 578              		.loc 1 114 0
+ 579 015c 0330C595 		strlsb	r3, [r5, #3]
+ 111:layer1/prim_pm.c **** 	if (num_meas > 1)
+ 580              		.loc 1 111 0
+ 581 0160 0900009A 		bls	.L27
+ 112:layer1/prim_pm.c **** 		pmr->pm[1] = dbm2rxlev(agc_inp_dbm8_by_pm(pm_level[1])/8);
+ 582              		.loc 1 112 0
+ 583 0164 F200DDE1 		ldrsh	r0, [sp, #2]
+ 584 0168 FEFFFFEB 		bl	agc_inp_dbm8_by_pm
+ 585 016c 0008A0E1 		mov	r0, r0, asl #16
+ 586 0170 4008A0E1 		mov	r0, r0, asr #16
+ 587 0174 073080E2 		add	r3, r0, #7
+ 588 0178 000050E3 		cmp	r0, #0
+ 589 017c 0300A0B1 		movlt	r0, r3
+ 590 0180 C001A0E1 		mov	r0, r0, asr #3
+ 591 0184 FEFFFFEB 		bl	dbm2rxlev
+ 592 0188 0300C5E5 		strb	r0, [r5, #3]
+ 593              	.L27:
+ 116:layer1/prim_pm.c **** 	if (l1s.pm.mode == 1) {
+ 594              		.loc 1 116 0
+ 595 018c 64409FE5 		ldr	r4, .L30+4
+ 596              	.LVL44:
+ 597 0190 F80A94E5 		ldr	r0, [r4, #2808]
+ 598 0194 010050E3 		cmp	r0, #1
+ 599 0198 1300001A 		bne	.L28
+ 117:layer1/prim_pm.c **** 		if (l1s.pm.range.arfcn_next != l1s.pm.range.arfcn_end) {
+ 600              		.loc 1 117 0
+ 601 019c 60309FE5 		ldr	r3, .L30+16
+ 602 01a0 0B1CA0E3 		mov	r1, #2816
+ 603 01a4 B32094E1 		ldrh	r2, [r4, r3]
+ 604 01a8 B11094E1 		ldrh	r1, [r4, r1]
+ 605 01ac 020051E1 		cmp	r1, r2
+ 606 01b0 0500000A 		beq	.L29
+ 119:layer1/prim_pm.c **** 			l1s.pm.range.arfcn_next =
+ 607              		.loc 1 119 0
+ 608 01b4 4C109FE5 		ldr	r1, .L30+20
+ 609 01b8 012082E2 		add	r2, r2, #1
+ 610 01bc 011002E0 		and	r1, r2, r1
+ 611 01c0 B31084E1 		strh	r1, [r4, r3]	@ movhi
+ 121:layer1/prim_pm.c **** 			l1s_pm_test(1, l1s.pm.range.arfcn_next);
+ 612              		.loc 1 121 0
+ 613 01c4 FEFFFFEB 		bl	l1s_pm_test
+ 614 01c8 070000EA 		b	.L28
+ 615              	.L29:
+ 616              	.LBB58:
+ 125:layer1/prim_pm.c **** 			l1h = (struct l1ctl_hdr *) l1s.pm.msg->l1h;
+ 617              		.loc 1 125 0
+ 618 01cc 040B94E5 		ldr	r0, [r4, #2820]
+ 619 01d0 103090E5 		ldr	r3, [r0, #16]
+ 620              	.LVL45:
+ 126:layer1/prim_pm.c **** 			l1h->flags |= L1CTL_F_DONE;
+ 621              		.loc 1 126 0
+ 622 01d4 0120D3E5 		ldrb	r2, [r3, #1]	@ zero_extendqisi2
+ 623 01d8 012082E3 		orr	r2, r2, #1
+ 624 01dc 0120C3E5 		strb	r2, [r3, #1]
+ 127:layer1/prim_pm.c **** 			l1_queue_for_l2(l1s.pm.msg);
+ 625              		.loc 1 127 0
+ 626 01e0 FEFFFFEB 		bl	l1_queue_for_l2
+ 627              	.LVL46:
+ 128:layer1/prim_pm.c **** 			l1s.pm.msg = NULL;
+ 628              		.loc 1 128 0
+ 629 01e4 0030A0E3 		mov	r3, #0
+ 630 01e8 043B84E5 		str	r3, [r4, #2820]
+ 631              	.L28:
+ 632              	.LBE58:
+ 133:layer1/prim_pm.c **** }
+ 633              		.loc 1 133 0
+ 634 01ec 0000A0E3 		mov	r0, #0
+ 635 01f0 F881BDE8 		ldmfd	sp!, {r3, r4, r5, r6, r7, r8, pc}
+ 636              	.L31:
+ 637              		.align	2
+ 638              	.L30:
+ 639 01f4 00000000 		.word	dsp_api
+ 640 01f8 00000000 		.word	l1s
+ 641 01fc 33000000 		.word	.LC1
+ 642 0200 00000000 		.word	.LC0
+ 643 0204 FE0A0000 		.word	2814
+ 644 0208 FFFB0000 		.word	64511
+ 645              		.cfi_endproc
+ 646              	.LFE67:
+ 648              		.global	neigh_pm_sched_set
+ 649              		.section	.rodata
+ 650              		.align	2
+ 651              		.set	.LANCHOR0,. + 0
+ 654              	pm_sched_set:
+ 655 0000 00000000 		.word	l1s_pm_cmd
+ 656 0004 01       		.byte	1
+ 657 0005 00       		.byte	0
+ 658 0006 0000     		.space	2
+ 659 0008 0000     		.short	0
+ 660 000a 0300     		.short	3
+ 661 000c 00000000 		.word	0
+ 662 0010 00       		.byte	0
+ 663 0011 00       		.byte	0
+ 664 0012 00000000 		.space	6
+ 664      0000
+ 665 0018 00000000 		.word	0
+ 666 001c 00       		.byte	0
+ 667 001d 00       		.byte	0
+ 668 001e 00000000 		.space	6
+ 668      0000
+ 669 0024 00000000 		.word	l1s_pm_resp
+ 670 0028 01       		.byte	1
+ 671 0029 00       		.byte	0
+ 672 002a 0000     		.space	2
+ 673 002c FCFF     		.short	-4
+ 674 002e 0000     		.short	0
+ 675 0030 00000000 		.word	0
+ 676 0034 00       		.byte	0
+ 677 0035 00       		.byte	0
+ 678 0036 00000000 		.space	6
+ 678      0000
+ 679 003c 00000000 		.word	tdma_end_set
+ 680 0040 00       		.byte	0
+ 681 0041 00       		.byte	0
+ 682 0042 00000000 		.space	6
+ 682      0000
+ 685              	neigh_pm_sched_set:
+ 686 0048 00000000 		.word	l1s_neigh_pm_cmd
+ 687 004c 01       		.byte	1
+ 688 004d 00       		.byte	0
+ 689 004e 0000     		.space	2
+ 690 0050 0000     		.short	0
+ 691 0052 0300     		.short	3
+ 692 0054 00000000 		.word	0
+ 693 0058 00       		.byte	0
+ 694 0059 00       		.byte	0
+ 695 005a 00000000 		.space	6
+ 695      0000
+ 696 0060 00000000 		.word	0
+ 697 0064 00       		.byte	0
+ 698 0065 00       		.byte	0
+ 699 0066 00000000 		.space	6
+ 699      0000
+ 700 006c 00000000 		.word	l1s_neigh_pm_resp
+ 701 0070 01       		.byte	1
+ 702 0071 00       		.byte	0
+ 703 0072 0000     		.space	2
+ 704 0074 FCFF     		.short	-4
+ 705 0076 0000     		.short	0
+ 706 0078 00000000 		.word	0
+ 707 007c 00       		.byte	0
+ 708 007d 00       		.byte	0
+ 709 007e 00000000 		.space	6
+ 709      0000
+ 710 0084 00000000 		.word	tdma_end_set
+ 711 0088 00       		.byte	0
+ 712 0089 00       		.byte	0
+ 713 008a 00000000 		.space	6
+ 713      0000
+ 714              		.section	.rodata.str1.1,"aMS",%progbits,1
+ 715              	.LC0:
+ 716 0000 6D736762 		.ascii	"msgb(%p): Not enough tailroom msgb_push (%u < %u)\012"
+ 716      28257029 
+ 716      3A204E6F 
+ 716      7420656E 
+ 716      6F756768 
+ 717 0032 00       		.ascii	"\000"
+ 718              	.LC1:
+ 719 0033 504D204D 		.ascii	"PM MEAS: ARFCN=%u, %-4d dBm at baseband, %-4d dBm a"
+ 719      4541533A 
+ 719      20415246 
+ 719      434E3D25 
+ 719      752C2025 
+ 720 0066 74205246 		.ascii	"t RF\012\000"
+ 720      0A00
+ 721              		.text
+ 722              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 prim_pm.c
+     /tmp/ccne4fnI.s:12     .text.l1s_neigh_pm_resp:0000000000000000 $a
+     /tmp/ccne4fnI.s:14     .text.l1s_neigh_pm_resp:0000000000000000 l1s_neigh_pm_resp
+     /tmp/ccne4fnI.s:207    .text.l1s_neigh_pm_resp:0000000000000164 $d
+     /tmp/ccne4fnI.s:216    .text.l1s_pm_cmd:0000000000000000 $a
+     /tmp/ccne4fnI.s:218    .text.l1s_pm_cmd:0000000000000000 l1s_pm_cmd
+     /tmp/ccne4fnI.s:267    .text.l1s_pm_cmd:000000000000004c $d
+     /tmp/ccne4fnI.s:272    .text.l1s_neigh_pm_cmd:0000000000000000 $a
+     /tmp/ccne4fnI.s:274    .text.l1s_neigh_pm_cmd:0000000000000000 l1s_neigh_pm_cmd
+     /tmp/ccne4fnI.s:337    .text.l1s_neigh_pm_cmd:0000000000000074 $d
+     /tmp/ccne4fnI.s:343    .text.l1s_pm_test:0000000000000000 $a
+     /tmp/ccne4fnI.s:346    .text.l1s_pm_test:0000000000000000 l1s_pm_test
+     /tmp/ccne4fnI.s:385    .text.l1s_pm_test:000000000000002c $d
+     /tmp/ccne4fnI.s:390    .text.l1s_pm_resp:0000000000000000 $a
+     /tmp/ccne4fnI.s:392    .text.l1s_pm_resp:0000000000000000 l1s_pm_resp
+     /tmp/ccne4fnI.s:639    .text.l1s_pm_resp:00000000000001f4 $d
+     /tmp/ccne4fnI.s:685    .rodata:0000000000000048 neigh_pm_sched_set
+     /tmp/ccne4fnI.s:650    .rodata:0000000000000000 $d
+     /tmp/ccne4fnI.s:654    .rodata:0000000000000000 pm_sched_set
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+agc_inp_dbm8_by_pm
+dbm2rxlev
+l1ctl_msgb_alloc
+l1_queue_for_l2
+osmo_panic
+dsp_api
+l1s
+rffe_compute_gain
+l1s_rx_win_ctrl
+rffe_get_gain
+rffe_set_gain
+tdma_schedule_set
+printf
+tdma_end_set

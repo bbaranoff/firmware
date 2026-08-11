@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  22930	    412	  33940	  57282	   dfc2	board/pirelli_dpl10/hello_world.highram.elf
+  23862	    416	  33968	  58246	   e386	board/pirelli_dpl10/hello_world.highram.elf

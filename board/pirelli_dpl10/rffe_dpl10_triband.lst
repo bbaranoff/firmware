@@ -44,42 +44,40 @@
   20              		@ args = 0, pretend = 0, frame = 0
   21              		@ frame_needed = 0, uses_anonymous_args = 0
   22              	.LVL0:
-  23 0000 30402DE9 		stmfd	sp!, {r4, r5, lr}
+  23 0000 10402DE9 		stmfd	sp!, {r4, lr}
   24              	.LCFI0:
-  25              		.cfi_def_cfa_offset 12
+  25              		.cfi_def_cfa_offset 8
   26              		.loc 1 32 0
   27 0004 0040A0E1 		mov	r4, r0
   28              		.cfi_offset 14, -4
-  29              		.cfi_offset 5, -8
-  30              		.cfi_offset 4, -12
-  31 0008 0150A0E1 		mov	r5, r1
+  29              		.cfi_offset 4, -8
   33:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	uint16_t tspact = tsp_act_state();
-  32              		.loc 1 33 0
-  33 000c FEFFFFEB 		bl	tsp_act_state
-  34              	.LVL1:
+  30              		.loc 1 33 0
+  31 0008 FEFFFFEB 		bl	tsp_act_state
+  32              	.LVL1:
   34:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
   35:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	/* First we mask off all bits from the state cache */
   36:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	tspact &= ~(PA_ENABLE| GSM_TXEN);
   37:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	tspact &= ~(ASM_VC1 | ASM_VC2 | ASM_VC3);
-  35              		.loc 1 37 0
-  36 0010 68309FE5 		ldr	r3, .L9
+  33              		.loc 1 37 0
+  34 000c 14309FE5 		ldr	r3, .L4
   38:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
   39:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	switch (band) {
-  37              		.loc 1 39 0
-  38 0014 080054E3 		cmp	r4, #8
+  35              		.loc 1 39 0
+  36 0010 080054E3 		cmp	r4, #8
   37:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	tspact &= ~(ASM_VC1 | ASM_VC2 | ASM_VC3);
-  39              		.loc 1 37 0
-  40 0018 033000E0 		and	r3, r0, r3
-  41              	.LVL2:
+  37              		.loc 1 37 0
+  38 0014 033000E0 		and	r3, r0, r3
+  39              	.LVL2:
   40:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	case GSM_BAND_850:
   41:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	case GSM_BAND_900:
   42:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	case GSM_BAND_1800:
   43:board/pirelli_dpl10/rffe_dpl10_triband.c **** 		break;
   44:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	case GSM_BAND_1900:
   45:board/pirelli_dpl10/rffe_dpl10_triband.c **** 		tspact |= ASM_VC1;
-  42              		.loc 1 45 0
-  43 001c 10308303 		orreq	r3, r3, #16
-  44              	.LVL3:
+  40              		.loc 1 45 0
+  41 0018 10308303 		orreq	r3, r3, #16
+  42              	.LVL3:
   46:board/pirelli_dpl10/rffe_dpl10_triband.c **** 		break;
   47:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	default:
   48:board/pirelli_dpl10/rffe_dpl10_triband.c **** 		/* TODO return/signal error here */
@@ -89,151 +87,113 @@
   52:board/pirelli_dpl10/rffe_dpl10_triband.c **** #ifdef CONFIG_TX_ENABLE
   53:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	/* Then we selectively set the bits on, if required */
   54:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	if (tx) {
-  45              		.loc 1 54 0
-  46 0020 000055E3 		cmp	r5, #0
-  47 0024 1200000A 		beq	.L4
   55:board/pirelli_dpl10/rffe_dpl10_triband.c **** 		switch (band) {
-  48              		.loc 1 55 0
-  49 0028 014044E2 		sub	r4, r4, #1
-  50              	.LVL4:
-  51 002c 070054E3 		cmp	r4, #7
-  52 0030 04F19F97 		ldrls	pc, [pc, r4, asl #2]
-  53 0034 0D0000EA 		b	.L5
-  54              	.L8:
-  55 0038 58000000 		.word	.L6
-  56 003c 58000000 		.word	.L6
-  57 0040 70000000 		.word	.L5
-  58 0044 60000000 		.word	.L7
-  59 0048 70000000 		.word	.L5
-  60 004c 70000000 		.word	.L5
-  61 0050 70000000 		.word	.L5
-  62 0054 60000000 		.word	.L7
-  63              	.L6:
   56:board/pirelli_dpl10/rffe_dpl10_triband.c **** 		case GSM_BAND_850:
   57:board/pirelli_dpl10/rffe_dpl10_triband.c **** 		case GSM_BAND_900:
   58:board/pirelli_dpl10/rffe_dpl10_triband.c **** 			tspact |= ASM_VC3;
-  64              		.loc 1 58 0
-  65 0058 023B83E3 		orr	r3, r3, #2048
-  66              	.LVL5:
   59:board/pirelli_dpl10/rffe_dpl10_triband.c **** 			break;
-  67              		.loc 1 59 0
-  68 005c 030000EA 		b	.L5
-  69              	.L7:
-  70              	.LVL6:
   60:board/pirelli_dpl10/rffe_dpl10_triband.c **** 		case GSM_BAND_1800:
   61:board/pirelli_dpl10/rffe_dpl10_triband.c **** 		case GSM_BAND_1900:
   62:board/pirelli_dpl10/rffe_dpl10_triband.c **** 			tspact |= GSM_TXEN;
   63:board/pirelli_dpl10/rffe_dpl10_triband.c **** 			tspact |= ASM_VC2;
-  71              		.loc 1 63 0
-  72 0060 013B83E3 		orr	r3, r3, #1024
-  73              	.LVL7:
-  74 0064 083083E3 		orr	r3, r3, #8
-  75 0068 0338A0E1 		mov	r3, r3, asl #16
-  76 006c 2338A0E1 		mov	r3, r3, lsr #16
-  77              	.LVL8:
-  78              	.L5:
   64:board/pirelli_dpl10/rffe_dpl10_triband.c **** 			break;
   65:board/pirelli_dpl10/rffe_dpl10_triband.c **** 		default:
   66:board/pirelli_dpl10/rffe_dpl10_triband.c **** 			break;
   67:board/pirelli_dpl10/rffe_dpl10_triband.c **** 		}
   68:board/pirelli_dpl10/rffe_dpl10_triband.c **** 		tspact |= PA_ENABLE;
-  79              		.loc 1 68 0
-  80 0070 013083E3 		orr	r3, r3, #1
-  81              	.LVL9:
-  82              	.L4:
   69:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	}
   70:board/pirelli_dpl10/rffe_dpl10_triband.c **** #endif /* TRANSMIT_SUPPORT */
   71:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
   72:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	tsp_act_update(tspact);
-  83              		.loc 1 72 0
-  84 0074 0300A0E1 		mov	r0, r3
+  43              		.loc 1 72 0
+  44 001c 0300A0E1 		mov	r0, r3
   73:board/pirelli_dpl10/rffe_dpl10_triband.c **** }
-  85              		.loc 1 73 0
-  86 0078 3040BDE8 		ldmfd	sp!, {r4, r5, lr}
+  45              		.loc 1 73 0
+  46 0020 1040BDE8 		ldmfd	sp!, {r4, lr}
   72:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	tsp_act_update(tspact);
-  87              		.loc 1 72 0
-  88 007c FEFFFFEA 		b	tsp_act_update
-  89              	.LVL10:
-  90              	.L10:
-  91              		.align	2
-  92              	.L9:
-  93 0080 E6F30000 		.word	62438
-  94              		.cfi_endproc
-  95              	.LFE3:
-  97              		.section	.text.rffe_get_rx_ports,"ax",%progbits
-  98              		.align	2
-  99              		.global	rffe_get_rx_ports
- 101              	rffe_get_rx_ports:
- 102              	.LFB4:
+  47              		.loc 1 72 0
+  48 0024 FEFFFFEA 		b	tsp_act_update
+  49              	.LVL4:
+  50              	.L5:
+  51              		.align	2
+  52              	.L4:
+  53 0028 E6F30000 		.word	62438
+  54              		.cfi_endproc
+  55              	.LFE3:
+  57              		.section	.text.rffe_get_rx_ports,"ax",%progbits
+  58              		.align	2
+  59              		.global	rffe_get_rx_ports
+  61              	rffe_get_rx_ports:
+  62              	.LFB4:
   74:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
   75:board/pirelli_dpl10/rffe_dpl10_triband.c **** /* Returns RF wiring */
   76:board/pirelli_dpl10/rffe_dpl10_triband.c **** uint32_t rffe_get_rx_ports(void)
   77:board/pirelli_dpl10/rffe_dpl10_triband.c **** {
- 103              		.loc 1 77 0
- 104              		.cfi_startproc
- 105              		@ args = 0, pretend = 0, frame = 0
- 106              		@ frame_needed = 0, uses_anonymous_args = 0
- 107              		@ link register save eliminated.
+  63              		.loc 1 77 0
+  64              		.cfi_startproc
+  65              		@ args = 0, pretend = 0, frame = 0
+  66              		@ frame_needed = 0, uses_anonymous_args = 0
+  67              		@ link register save eliminated.
   78:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	return (1 << PORT_LO) | (1 << PORT_DCS1800) | (1 << PORT_PCS1900);
   79:board/pirelli_dpl10/rffe_dpl10_triband.c **** }
- 108              		.loc 1 79 0
- 109 0000 3100A0E3 		mov	r0, #49
- 110 0004 1EFF2FE1 		bx	lr
- 111              		.cfi_endproc
- 112              	.LFE4:
- 114              		.section	.text.rffe_get_tx_ports,"ax",%progbits
- 115              		.align	2
- 116              		.global	rffe_get_tx_ports
- 118              	rffe_get_tx_ports:
- 119              	.LFB5:
+  68              		.loc 1 79 0
+  69 0000 3100A0E3 		mov	r0, #49
+  70 0004 1EFF2FE1 		bx	lr
+  71              		.cfi_endproc
+  72              	.LFE4:
+  74              		.section	.text.rffe_get_tx_ports,"ax",%progbits
+  75              		.align	2
+  76              		.global	rffe_get_tx_ports
+  78              	rffe_get_tx_ports:
+  79              	.LFB5:
   80:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
   81:board/pirelli_dpl10/rffe_dpl10_triband.c **** uint32_t rffe_get_tx_ports(void)
   82:board/pirelli_dpl10/rffe_dpl10_triband.c **** {
- 120              		.loc 1 82 0
- 121              		.cfi_startproc
- 122              		@ args = 0, pretend = 0, frame = 0
- 123              		@ frame_needed = 0, uses_anonymous_args = 0
- 124              		@ link register save eliminated.
+  80              		.loc 1 82 0
+  81              		.cfi_startproc
+  82              		@ args = 0, pretend = 0, frame = 0
+  83              		@ frame_needed = 0, uses_anonymous_args = 0
+  84              		@ link register save eliminated.
   83:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	return (1 << PORT_LO) | (1 << PORT_HI);
   84:board/pirelli_dpl10/rffe_dpl10_triband.c **** }
- 125              		.loc 1 84 0
- 126 0000 0300A0E3 		mov	r0, #3
- 127 0004 1EFF2FE1 		bx	lr
- 128              		.cfi_endproc
- 129              	.LFE5:
- 131              		.section	.text.rffe_iq_swapped,"ax",%progbits
- 132              		.align	2
- 133              		.global	rffe_iq_swapped
- 135              	rffe_iq_swapped:
- 136              	.LFB6:
+  85              		.loc 1 84 0
+  86 0000 0300A0E3 		mov	r0, #3
+  87 0004 1EFF2FE1 		bx	lr
+  88              		.cfi_endproc
+  89              	.LFE5:
+  91              		.section	.text.rffe_iq_swapped,"ax",%progbits
+  92              		.align	2
+  93              		.global	rffe_iq_swapped
+  95              	rffe_iq_swapped:
+  96              	.LFB6:
   85:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
   86:board/pirelli_dpl10/rffe_dpl10_triband.c **** /* Returns need for IQ swap */
   87:board/pirelli_dpl10/rffe_dpl10_triband.c **** int rffe_iq_swapped(uint16_t band_arfcn, int tx)
   88:board/pirelli_dpl10/rffe_dpl10_triband.c **** {
- 137              		.loc 1 88 0
- 138              		.cfi_startproc
- 139              		@ args = 0, pretend = 0, frame = 0
- 140              		@ frame_needed = 0, uses_anonymous_args = 0
- 141              		@ link register save eliminated.
- 142              	.LVL11:
- 143              		.loc 1 88 0
- 144 0000 0008A0E1 		mov	r0, r0, asl #16
- 145              	.LVL12:
+  97              		.loc 1 88 0
+  98              		.cfi_startproc
+  99              		@ args = 0, pretend = 0, frame = 0
+ 100              		@ frame_needed = 0, uses_anonymous_args = 0
+ 101              		@ link register save eliminated.
+ 102              	.LVL5:
+ 103              		.loc 1 88 0
+ 104 0000 0008A0E1 		mov	r0, r0, asl #16
+ 105              	.LVL6:
   89:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	return trf6151_iq_swapped(band_arfcn, tx);
- 146              		.loc 1 89 0
- 147 0004 2008A0E1 		mov	r0, r0, lsr #16
+ 106              		.loc 1 89 0
+ 107 0004 2008A0E1 		mov	r0, r0, lsr #16
   90:board/pirelli_dpl10/rffe_dpl10_triband.c **** }
- 148              		.loc 1 90 0
+ 108              		.loc 1 90 0
   89:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	return trf6151_iq_swapped(band_arfcn, tx);
- 149              		.loc 1 89 0
- 150 0008 FEFFFFEA 		b	trf6151_iq_swapped
- 151              		.cfi_endproc
- 152              	.LFE6:
- 154              		.section	.text.rffe_init,"ax",%progbits
- 155              		.align	2
- 156              		.global	rffe_init
- 158              	rffe_init:
- 159              	.LFB7:
+ 109              		.loc 1 89 0
+ 110 0008 FEFFFFEA 		b	trf6151_iq_swapped
+ 111              		.cfi_endproc
+ 112              	.LFE6:
+ 114              		.section	.text.rffe_init,"ax",%progbits
+ 115              		.align	2
+ 116              		.global	rffe_init
+ 118              	rffe_init:
+ 119              	.LFB7:
   91:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
   92:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
   93:board/pirelli_dpl10/rffe_dpl10_triband.c **** #define MCU_SW_TRACE	0xfffef00e
@@ -242,148 +202,148 @@
   96:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
   97:board/pirelli_dpl10/rffe_dpl10_triband.c **** void rffe_init(void)
   98:board/pirelli_dpl10/rffe_dpl10_triband.c **** {
- 160              		.loc 1 98 0
- 161              		.cfi_startproc
- 162              		@ args = 0, pretend = 0, frame = 0
- 163              		@ frame_needed = 0, uses_anonymous_args = 0
+ 120              		.loc 1 98 0
+ 121              		.cfi_startproc
+ 122              		@ args = 0, pretend = 0, frame = 0
+ 123              		@ frame_needed = 0, uses_anonymous_args = 0
   99:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	uint16_t reg;
  100:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
  101:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	reg = readw(ARM_CONF_REG);
- 164              		.loc 1 101 0
- 165 0000 54309FE5 		ldr	r3, .L15
+ 124              		.loc 1 101 0
+ 125 0000 54309FE5 		ldr	r3, .L10
  102:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	reg &= ~ (1 << 7);	/* TSPACT4 I/O function, not nRDYMEM */
- 166              		.loc 1 102 0
- 167 0004 54209FE5 		ldr	r2, .L15+4
+ 126              		.loc 1 102 0
+ 127 0004 54209FE5 		ldr	r2, .L10+4
  101:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	reg = readw(ARM_CONF_REG);
- 168              		.loc 1 101 0
- 169 0008 B91F53E1 		ldrh	r1, [r3, #-249]
- 170              	.LVL13:
- 171              		.loc 1 102 0
- 172 000c 022001E0 		and	r2, r1, r2
- 173              	.LVL14:
+ 128              		.loc 1 101 0
+ 129 0008 B91F53E1 		ldrh	r1, [r3, #-249]
+ 130              	.LVL7:
+ 131              		.loc 1 102 0
+ 132 000c 022001E0 		and	r2, r1, r2
+ 133              	.LVL8:
   98:board/pirelli_dpl10/rffe_dpl10_triband.c **** {
- 174              		.loc 1 98 0
- 175 0010 04E02DE5 		str	lr, [sp, #-4]!
- 176              	.LCFI1:
- 177              		.cfi_def_cfa_offset 4
+ 134              		.loc 1 98 0
+ 135 0010 04E02DE5 		str	lr, [sp, #-4]!
+ 136              	.LCFI1:
+ 137              		.cfi_def_cfa_offset 4
  103:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	writew(reg, ARM_CONF_REG);
- 178              		.loc 1 103 0
- 179 0014 B92F43E1 		strh	r2, [r3, #-249]	@ movhi
+ 138              		.loc 1 103 0
+ 139 0014 B92F43E1 		strh	r2, [r3, #-249]	@ movhi
  104:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
  105:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	reg = readw(ASIC_CONF_REG);
- 180              		.loc 1 105 0
- 181 0018 B72F53E1 		ldrh	r2, [r3, #-247]
- 182              	.LVL15:
+ 140              		.loc 1 105 0
+ 141 0018 B72F53E1 		ldrh	r2, [r3, #-247]
+ 142              	.LVL9:
  106:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	reg &= ~ (1 << 15);	/* TSPACT5 I/O function, not DPLLCLK */
- 183              		.loc 1 106 0
- 184 001c 8228A0E1 		mov	r2, r2, asl #17
- 185              	.LVL16:
- 186 0020 A228A0E1 		mov	r2, r2, lsr #17
- 187              	.LVL17:
+ 143              		.loc 1 106 0
+ 144 001c 8228A0E1 		mov	r2, r2, asl #17
+ 145              	.LVL10:
+ 146 0020 A228A0E1 		mov	r2, r2, lsr #17
+ 147              	.LVL11:
  107:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	writew(reg, ASIC_CONF_REG);
- 188              		.loc 1 107 0
- 189 0024 B72F43E1 		strh	r2, [r3, #-247]	@ movhi
+ 148              		.loc 1 107 0
+ 149 0024 B72F43E1 		strh	r2, [r3, #-247]	@ movhi
  108:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
  109:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	reg = readw(MCU_SW_TRACE);
  110:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	reg &= ~(1 << 3);	/* TSPACT10 I/O function, not nWAIT(1) */
  111:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	reg &= ~(1 << 2);	/* TSPACT11 I/O function, not MCLK(1) */
- 190              		.loc 1 111 0
- 191 0028 34209FE5 		ldr	r2, .L15+8
- 192              	.LVL18:
+ 150              		.loc 1 111 0
+ 151 0028 34209FE5 		ldr	r2, .L10+8
+ 152              	.LVL12:
  109:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	reg = readw(MCU_SW_TRACE);
- 193              		.loc 1 109 0
- 194 002c B11F53E1 		ldrh	r1, [r3, #-241]
- 195              	.LVL19:
+ 153              		.loc 1 109 0
+ 154 002c B11F53E1 		ldrh	r1, [r3, #-241]
+ 155              	.LVL13:
  112:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	writew(reg, MCU_SW_TRACE);
  113:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
  114:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	/* Configure the TSPEN which is connected to the TWL3025 */
  115:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	tsp_setup(IOTA_STROBE, 1, 0, 0);
- 196              		.loc 1 115 0
- 197 0030 0000A0E3 		mov	r0, #0
+ 156              		.loc 1 115 0
+ 157 0030 0000A0E3 		mov	r0, #0
  111:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	reg &= ~(1 << 2);	/* TSPACT11 I/O function, not MCLK(1) */
- 198              		.loc 1 111 0
- 199 0034 022001E0 		and	r2, r1, r2
- 200              	.LVL20:
+ 158              		.loc 1 111 0
+ 159 0034 022001E0 		and	r2, r1, r2
+ 160              	.LVL14:
  112:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	writew(reg, MCU_SW_TRACE);
- 201              		.loc 1 112 0
- 202 0038 B12F43E1 		strh	r2, [r3, #-241]	@ movhi
- 203              		.loc 1 115 0
- 204 003c 0110A0E3 		mov	r1, #1
- 205 0040 0020A0E1 		mov	r2, r0
- 206              	.LVL21:
- 207 0044 0030A0E1 		mov	r3, r0
- 208              		.cfi_offset 14, -4
- 209 0048 FEFFFFEB 		bl	tsp_setup
+ 161              		.loc 1 112 0
+ 162 0038 B12F43E1 		strh	r2, [r3, #-241]	@ movhi
+ 163              		.loc 1 115 0
+ 164 003c 0110A0E3 		mov	r1, #1
+ 165 0040 0020A0E1 		mov	r2, r0
+ 166              	.LVL15:
+ 167 0044 0030A0E1 		mov	r3, r0
+ 168              		.cfi_offset 14, -4
+ 169 0048 FEFFFFEB 		bl	tsp_setup
  116:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
  117:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	trf6151_init(RITA_STROBE, RITA_RESET);
- 210              		.loc 1 117 0
- 211 004c 0100A0E3 		mov	r0, #1
- 212 0050 2010A0E3 		mov	r1, #32
+ 170              		.loc 1 117 0
+ 171 004c 0100A0E3 		mov	r0, #1
+ 172 0050 2010A0E3 		mov	r1, #32
  118:board/pirelli_dpl10/rffe_dpl10_triband.c **** }
- 213              		.loc 1 118 0
- 214 0054 04E09DE4 		ldr	lr, [sp], #4
+ 173              		.loc 1 118 0
+ 174 0054 04E09DE4 		ldr	lr, [sp], #4
  117:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	trf6151_init(RITA_STROBE, RITA_RESET);
- 215              		.loc 1 117 0
- 216 0058 FEFFFFEA 		b	trf6151_init
- 217              	.L16:
- 218              		.align	2
- 219              	.L15:
- 220 005c FFF0FEFF 		.word	-69377
- 221 0060 7FFF0000 		.word	65407
- 222 0064 F3FF0000 		.word	65523
- 223              		.cfi_endproc
- 224              	.LFE7:
- 226              		.section	.text.rffe_get_gain,"ax",%progbits
- 227              		.align	2
- 228              		.global	rffe_get_gain
- 230              	rffe_get_gain:
- 231              	.LFB8:
+ 175              		.loc 1 117 0
+ 176 0058 FEFFFFEA 		b	trf6151_init
+ 177              	.L11:
+ 178              		.align	2
+ 179              	.L10:
+ 180 005c FFF0FEFF 		.word	-69377
+ 181 0060 7FFF0000 		.word	65407
+ 182 0064 F3FF0000 		.word	65523
+ 183              		.cfi_endproc
+ 184              	.LFE7:
+ 186              		.section	.text.rffe_get_gain,"ax",%progbits
+ 187              		.align	2
+ 188              		.global	rffe_get_gain
+ 190              	rffe_get_gain:
+ 191              	.LFB8:
  119:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
  120:board/pirelli_dpl10/rffe_dpl10_triband.c **** uint8_t rffe_get_gain(void)
  121:board/pirelli_dpl10/rffe_dpl10_triband.c **** {
- 232              		.loc 1 121 0
- 233              		.cfi_startproc
- 234              		@ args = 0, pretend = 0, frame = 0
- 235              		@ frame_needed = 0, uses_anonymous_args = 0
- 236              		@ link register save eliminated.
+ 192              		.loc 1 121 0
+ 193              		.cfi_startproc
+ 194              		@ args = 0, pretend = 0, frame = 0
+ 195              		@ frame_needed = 0, uses_anonymous_args = 0
+ 196              		@ link register save eliminated.
  122:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	return trf6151_get_gain();
  123:board/pirelli_dpl10/rffe_dpl10_triband.c **** }
- 237              		.loc 1 123 0
+ 197              		.loc 1 123 0
  122:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	return trf6151_get_gain();
- 238              		.loc 1 122 0
- 239 0000 FEFFFFEA 		b	trf6151_get_gain
- 240              		.cfi_endproc
- 241              	.LFE8:
- 243              		.section	.text.rffe_set_gain,"ax",%progbits
- 244              		.align	2
- 245              		.global	rffe_set_gain
- 247              	rffe_set_gain:
- 248              	.LFB9:
+ 198              		.loc 1 122 0
+ 199 0000 FEFFFFEA 		b	trf6151_get_gain
+ 200              		.cfi_endproc
+ 201              	.LFE8:
+ 203              		.section	.text.rffe_set_gain,"ax",%progbits
+ 204              		.align	2
+ 205              		.global	rffe_set_gain
+ 207              	rffe_set_gain:
+ 208              	.LFB9:
  124:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
  125:board/pirelli_dpl10/rffe_dpl10_triband.c **** void rffe_set_gain(uint8_t dbm)
  126:board/pirelli_dpl10/rffe_dpl10_triband.c **** {
- 249              		.loc 1 126 0
- 250              		.cfi_startproc
- 251              		@ args = 0, pretend = 0, frame = 0
- 252              		@ frame_needed = 0, uses_anonymous_args = 0
- 253              		@ link register save eliminated.
- 254              	.LVL22:
- 255              		.loc 1 126 0
- 256 0000 FF0000E2 		and	r0, r0, #255
- 257              	.LVL23:
+ 209              		.loc 1 126 0
+ 210              		.cfi_startproc
+ 211              		@ args = 0, pretend = 0, frame = 0
+ 212              		@ frame_needed = 0, uses_anonymous_args = 0
+ 213              		@ link register save eliminated.
+ 214              	.LVL16:
+ 215              		.loc 1 126 0
+ 216 0000 FF0000E2 		and	r0, r0, #255
+ 217              	.LVL17:
  127:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	trf6151_set_gain(dbm);
  128:board/pirelli_dpl10/rffe_dpl10_triband.c **** }
- 258              		.loc 1 128 0
+ 218              		.loc 1 128 0
  127:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	trf6151_set_gain(dbm);
- 259              		.loc 1 127 0
- 260 0004 FEFFFFEA 		b	trf6151_set_gain
- 261              		.cfi_endproc
- 262              	.LFE9:
- 264              		.section	.text.rffe_compute_gain,"ax",%progbits
- 265              		.align	2
- 266              		.global	rffe_compute_gain
- 268              	rffe_compute_gain:
- 269              	.LFB10:
+ 219              		.loc 1 127 0
+ 220 0004 FEFFFFEA 		b	trf6151_set_gain
+ 221              		.cfi_endproc
+ 222              	.LFE9:
+ 224              		.section	.text.rffe_compute_gain,"ax",%progbits
+ 225              		.align	2
+ 226              		.global	rffe_compute_gain
+ 228              	rffe_compute_gain:
+ 229              	.LFB10:
  129:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
  130:board/pirelli_dpl10/rffe_dpl10_triband.c **** const uint8_t system_inherent_gain = SYSTEM_INHERENT_GAIN;
  131:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
@@ -391,79 +351,77 @@
  133:board/pirelli_dpl10/rffe_dpl10_triband.c ****  * dBm8, configure the RF Frontend with the respective gain */
  134:board/pirelli_dpl10/rffe_dpl10_triband.c **** void rffe_compute_gain(int16_t exp_inp, int16_t target_bb)
  135:board/pirelli_dpl10/rffe_dpl10_triband.c **** {
- 270              		.loc 1 135 0
- 271              		.cfi_startproc
- 272              		@ args = 0, pretend = 0, frame = 0
- 273              		@ frame_needed = 0, uses_anonymous_args = 0
- 274              		@ link register save eliminated.
- 275              	.LVL24:
- 276              		.loc 1 135 0
- 277 0000 0008A0E1 		mov	r0, r0, asl #16
- 278              	.LVL25:
- 279 0004 0118A0E1 		mov	r1, r1, asl #16
- 280              	.LVL26:
+ 230              		.loc 1 135 0
+ 231              		.cfi_startproc
+ 232              		@ args = 0, pretend = 0, frame = 0
+ 233              		@ frame_needed = 0, uses_anonymous_args = 0
+ 234              		@ link register save eliminated.
+ 235              	.LVL18:
+ 236              		.loc 1 135 0
+ 237 0000 0008A0E1 		mov	r0, r0, asl #16
+ 238              	.LVL19:
+ 239 0004 0118A0E1 		mov	r1, r1, asl #16
+ 240              	.LVL20:
  136:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	trf6151_compute_gain(exp_inp, target_bb);
- 281              		.loc 1 136 0
- 282 0008 4008A0E1 		mov	r0, r0, asr #16
- 283 000c 4118A0E1 		mov	r1, r1, asr #16
+ 241              		.loc 1 136 0
+ 242 0008 4008A0E1 		mov	r0, r0, asr #16
+ 243 000c 4118A0E1 		mov	r1, r1, asr #16
  137:board/pirelli_dpl10/rffe_dpl10_triband.c **** }
- 284              		.loc 1 137 0
+ 244              		.loc 1 137 0
  136:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	trf6151_compute_gain(exp_inp, target_bb);
- 285              		.loc 1 136 0
- 286 0010 FEFFFFEA 		b	trf6151_compute_gain
- 287              		.cfi_endproc
- 288              	.LFE10:
- 290              		.section	.text.rffe_rx_win_ctrl,"ax",%progbits
- 291              		.align	2
- 292              		.global	rffe_rx_win_ctrl
- 294              	rffe_rx_win_ctrl:
- 295              	.LFB11:
+ 245              		.loc 1 136 0
+ 246 0010 FEFFFFEA 		b	trf6151_compute_gain
+ 247              		.cfi_endproc
+ 248              	.LFE10:
+ 250              		.section	.text.rffe_rx_win_ctrl,"ax",%progbits
+ 251              		.align	2
+ 252              		.global	rffe_rx_win_ctrl
+ 254              	rffe_rx_win_ctrl:
+ 255              	.LFB11:
  138:board/pirelli_dpl10/rffe_dpl10_triband.c **** 
  139:board/pirelli_dpl10/rffe_dpl10_triband.c **** void rffe_rx_win_ctrl(int16_t exp_inp, int16_t target_bb)
  140:board/pirelli_dpl10/rffe_dpl10_triband.c **** {
- 296              		.loc 1 140 0
- 297              		.cfi_startproc
- 298              		@ args = 0, pretend = 0, frame = 0
- 299              		@ frame_needed = 0, uses_anonymous_args = 0
- 300              		@ link register save eliminated.
- 301              	.LVL27:
+ 256              		.loc 1 140 0
+ 257              		.cfi_startproc
+ 258              		@ args = 0, pretend = 0, frame = 0
+ 259              		@ frame_needed = 0, uses_anonymous_args = 0
+ 260              		@ link register save eliminated.
+ 261              	.LVL21:
  141:board/pirelli_dpl10/rffe_dpl10_triband.c **** 	/* FIXME */
  142:board/pirelli_dpl10/rffe_dpl10_triband.c **** }
- 302              		.loc 1 142 0
- 303 0000 1EFF2FE1 		bx	lr
- 304              		.cfi_endproc
- 305              	.LFE11:
- 307              		.global	system_inherent_gain
- 308              		.section	.rodata
- 311              	system_inherent_gain:
- 312 0000 47       		.byte	71
- 313              		.text
- 314              	.Letext0:
+ 262              		.loc 1 142 0
+ 263 0000 1EFF2FE1 		bx	lr
+ 264              		.cfi_endproc
+ 265              	.LFE11:
+ 267              		.global	system_inherent_gain
+ 268              		.section	.rodata
+ 271              	system_inherent_gain:
+ 272 0000 47       		.byte	71
+ 273              		.text
+ 274              	.Letext0:
 DEFINED SYMBOLS
                             *ABS*:0000000000000000 rffe_dpl10_triband.c
-     /tmp/cc9P59oU.s:12     .text.rffe_mode:0000000000000000 $a
-     /tmp/cc9P59oU.s:15     .text.rffe_mode:0000000000000000 rffe_mode
-     /tmp/cc9P59oU.s:55     .text.rffe_mode:0000000000000038 $d
-     /tmp/cc9P59oU.s:65     .text.rffe_mode:0000000000000058 $a
-     /tmp/cc9P59oU.s:93     .text.rffe_mode:0000000000000080 $d
-     /tmp/cc9P59oU.s:98     .text.rffe_get_rx_ports:0000000000000000 $a
-     /tmp/cc9P59oU.s:101    .text.rffe_get_rx_ports:0000000000000000 rffe_get_rx_ports
-     /tmp/cc9P59oU.s:115    .text.rffe_get_tx_ports:0000000000000000 $a
-     /tmp/cc9P59oU.s:118    .text.rffe_get_tx_ports:0000000000000000 rffe_get_tx_ports
-     /tmp/cc9P59oU.s:132    .text.rffe_iq_swapped:0000000000000000 $a
-     /tmp/cc9P59oU.s:135    .text.rffe_iq_swapped:0000000000000000 rffe_iq_swapped
-     /tmp/cc9P59oU.s:155    .text.rffe_init:0000000000000000 $a
-     /tmp/cc9P59oU.s:158    .text.rffe_init:0000000000000000 rffe_init
-     /tmp/cc9P59oU.s:220    .text.rffe_init:000000000000005c $d
-     /tmp/cc9P59oU.s:227    .text.rffe_get_gain:0000000000000000 $a
-     /tmp/cc9P59oU.s:230    .text.rffe_get_gain:0000000000000000 rffe_get_gain
-     /tmp/cc9P59oU.s:244    .text.rffe_set_gain:0000000000000000 $a
-     /tmp/cc9P59oU.s:247    .text.rffe_set_gain:0000000000000000 rffe_set_gain
-     /tmp/cc9P59oU.s:265    .text.rffe_compute_gain:0000000000000000 $a
-     /tmp/cc9P59oU.s:268    .text.rffe_compute_gain:0000000000000000 rffe_compute_gain
-     /tmp/cc9P59oU.s:291    .text.rffe_rx_win_ctrl:0000000000000000 $a
-     /tmp/cc9P59oU.s:294    .text.rffe_rx_win_ctrl:0000000000000000 rffe_rx_win_ctrl
-     /tmp/cc9P59oU.s:311    .rodata:0000000000000000 system_inherent_gain
+     /tmp/ccb1wPCG.s:12     .text.rffe_mode:0000000000000000 $a
+     /tmp/ccb1wPCG.s:15     .text.rffe_mode:0000000000000000 rffe_mode
+     /tmp/ccb1wPCG.s:53     .text.rffe_mode:0000000000000028 $d
+     /tmp/ccb1wPCG.s:58     .text.rffe_get_rx_ports:0000000000000000 $a
+     /tmp/ccb1wPCG.s:61     .text.rffe_get_rx_ports:0000000000000000 rffe_get_rx_ports
+     /tmp/ccb1wPCG.s:75     .text.rffe_get_tx_ports:0000000000000000 $a
+     /tmp/ccb1wPCG.s:78     .text.rffe_get_tx_ports:0000000000000000 rffe_get_tx_ports
+     /tmp/ccb1wPCG.s:92     .text.rffe_iq_swapped:0000000000000000 $a
+     /tmp/ccb1wPCG.s:95     .text.rffe_iq_swapped:0000000000000000 rffe_iq_swapped
+     /tmp/ccb1wPCG.s:115    .text.rffe_init:0000000000000000 $a
+     /tmp/ccb1wPCG.s:118    .text.rffe_init:0000000000000000 rffe_init
+     /tmp/ccb1wPCG.s:180    .text.rffe_init:000000000000005c $d
+     /tmp/ccb1wPCG.s:187    .text.rffe_get_gain:0000000000000000 $a
+     /tmp/ccb1wPCG.s:190    .text.rffe_get_gain:0000000000000000 rffe_get_gain
+     /tmp/ccb1wPCG.s:204    .text.rffe_set_gain:0000000000000000 $a
+     /tmp/ccb1wPCG.s:207    .text.rffe_set_gain:0000000000000000 rffe_set_gain
+     /tmp/ccb1wPCG.s:225    .text.rffe_compute_gain:0000000000000000 $a
+     /tmp/ccb1wPCG.s:228    .text.rffe_compute_gain:0000000000000000 rffe_compute_gain
+     /tmp/ccb1wPCG.s:251    .text.rffe_rx_win_ctrl:0000000000000000 $a
+     /tmp/ccb1wPCG.s:254    .text.rffe_rx_win_ctrl:0000000000000000 rffe_rx_win_ctrl
+     /tmp/ccb1wPCG.s:271    .rodata:0000000000000000 system_inherent_gain
                      .debug_frame:0000000000000010 $d
 
 UNDEFINED SYMBOLS

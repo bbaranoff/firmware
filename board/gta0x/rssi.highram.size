@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  74348	   2480	  26116	 102944	  19220	board/gta0x/rssi.highram.elf
+  72516	   4200	  24212	 100928	  18a40	board/gta0x/rssi.highram.elf

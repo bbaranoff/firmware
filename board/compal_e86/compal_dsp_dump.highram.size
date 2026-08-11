@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  23626	   2248	  23680	  49554	   c192	board/compal_e86/compal_dsp_dump.highram.elf
+  24502	    900	  23708	  49110	   bfd6	board/compal_e86/compal_dsp_dump.highram.elf

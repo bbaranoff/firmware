@@ -1,0 +1,1240 @@
+   1              		.file	"compal_e88.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.bat_compal_e88_goto_state,"ax",%progbits
+  12              		.align	2
+  14              	bat_compal_e88_goto_state:
+  15              	.LFB13:
+  16              		.file 1 "battery/compal_e88.c"
+   1:battery/compal_e88.c **** /* Battery management for compal_e88 */
+   2:battery/compal_e88.c **** 
+   3:battery/compal_e88.c **** /* (C) 2010 by Christian Vogel <vogelchr@vogel.cx>
+   4:battery/compal_e88.c ****  *
+   5:battery/compal_e88.c ****  * All Rights Reserved
+   6:battery/compal_e88.c ****  *
+   7:battery/compal_e88.c ****  * This program is free software; you can redistribute it and/or modify
+   8:battery/compal_e88.c ****  * it under the terms of the GNU General Public License as published by
+   9:battery/compal_e88.c ****  * the Free Software Foundation; either version 2 of the License, or
+  10:battery/compal_e88.c ****  * (at your option) any later version.
+  11:battery/compal_e88.c ****  *
+  12:battery/compal_e88.c ****  * This program is distributed in the hope that it will be useful,
+  13:battery/compal_e88.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  14:battery/compal_e88.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  15:battery/compal_e88.c ****  * GNU General Public License for more details.
+  16:battery/compal_e88.c ****  *
+  17:battery/compal_e88.c ****  */
+  18:battery/compal_e88.c **** 
+  19:battery/compal_e88.c **** /*
+  20:battery/compal_e88.c ****  * ___C123 (compal e88) very simplified diagram of charging circuitry___
+  21:battery/compal_e88.c ****  *
+  22:battery/compal_e88.c ****  *                           ICTL
+  23:battery/compal_e88.c ****  *                            |
+  24:battery/compal_e88.c ****  *                            v
+  25:battery/compal_e88.c ****  *  Charger -> OVP -------> P-Mosfet --->[0.15 Ohm]---> Battery
+  26:battery/compal_e88.c ****  *             (NCP345,  |             |            |
+  27:battery/compal_e88.c ****  *              6.85V)   v             v            v
+  28:battery/compal_e88.c ****  *                      VCHG          VCCS        VBAT &
+  29:battery/compal_e88.c ****  *                                                VBATS
+  30:battery/compal_e88.c ****  *
+  31:battery/compal_e88.c ****  * Inputs to IOTA:
+  32:battery/compal_e88.c ****  *  VCHG:        senses voltage on the charger input
+  33:battery/compal_e88.c ****  *  VCSS/VBATS:  to difference amplifier, to measure charge current
+  34:battery/compal_e88.c ****  *  VBAT:        senses voltage on the battery terminal
+  35:battery/compal_e88.c ****  * Outputs from IOTA:
+  36:battery/compal_e88.c ****  *  ICTL:        Control signal for the switching mosfet
+  37:battery/compal_e88.c ****  *
+  38:battery/compal_e88.c ****  */
+  39:battery/compal_e88.c **** 
+  40:battery/compal_e88.c **** #include <battery/battery.h>
+  41:battery/compal_e88.c **** #include <battery/compal_e88.h>
+  42:battery/compal_e88.c **** 
+  43:battery/compal_e88.c **** #include <stdint.h>
+  44:battery/compal_e88.c **** #include <abb/twl3025.h>
+  45:battery/compal_e88.c **** #include <comm/timer.h>
+  46:battery/compal_e88.c **** #include <stdio.h>
+  47:battery/compal_e88.c **** 
+  48:battery/compal_e88.c **** /* ADC calibration, scale is LSB/uV or LSB/uA, physical unit is mV or mA */
+  49:battery/compal_e88.c **** #define ADC_TO_PHYSICAL(adc,scale) (((adc)*(scale)+500)/1000)
+  50:battery/compal_e88.c **** #define PHYSICAL_TO_ADC(phy,scale) (((phy)*1000+(scale)/2)/(scale))
+  51:battery/compal_e88.c **** 
+  52:battery/compal_e88.c **** /* conversion factors for internal IOTA battery charging/sensing circuitry */
+  53:battery/compal_e88.c **** #define VREF_LSB_uV 1709  /* VREF = 1.75V    --> 1.709 mV/LSB */
+  54:battery/compal_e88.c **** #define VBAT_LSB_uV 6836  /* VBAT = 7.0 V FS --> 6.836 mV/LSB */
+  55:battery/compal_e88.c **** #define VCHG_LSB_uV 8545  /* VCHG = 8.75V FS --> 8.545 mV/LSB */
+  56:battery/compal_e88.c **** #define ICHG_LSB_uA 854   /* ICHG = 875mA FS --> 0.854 mA/LSB */
+  57:battery/compal_e88.c **** 
+  58:battery/compal_e88.c **** /* battery is considered full/empty at these thresholds... */
+  59:battery/compal_e88.c **** #define VBAT_full   PHYSICAL_TO_ADC(4000,VBAT_LSB_uV)
+  60:battery/compal_e88.c **** #define VBAT_empty  PHYSICAL_TO_ADC(3200,VBAT_LSB_uV)
+  61:battery/compal_e88.c **** 
+  62:battery/compal_e88.c **** /* we declare overvoltage at this point... */
+  63:battery/compal_e88.c **** #define VBAT_fail   PHYSICAL_TO_ADC(4250,VBAT_LSB_uV)
+  64:battery/compal_e88.c **** 
+  65:battery/compal_e88.c **** /* DAC to ADC offsets in CC mode with my C123 
+  66:battery/compal_e88.c ****    IMEI 358317015976471, P329431014
+  67:battery/compal_e88.c **** 
+  68:battery/compal_e88.c ****    I/mA DAC     ADC
+  69:battery/compal_e88.c ****    ----------------
+  70:battery/compal_e88.c ****    100	117	108
+  71:battery/compal_e88.c ****    150	176	168
+  72:battery/compal_e88.c ****    200	234	227
+  73:battery/compal_e88.c ****    250	293	291
+  74:battery/compal_e88.c ****    300	351	349
+  75:battery/compal_e88.c ****    350	410	410
+  76:battery/compal_e88.c **** */
+  77:battery/compal_e88.c **** 
+  78:battery/compal_e88.c **** #define CHGDAC_GAIN   967  /* times 0.001 */
+  79:battery/compal_e88.c **** #define CHGDAC_OFFS    13
+  80:battery/compal_e88.c **** 
+  81:battery/compal_e88.c **** /* convert ADC reading to DAC value, according to calibration values
+  82:battery/compal_e88.c ****    given above */
+  83:battery/compal_e88.c **** #define CHGDAC_ADJ(x)   (CHGDAC_GAIN*(x)/1000+CHGDAC_OFFS)
+  84:battery/compal_e88.c **** 
+  85:battery/compal_e88.c **** /* charging current in DAC LSBs, same ref. and # of bits, but keep
+  86:battery/compal_e88.c ****    the correction specified above in mind!  */
+  87:battery/compal_e88.c **** 
+  88:battery/compal_e88.c **** #define ICHG_set    CHGDAC_ADJ(PHYSICAL_TO_ADC(200,ICHG_LSB_uA))
+  89:battery/compal_e88.c **** #define VCHG_set    CHGDAC_ADJ(VBAT_full)
+  90:battery/compal_e88.c **** 
+  91:battery/compal_e88.c **** struct battery_info battery_info;	/* global battery info */
+  92:battery/compal_e88.c **** uint16_t bat_compal_e88_madc[MADC_NUM_CHANNELS];	/* MADC measurements */
+  93:battery/compal_e88.c **** 
+  94:battery/compal_e88.c **** static const int BATTERY_TIMER_DELAY=5000; /* 5000ms for control loop */
+  95:battery/compal_e88.c **** static const int ADC_TIMER_DELAY=100;      /*  100ms for ADC conversion */
+  96:battery/compal_e88.c **** 
+  97:battery/compal_e88.c **** /* thermistor sense current, turn it up to eleven! */
+  98:battery/compal_e88.c **** #define  TH_SENS               (THSENS0|THSENS1|THSENS2|THEN)
+  99:battery/compal_e88.c **** #define  BATTERY_ALL_SENSE     (TH_SENS|MESBAT|TYPEN)
+ 100:battery/compal_e88.c **** 
+ 101:battery/compal_e88.c **** /*
+ 102:battery/compal_e88.c ****  * charger modes state machine
+ 103:battery/compal_e88.c ****  *
+ 104:battery/compal_e88.c ****  *    +------------------+-------------------+
+ 105:battery/compal_e88.c ****  *    |                  |                   | lost AC power
+ 106:battery/compal_e88.c ****  *    |                  ^                   ^
+ 107:battery/compal_e88.c ****  *    V  on AC power     |    @VBAT_full     |
+ 108:battery/compal_e88.c ****  * +-----+        +------------+ -----> +------------+
+ 109:battery/compal_e88.c ****  * | OFF | -----> | CONST_CURR |        | CONST_VOLT |
+ 110:battery/compal_e88.c ****  * +-----+        +------------+        +------------+
+ 111:battery/compal_e88.c ****  *    ^          ^        |                   |
+ 112:battery/compal_e88.c ****  *    |         /failure  v                   v failure
+ 113:battery/compal_e88.c ****  * +---------+ /  gone    |                   | condition
+ 114:battery/compal_e88.c ****  * | FAILURE | <----------+-------------------+
+ 115:battery/compal_e88.c ****  * +---------+
+ 116:battery/compal_e88.c ****  *
+ 117:battery/compal_e88.c ****  *  Failure modes currently detected:
+ 118:battery/compal_e88.c ****  *          + high battery voltage
+ 119:battery/compal_e88.c ****  *  Failure modes TODO:
+ 120:battery/compal_e88.c ****  *          + high battery temperature
+ 121:battery/compal_e88.c ****  */
+ 122:battery/compal_e88.c **** enum bat_compal_e88_chg_state {
+ 123:battery/compal_e88.c **** 	CHARG_OFF,
+ 124:battery/compal_e88.c **** 	CHARG_CONST_CURR,
+ 125:battery/compal_e88.c **** 	CHARG_CONST_VOLT,
+ 126:battery/compal_e88.c **** 	CHARG_FAIL
+ 127:battery/compal_e88.c **** };
+ 128:battery/compal_e88.c **** static enum bat_compal_e88_chg_state bat_compal_e88_chg_state;
+ 129:battery/compal_e88.c **** 
+ 130:battery/compal_e88.c **** static const char *bat_compal_e88_chg_state_names[]={
+ 131:battery/compal_e88.c **** 	"Off",
+ 132:battery/compal_e88.c **** 	"Constant Current",
+ 133:battery/compal_e88.c **** 	"Constant Voltage",
+ 134:battery/compal_e88.c **** 	"Battery Failure"
+ 135:battery/compal_e88.c **** };
+ 136:battery/compal_e88.c **** 
+ 137:battery/compal_e88.c **** static void
+ 138:battery/compal_e88.c **** bat_compal_e88_goto_state(enum bat_compal_e88_chg_state newstate){
+  17              		.loc 1 138 0
+  18              		.cfi_startproc
+  19              		@ args = 0, pretend = 0, frame = 0
+  20              		@ frame_needed = 0, uses_anonymous_args = 0
+  21              	.LVL0:
+ 139:battery/compal_e88.c **** 
+ 140:battery/compal_e88.c **** 	if(bat_compal_e88_chg_state == newstate) /* already there? */
+  22              		.loc 1 140 0
+  23 0000 14319FE5 		ldr	r3, .L10
+  24 0004 002093E5 		ldr	r2, [r3, #0]
+  25 0008 000052E1 		cmp	r2, r0
+ 138:battery/compal_e88.c **** bat_compal_e88_goto_state(enum bat_compal_e88_chg_state newstate){
+  26              		.loc 1 138 0
+  27 000c 30402DE9 		stmfd	sp!, {r4, r5, lr}
+  28              	.LCFI0:
+  29              		.cfi_def_cfa_offset 12
+ 138:battery/compal_e88.c **** bat_compal_e88_goto_state(enum bat_compal_e88_chg_state newstate){
+  30              		.loc 1 138 0
+  31 0010 0040A0E1 		mov	r4, r0
+  32              		.cfi_offset 14, -4
+  33              		.cfi_offset 5, -8
+  34              		.cfi_offset 4, -12
+  35              		.loc 1 140 0
+  36 0014 3080BD08 		ldmeqfd	sp!, {r4, r5, pc}
+ 141:battery/compal_e88.c **** 		return;
+ 142:battery/compal_e88.c **** 
+ 143:battery/compal_e88.c **** 	printf("\033[34;1mCHARGER: %s --> %s.\033[0m\n",
+  37              		.loc 1 143 0
+  38 0018 00319FE5 		ldr	r3, .L10+4
+  39 001c 00019FE5 		ldr	r0, .L10+8
+  40              	.LVL1:
+  41 0020 021193E7 		ldr	r1, [r3, r2, asl #2]
+  42 0024 042193E7 		ldr	r2, [r3, r4, asl #2]
+  43 0028 FEFFFFEB 		bl	printf
+ 144:battery/compal_e88.c **** 			bat_compal_e88_chg_state_names[bat_compal_e88_chg_state],
+ 145:battery/compal_e88.c **** 			bat_compal_e88_chg_state_names[newstate]);
+ 146:battery/compal_e88.c **** 
+ 147:battery/compal_e88.c **** 	/* update user visible flags, set registers */
+ 148:battery/compal_e88.c **** 	switch(newstate){
+  44              		.loc 1 148 0
+  45 002c 010054E3 		cmp	r4, #1
+  46 0030 0300000A 		beq	.L4
+  47 0034 020054E3 		cmp	r4, #2
+  48 0038 E8309FE5 		ldr	r3, .L10+12
+  49 003c 2100001A 		bne	.L7
+  50 0040 100000EA 		b	.L9
+  51              	.L4:
+ 149:battery/compal_e88.c **** 	case CHARG_CONST_CURR:
+ 150:battery/compal_e88.c **** 		battery_info.flags &= ~BATTERY_FAILURE;
+ 151:battery/compal_e88.c **** 		battery_info.flags |= (BATTERY_CHG_ENABLED|
+  52              		.loc 1 151 0
+  53 0044 DC309FE5 		ldr	r3, .L10+12
+ 150:battery/compal_e88.c **** 		battery_info.flags &= ~BATTERY_FAILURE;
+  54              		.loc 1 150 0
+  55 0048 002093E5 		ldr	r2, [r3, #0]
+  56 004c 0820C2E3 		bic	r2, r2, #8
+  57              		.loc 1 151 0
+  58 0050 062082E3 		orr	r2, r2, #6
+  59 0054 002083E5 		str	r2, [r3, #0]
+ 152:battery/compal_e88.c **** 						BATTERY_CHARGING);
+ 153:battery/compal_e88.c **** 		twl3025_reg_write(BCICTL2,0);
+  60              		.loc 1 153 0
+  61 0058 1D00A0E3 		mov	r0, #29
+  62 005c 0010A0E3 		mov	r1, #0
+  63 0060 FEFFFFEB 		bl	twl3025_reg_write
+ 154:battery/compal_e88.c **** 		twl3025_reg_write(CHGREG,0);
+  64              		.loc 1 154 0
+  65 0064 1900A0E3 		mov	r0, #25
+  66 0068 0010A0E3 		mov	r1, #0
+  67 006c FEFFFFEB 		bl	twl3025_reg_write
+ 155:battery/compal_e88.c **** 		twl3025_reg_write(BCICTL2,CHEN|LEDC|CHIV);
+  68              		.loc 1 155 0
+  69 0070 1D00A0E3 		mov	r0, #29
+  70 0074 2310A0E3 		mov	r1, #35
+  71 0078 FEFFFFEB 		bl	twl3025_reg_write
+ 156:battery/compal_e88.c **** 		twl3025_reg_write(CHGREG,ICHG_set);
+  72              		.loc 1 156 0
+  73 007c 1900A0E3 		mov	r0, #25
+  74 0080 EF10A0E3 		mov	r1, #239
+  75 0084 170000EA 		b	.L8
+  76              	.L9:
+ 157:battery/compal_e88.c **** 
+ 158:battery/compal_e88.c **** 		break;
+ 159:battery/compal_e88.c **** 
+ 160:battery/compal_e88.c **** 	case CHARG_CONST_VOLT:
+ 161:battery/compal_e88.c **** 		battery_info.flags &= ~( BATTERY_CHARGING |
+  77              		.loc 1 161 0
+  78 0088 002093E5 		ldr	r2, [r3, #0]
+  79 008c 0C20C2E3 		bic	r2, r2, #12
+ 162:battery/compal_e88.c **** 						BATTERY_FAILURE );
+ 163:battery/compal_e88.c **** 		battery_info.flags |= BATTERY_CHG_ENABLED;
+  80              		.loc 1 163 0
+  81 0090 022082E3 		orr	r2, r2, #2
+  82 0094 002083E5 		str	r2, [r3, #0]
+ 164:battery/compal_e88.c **** 		twl3025_reg_write(BCICTL2,0);
+  83              		.loc 1 164 0
+  84 0098 1D00A0E3 		mov	r0, #29
+  85 009c 0010A0E3 		mov	r1, #0
+  86 00a0 FEFFFFEB 		bl	twl3025_reg_write
+ 165:battery/compal_e88.c **** 		twl3025_reg_write(CHGREG,0);
+  87              		.loc 1 165 0
+  88 00a4 1900A0E3 		mov	r0, #25
+  89 00a8 0010A0E3 		mov	r1, #0
+  90 00ac FEFFFFEB 		bl	twl3025_reg_write
+ 166:battery/compal_e88.c **** 		twl3025_reg_write(BCICTL2,CHEN|LEDC);
+  91              		.loc 1 166 0
+  92 00b0 1D00A0E3 		mov	r0, #29
+  93 00b4 2110A0E3 		mov	r1, #33
+  94 00b8 FEFFFFEB 		bl	twl3025_reg_write
+ 167:battery/compal_e88.c **** 		twl3025_reg_write(CHGREG,VCHG_set);
+  95              		.loc 1 167 0
+  96 00bc 1900A0E3 		mov	r0, #25
+  97 00c0 64109FE5 		ldr	r1, .L10+16
+  98 00c4 070000EA 		b	.L8
+  99              	.L7:
+ 168:battery/compal_e88.c **** 		break;
+ 169:battery/compal_e88.c **** 
+ 170:battery/compal_e88.c **** 	case CHARG_FAIL:
+ 171:battery/compal_e88.c **** 	case CHARG_OFF:
+ 172:battery/compal_e88.c **** 	default:
+ 173:battery/compal_e88.c **** 		battery_info.flags &= ~( BATTERY_CHG_ENABLED |
+ 100              		.loc 1 173 0
+ 101 00c8 002093E5 		ldr	r2, [r3, #0]
+ 102 00cc 0E20C2E3 		bic	r2, r2, #14
+ 174:battery/compal_e88.c **** 			BATTERY_CHARGING | BATTERY_FAILURE );
+ 175:battery/compal_e88.c **** 		twl3025_reg_write(BCICTL2,0); /* turn off charger */
+ 103              		.loc 1 175 0
+ 104 00d0 1D00A0E3 		mov	r0, #29
+ 105 00d4 0010A0E3 		mov	r1, #0
+ 173:battery/compal_e88.c **** 		battery_info.flags &= ~( BATTERY_CHG_ENABLED |
+ 106              		.loc 1 173 0
+ 107 00d8 002083E5 		str	r2, [r3, #0]
+ 108              		.loc 1 175 0
+ 109 00dc FEFFFFEB 		bl	twl3025_reg_write
+ 176:battery/compal_e88.c **** 		twl3025_reg_write(CHGREG,0);
+ 110              		.loc 1 176 0
+ 111 00e0 1900A0E3 		mov	r0, #25
+ 112 00e4 0010A0E3 		mov	r1, #0
+ 113              	.L8:
+ 114 00e8 FEFFFFEB 		bl	twl3025_reg_write
+ 177:battery/compal_e88.c **** 		break;
+ 178:battery/compal_e88.c **** 	}
+ 179:battery/compal_e88.c **** 
+ 180:battery/compal_e88.c **** 	printf("BCICTL2 is 0x%03x, CHGREG=%d\n",
+ 181:battery/compal_e88.c **** 			twl3025_reg_read(BCICTL2),
+ 115              		.loc 1 181 0
+ 116 00ec 1D00A0E3 		mov	r0, #29
+ 117 00f0 FEFFFFEB 		bl	twl3025_reg_read
+ 118 00f4 0050A0E1 		mov	r5, r0
+ 182:battery/compal_e88.c **** 			twl3025_reg_read(CHGREG));
+ 119              		.loc 1 182 0
+ 120 00f8 1900A0E3 		mov	r0, #25
+ 121 00fc FEFFFFEB 		bl	twl3025_reg_read
+ 180:battery/compal_e88.c **** 	printf("BCICTL2 is 0x%03x, CHGREG=%d\n",
+ 122              		.loc 1 180 0
+ 123 0100 0510A0E1 		mov	r1, r5
+ 124              		.loc 1 182 0
+ 125 0104 0020A0E1 		mov	r2, r0
+ 180:battery/compal_e88.c **** 	printf("BCICTL2 is 0x%03x, CHGREG=%d\n",
+ 126              		.loc 1 180 0
+ 127 0108 20009FE5 		ldr	r0, .L10+20
+ 128 010c FEFFFFEB 		bl	printf
+ 183:battery/compal_e88.c **** 
+ 184:battery/compal_e88.c **** 	bat_compal_e88_chg_state = newstate;
+ 129              		.loc 1 184 0
+ 130 0110 04309FE5 		ldr	r3, .L10
+ 131 0114 004083E5 		str	r4, [r3, #0]
+ 132 0118 3080BDE8 		ldmfd	sp!, {r4, r5, pc}
+ 133              	.L11:
+ 134              		.align	2
+ 135              	.L10:
+ 136 011c 00000000 		.word	.LANCHOR0
+ 137 0120 00000000 		.word	.LANCHOR1
+ 138 0124 00000000 		.word	.LC0
+ 139 0128 00000000 		.word	battery_info
+ 140 012c 42020000 		.word	578
+ 141 0130 20000000 		.word	.LC1
+ 142              		.cfi_endproc
+ 143              	.LFE13:
+ 145              		.global	__divsi3
+ 146              		.section	.text.battery_compal_e88_timer_cb,"ax",%progbits
+ 147              		.align	2
+ 149              	battery_compal_e88_timer_cb:
+ 150              	.LFB18:
+ 185:battery/compal_e88.c **** }
+ 186:battery/compal_e88.c **** 
+ 187:battery/compal_e88.c **** static void
+ 188:battery/compal_e88.c **** bat_compal_e88_chg_control(){
+ 189:battery/compal_e88.c **** 	/* with AC power disconnected, always go to off state */
+ 190:battery/compal_e88.c **** 	if(!(battery_info.flags & BATTERY_CHG_CONNECTED)){
+ 191:battery/compal_e88.c **** 		bat_compal_e88_goto_state(CHARG_OFF);
+ 192:battery/compal_e88.c **** 		return;
+ 193:battery/compal_e88.c **** 	}
+ 194:battery/compal_e88.c **** 
+ 195:battery/compal_e88.c **** 	/* if failure condition is detected, always goto failure state */
+ 196:battery/compal_e88.c **** 	if(bat_compal_e88_madc[MADC_VBAT] > VBAT_fail){
+ 197:battery/compal_e88.c **** 		bat_compal_e88_goto_state(CHARG_FAIL);
+ 198:battery/compal_e88.c **** 		return;
+ 199:battery/compal_e88.c **** 	}
+ 200:battery/compal_e88.c **** 
+ 201:battery/compal_e88.c **** 	/* now AC power is present and battery is not over failure
+ 202:battery/compal_e88.c **** 	   thresholds */
+ 203:battery/compal_e88.c **** 	switch(bat_compal_e88_chg_state){
+ 204:battery/compal_e88.c **** 	case CHARG_OFF:
+ 205:battery/compal_e88.c **** 		if(bat_compal_e88_madc[MADC_VBAT] >= VBAT_full)
+ 206:battery/compal_e88.c **** 			bat_compal_e88_goto_state(CHARG_CONST_VOLT);
+ 207:battery/compal_e88.c **** 		else
+ 208:battery/compal_e88.c **** 			bat_compal_e88_goto_state(CHARG_CONST_CURR);
+ 209:battery/compal_e88.c **** 		break;
+ 210:battery/compal_e88.c **** 	case CHARG_CONST_CURR:
+ 211:battery/compal_e88.c **** 		if(bat_compal_e88_madc[MADC_VBAT] >= VBAT_full)
+ 212:battery/compal_e88.c **** 			bat_compal_e88_goto_state(CHARG_CONST_VOLT);
+ 213:battery/compal_e88.c **** 		break;
+ 214:battery/compal_e88.c **** 	case CHARG_CONST_VOLT:
+ 215:battery/compal_e88.c **** 		break;
+ 216:battery/compal_e88.c **** 	default:
+ 217:battery/compal_e88.c **** 	case CHARG_FAIL:
+ 218:battery/compal_e88.c **** 		if(bat_compal_e88_madc[MADC_VBAT] < VBAT_full)
+ 219:battery/compal_e88.c **** 			bat_compal_e88_goto_state(CHARG_CONST_CURR);
+ 220:battery/compal_e88.c **** 		break;
+ 221:battery/compal_e88.c **** 	}
+ 222:battery/compal_e88.c **** }
+ 223:battery/compal_e88.c **** 
+ 224:battery/compal_e88.c **** /*
+ 225:battery/compal_e88.c ****  * Charging voltage connection - state machine, remembers
+ 226:battery/compal_e88.c ****  * state in battery_info.flags.
+ 227:battery/compal_e88.c ****  *
+ 228:battery/compal_e88.c ****  *                     VCHG > VCHG_thr_on
+ 229:battery/compal_e88.c ****  * +-----------------+ ------------------> +---------------+
+ 230:battery/compal_e88.c ****  * | ! CHG_CONNECTED |                     | CHG_CONNECTED |
+ 231:battery/compal_e88.c ****  * +-----------------+ <------------------ +---------------+
+ 232:battery/compal_e88.c ****  *                     VCHG < VCHG_thr_off
+ 233:battery/compal_e88.c ****  */
+ 234:battery/compal_e88.c **** static void
+ 235:battery/compal_e88.c **** bat_compal_e88_chk_ac_presence(){
+ 236:battery/compal_e88.c **** 	int vrpcsts = twl3025_reg_read(VRPCSTS);
+ 237:battery/compal_e88.c **** 
+ 238:battery/compal_e88.c **** 	/* check for presence of charging voltage */
+ 239:battery/compal_e88.c **** 	if(!(battery_info.flags & BATTERY_CHG_CONNECTED)){
+ 240:battery/compal_e88.c **** 		if(vrpcsts & CHGPRES){
+ 241:battery/compal_e88.c **** 			puts("\033[34;1mCHARGER: external voltage connected!\033[0m\n");
+ 242:battery/compal_e88.c **** 			battery_info.flags |= BATTERY_CHG_CONNECTED;
+ 243:battery/compal_e88.c **** 
+ 244:battery/compal_e88.c **** 			/* always keep ADC, voltage dividers and bias voltages on */
+ 245:battery/compal_e88.c **** 			twl3025_unit_enable(TWL3025_UNIT_MAD,1);
+ 246:battery/compal_e88.c **** 			twl3025_reg_write(BCICTL1,BATTERY_ALL_SENSE);
+ 247:battery/compal_e88.c **** 		}
+ 248:battery/compal_e88.c **** 	} else {
+ 249:battery/compal_e88.c **** 		if(!(vrpcsts & CHGPRES)){
+ 250:battery/compal_e88.c **** 			/* we'll only run ADC on demand */
+ 251:battery/compal_e88.c **** 			twl3025_unit_enable(TWL3025_UNIT_MAD,0);
+ 252:battery/compal_e88.c **** 			twl3025_reg_write(BCICTL1,0);
+ 253:battery/compal_e88.c **** 
+ 254:battery/compal_e88.c **** 			battery_info.flags &= ~ BATTERY_CHG_CONNECTED;
+ 255:battery/compal_e88.c **** 			puts("\033[34;1mCHARGER: external voltage disconnected!\033[0m\n");
+ 256:battery/compal_e88.c **** 		}
+ 257:battery/compal_e88.c **** 	}
+ 258:battery/compal_e88.c **** }
+ 259:battery/compal_e88.c **** 
+ 260:battery/compal_e88.c **** /* ---- update voltages visible to the user ---- */
+ 261:battery/compal_e88.c **** static void
+ 262:battery/compal_e88.c **** bat_compal_e88_upd_measurements(){
+ 263:battery/compal_e88.c **** 	int adc,i;
+ 264:battery/compal_e88.c **** 
+ 265:battery/compal_e88.c **** 	battery_info.charger_volt_mV=
+ 266:battery/compal_e88.c **** 		ADC_TO_PHYSICAL(bat_compal_e88_madc[MADC_VCHG],VCHG_LSB_uV);
+ 267:battery/compal_e88.c **** 	battery_info.bat_volt_mV=
+ 268:battery/compal_e88.c **** 		ADC_TO_PHYSICAL(bat_compal_e88_madc[MADC_VBAT],VBAT_LSB_uV);
+ 269:battery/compal_e88.c **** 	battery_info.bat_chg_curr_mA=
+ 270:battery/compal_e88.c **** 		ADC_TO_PHYSICAL(bat_compal_e88_madc[MADC_ICHG],ICHG_LSB_uA);
+ 271:battery/compal_e88.c **** 
+ 272:battery/compal_e88.c **** 	adc = bat_compal_e88_madc[MADC_VBAT];
+ 273:battery/compal_e88.c **** 	if(adc <= VBAT_empty){			/* battery 0..100% */
+ 274:battery/compal_e88.c **** 		battery_info.battery_percent = 0;
+ 275:battery/compal_e88.c **** 	} else if (adc >= VBAT_full){
+ 276:battery/compal_e88.c **** 		battery_info.battery_percent = 100;
+ 277:battery/compal_e88.c **** 	} else {
+ 278:battery/compal_e88.c **** 		battery_info.battery_percent =
+ 279:battery/compal_e88.c **** 			(50+100*(adc-VBAT_empty))/(VBAT_full-VBAT_empty);
+ 280:battery/compal_e88.c **** 	}
+ 281:battery/compal_e88.c **** 
+ 282:battery/compal_e88.c ****         /* DEBUG */
+ 283:battery/compal_e88.c ****         printf("BAT-ADC: ");
+ 284:battery/compal_e88.c ****         for(i=0;i<MADC_NUM_CHANNELS;i++)
+ 285:battery/compal_e88.c ****                 printf("%3d ",bat_compal_e88_madc[i]);
+ 286:battery/compal_e88.c ****         printf("%c\n",32);
+ 287:battery/compal_e88.c ****         printf("\tCharger at %u mV.\n",battery_info.charger_volt_mV);
+ 288:battery/compal_e88.c ****         printf("\tBattery at %u mV.\n",battery_info.bat_volt_mV);
+ 289:battery/compal_e88.c ****         printf("\tCharging at %u mA.\n",battery_info.bat_chg_curr_mA);
+ 290:battery/compal_e88.c ****         printf("\tBattery capacity is %u%%.\n",battery_info.battery_percent);
+ 291:battery/compal_e88.c **** 	printf("\tBattery range is %d..%d mV.\n",
+ 292:battery/compal_e88.c **** 		ADC_TO_PHYSICAL(VBAT_empty,VBAT_LSB_uV),
+ 293:battery/compal_e88.c **** 		ADC_TO_PHYSICAL(VBAT_full,VBAT_LSB_uV));
+ 294:battery/compal_e88.c ****         printf("\tBattery full at %d LSB .. full at %d LSB\n",VBAT_empty,VBAT_full);
+ 295:battery/compal_e88.c ****         printf("\tCharging at %d LSB (%d mA).\n",ICHG_set,
+ 296:battery/compal_e88.c ****                 ADC_TO_PHYSICAL(ICHG_set,ICHG_LSB_uA));
+ 297:battery/compal_e88.c ****         i = twl3025_reg_read(BCICTL2);
+ 298:battery/compal_e88.c ****         printf("\tBCICTL2=0x%03x\n",i);      
+ 299:battery/compal_e88.c **** 	printf("\tbattery-info.flags=0x%08x\n",battery_info.flags);
+ 300:battery/compal_e88.c **** 	printf("\tbat_compal_e88_chg_state=%d\n",bat_compal_e88_chg_state);
+ 301:battery/compal_e88.c **** }
+ 302:battery/compal_e88.c **** 
+ 303:battery/compal_e88.c **** /* bat_compal_e88_adc_read() :
+ 304:battery/compal_e88.c ****  *
+ 305:battery/compal_e88.c ****  * Schedule a ADC conversion or read values from ADC. If we are
+ 306:battery/compal_e88.c ****  * running on battery, bias currents/voltage dividers are turned
+ 307:battery/compal_e88.c ****  * on on demand.
+ 308:battery/compal_e88.c ****  *
+ 309:battery/compal_e88.c ****  * Return 0 if new ADC values have been acquired, 1 if ADC
+ 310:battery/compal_e88.c ****  * has been scheduled for a new conversion or is not yet finished.
+ 311:battery/compal_e88.c ****  * 
+ 312:battery/compal_e88.c ****  */
+ 313:battery/compal_e88.c **** 
+ 314:battery/compal_e88.c **** enum bat_compal_e88_madc_stat {
+ 315:battery/compal_e88.c **** 	ADC_CONVERSION = 1 << 0
+ 316:battery/compal_e88.c **** };
+ 317:battery/compal_e88.c **** static uint32_t bat_compal_e88_madc_stat=0;
+ 318:battery/compal_e88.c **** 
+ 319:battery/compal_e88.c **** static int
+ 320:battery/compal_e88.c **** bat_compal_e88_adc_read(){
+ 321:battery/compal_e88.c **** 	int i;
+ 322:battery/compal_e88.c **** 
+ 323:battery/compal_e88.c **** 	if(bat_compal_e88_madc_stat & ADC_CONVERSION){
+ 324:battery/compal_e88.c **** 		i = twl3025_reg_read(MADCSTAT);
+ 325:battery/compal_e88.c **** 		if(i & ADCBUSY)
+ 326:battery/compal_e88.c **** 			return 1;
+ 327:battery/compal_e88.c **** 		for(i=0;i<MADC_NUM_CHANNELS;i++)
+ 328:battery/compal_e88.c **** 			bat_compal_e88_madc[i]=twl3025_reg_read(VBATREG+i);
+ 329:battery/compal_e88.c **** 		/* if charger is connected, we keep the ADC and BIAS on
+ 330:battery/compal_e88.c **** 		   continuously, if running on battery, we try to save power */
+ 331:battery/compal_e88.c **** 		if(!(battery_info.flags & BATTERY_CHG_CONNECTED)){
+ 332:battery/compal_e88.c **** 			twl3025_reg_write(BCICTL1,0x00); /* turn off bias */
+ 333:battery/compal_e88.c **** 			twl3025_unit_enable(TWL3025_UNIT_MAD,0); /* & ADC */
+ 334:battery/compal_e88.c **** 		}
+ 335:battery/compal_e88.c **** 		bat_compal_e88_madc_stat &= ~ ADC_CONVERSION;
+ 336:battery/compal_e88.c **** 		return 0;
+ 337:battery/compal_e88.c **** 	} else {
+ 338:battery/compal_e88.c **** 		/* if running on battery, turn on ADC & BIAS on demand */
+ 339:battery/compal_e88.c **** 		if(!(battery_info.flags & BATTERY_CHG_CONNECTED)){
+ 340:battery/compal_e88.c **** 			twl3025_unit_enable(TWL3025_UNIT_MAD,1);
+ 341:battery/compal_e88.c **** 			twl3025_reg_write(BCICTL1,BATTERY_ALL_SENSE);
+ 342:battery/compal_e88.c **** 		}
+ 343:battery/compal_e88.c **** 
+ 344:battery/compal_e88.c **** 		twl3025_reg_write(MADCTRL,0xff); /* convert all channels */
+ 345:battery/compal_e88.c **** 		twl3025_reg_write(VBATREG,0);    /* trigger conversion */
+ 346:battery/compal_e88.c **** 
+ 347:battery/compal_e88.c **** 		bat_compal_e88_madc_stat |= ADC_CONVERSION;
+ 348:battery/compal_e88.c **** 		return 1;
+ 349:battery/compal_e88.c **** 	}
+ 350:battery/compal_e88.c **** }
+ 351:battery/compal_e88.c **** 
+ 352:battery/compal_e88.c **** static void
+ 353:battery/compal_e88.c **** battery_compal_e88_timer_cb(void *p){
+ 151              		.loc 1 353 0
+ 152              		.cfi_startproc
+ 153              		@ args = 0, pretend = 0, frame = 0
+ 154              		@ frame_needed = 0, uses_anonymous_args = 0
+ 155              	.LVL2:
+ 156              	.LBB14:
+ 157              	.LBB16:
+ 323:battery/compal_e88.c **** 	if(bat_compal_e88_madc_stat & ADC_CONVERSION){
+ 158              		.loc 1 323 0
+ 159 0000 3C339FE5 		ldr	r3, .L42
+ 160 0004 043093E5 		ldr	r3, [r3, #4]
+ 161 0008 010013E3 		tst	r3, #1
+ 162              	.LBE16:
+ 163              	.LBE14:
+ 164              		.loc 1 353 0
+ 165 000c F0412DE9 		stmfd	sp!, {r4, r5, r6, r7, r8, lr}
+ 166              	.LCFI1:
+ 167              		.cfi_def_cfa_offset 24
+ 168              		.loc 1 353 0
+ 169 0010 0050A0E1 		mov	r5, r0
+ 170              		.cfi_offset 14, -4
+ 171              		.cfi_offset 8, -8
+ 172              		.cfi_offset 7, -12
+ 173              		.cfi_offset 6, -16
+ 174              		.cfi_offset 5, -20
+ 175              		.cfi_offset 4, -24
+ 176              	.LVL3:
+ 177              	.LBB19:
+ 178              	.LBB17:
+ 323:battery/compal_e88.c **** 	if(bat_compal_e88_madc_stat & ADC_CONVERSION){
+ 179              		.loc 1 323 0
+ 180 0014 3500000A 		beq	.L13
+ 324:battery/compal_e88.c **** 		i = twl3025_reg_read(MADCSTAT);
+ 181              		.loc 1 324 0
+ 182 0018 1800A0E3 		mov	r0, #24
+ 183              	.LVL4:
+ 184 001c FEFFFFEB 		bl	twl3025_reg_read
+ 185              	.LVL5:
+ 325:battery/compal_e88.c **** 		if(i & ADCBUSY)
+ 186              		.loc 1 325 0
+ 187 0020 010010E3 		tst	r0, #1
+ 188 0024 4500001A 		bne	.L14
+ 189 0028 18639FE5 		ldr	r6, .L42+4
+ 190 002c 0F40A0E3 		mov	r4, #15
+ 191 0030 0670A0E1 		mov	r7, r6
+ 192              	.LVL6:
+ 193              	.L15:
+ 328:battery/compal_e88.c **** 			bat_compal_e88_madc[i]=twl3025_reg_read(VBATREG+i);
+ 194              		.loc 1 328 0
+ 195 0034 0400A0E1 		mov	r0, r4
+ 196 0038 FEFFFFEB 		bl	twl3025_reg_read
+ 197 003c 014084E2 		add	r4, r4, #1
+ 327:battery/compal_e88.c **** 		for(i=0;i<MADC_NUM_CHANNELS;i++)
+ 198              		.loc 1 327 0
+ 199 0040 170054E3 		cmp	r4, #23
+ 328:battery/compal_e88.c **** 			bat_compal_e88_madc[i]=twl3025_reg_read(VBATREG+i);
+ 200              		.loc 1 328 0
+ 201 0044 B200E7E1 		strh	r0, [r7, #2]!	@ movhi
+ 327:battery/compal_e88.c **** 		for(i=0;i<MADC_NUM_CHANNELS;i++)
+ 202              		.loc 1 327 0
+ 203 0048 F9FFFF1A 		bne	.L15
+ 331:battery/compal_e88.c **** 		if(!(battery_info.flags & BATTERY_CHG_CONNECTED)){
+ 204              		.loc 1 331 0
+ 205 004c F8329FE5 		ldr	r3, .L42+8
+ 206 0050 004093E5 		ldr	r4, [r3, #0]
+ 207 0054 014014E2 		ands	r4, r4, #1
+ 208 0058 0500001A 		bne	.L16
+ 332:battery/compal_e88.c **** 			twl3025_reg_write(BCICTL1,0x00); /* turn off bias */
+ 209              		.loc 1 332 0
+ 210 005c 1C00A0E3 		mov	r0, #28
+ 211 0060 0410A0E1 		mov	r1, r4
+ 212 0064 FEFFFFEB 		bl	twl3025_reg_write
+ 333:battery/compal_e88.c **** 			twl3025_unit_enable(TWL3025_UNIT_MAD,0); /* & ADC */
+ 213              		.loc 1 333 0
+ 214 0068 0100A0E3 		mov	r0, #1
+ 215 006c 0410A0E1 		mov	r1, r4
+ 216 0070 FEFFFFEB 		bl	twl3025_unit_enable
+ 217              	.L16:
+ 335:battery/compal_e88.c **** 		bat_compal_e88_madc_stat &= ~ ADC_CONVERSION;
+ 218              		.loc 1 335 0
+ 219 0074 C8329FE5 		ldr	r3, .L42
+ 220 0078 042093E5 		ldr	r2, [r3, #4]
+ 221              	.LBE17:
+ 222              	.LBE19:
+ 223              	.LBB20:
+ 224              	.LBB22:
+ 266:battery/compal_e88.c **** 		ADC_TO_PHYSICAL(bat_compal_e88_madc[MADC_VCHG],VCHG_LSB_uV);
+ 225              		.loc 1 266 0
+ 226 007c CC829FE5 		ldr	r8, .L42+12
+ 227              	.LBE22:
+ 228              	.LBE20:
+ 229              	.LBB24:
+ 230              	.LBB15:
+ 335:battery/compal_e88.c **** 		bat_compal_e88_madc_stat &= ~ ADC_CONVERSION;
+ 231              		.loc 1 335 0
+ 232 0080 0120C2E3 		bic	r2, r2, #1
+ 233 0084 042083E5 		str	r2, [r3, #4]
+ 234              	.LBE15:
+ 235              	.LBE24:
+ 236              	.LBB25:
+ 237              	.LBB21:
+ 266:battery/compal_e88.c **** 		ADC_TO_PHYSICAL(bat_compal_e88_madc[MADC_VCHG],VCHG_LSB_uV);
+ 238              		.loc 1 266 0
+ 239 0088 C4029FE5 		ldr	r0, .L42+16
+ 240 008c B230D8E1 		ldrh	r3, [r8, #2]
+ 241 0090 930000E0 		mul	r0, r3, r0
+ 242 0094 FA1FA0E3 		mov	r1, #1000
+ 243 0098 7D0F80E2 		add	r0, r0, #500
+ 244 009c FEFFFFEB 		bl	__divsi3
+ 265:battery/compal_e88.c **** 	battery_info.charger_volt_mV=
+ 245              		.loc 1 265 0
+ 246 00a0 A4429FE5 		ldr	r4, .L42+8
+ 268:battery/compal_e88.c **** 		ADC_TO_PHYSICAL(bat_compal_e88_madc[MADC_VBAT],VBAT_LSB_uV);
+ 247              		.loc 1 268 0
+ 248 00a4 B070D8E1 		ldrh	r7, [r8, #0]
+ 265:battery/compal_e88.c **** 	battery_info.charger_volt_mV=
+ 249              		.loc 1 265 0
+ 250 00a8 040084E5 		str	r0, [r4, #4]
+ 268:battery/compal_e88.c **** 		ADC_TO_PHYSICAL(bat_compal_e88_madc[MADC_VBAT],VBAT_LSB_uV);
+ 251              		.loc 1 268 0
+ 252 00ac A4029FE5 		ldr	r0, .L42+20
+ 253 00b0 970000E0 		mul	r0, r7, r0
+ 254 00b4 FA1FA0E3 		mov	r1, #1000
+ 255 00b8 7D0F80E2 		add	r0, r0, #500
+ 256 00bc FEFFFFEB 		bl	__divsi3
+ 270:battery/compal_e88.c **** 		ADC_TO_PHYSICAL(bat_compal_e88_madc[MADC_ICHG],ICHG_LSB_uA);
+ 257              		.loc 1 270 0
+ 258 00c0 B430D8E1 		ldrh	r3, [r8, #4]
+ 267:battery/compal_e88.c **** 	battery_info.bat_volt_mV=
+ 259              		.loc 1 267 0
+ 260 00c4 080084E5 		str	r0, [r4, #8]
+ 270:battery/compal_e88.c **** 		ADC_TO_PHYSICAL(bat_compal_e88_madc[MADC_ICHG],ICHG_LSB_uA);
+ 261              		.loc 1 270 0
+ 262 00c8 8C029FE5 		ldr	r0, .L42+24
+ 263 00cc 930000E0 		mul	r0, r3, r0
+ 264 00d0 FA1FA0E3 		mov	r1, #1000
+ 265 00d4 7D0F80E2 		add	r0, r0, #500
+ 266 00d8 FEFFFFEB 		bl	__divsi3
+ 273:battery/compal_e88.c **** 	if(adc <= VBAT_empty){			/* battery 0..100% */
+ 267              		.loc 1 273 0
+ 268 00dc 750F57E3 		cmp	r7, #468
+ 269:battery/compal_e88.c **** 	battery_info.bat_chg_curr_mA=
+ 269              		.loc 1 269 0
+ 270 00e0 0C0084E5 		str	r0, [r4, #12]
+ 271              	.LVL7:
+ 274:battery/compal_e88.c **** 		battery_info.battery_percent = 0;
+ 272              		.loc 1 274 0
+ 273 00e4 0030A0D3 		movle	r3, #0
+ 273:battery/compal_e88.c **** 	if(adc <= VBAT_empty){			/* battery 0..100% */
+ 274              		.loc 1 273 0
+ 275 00e8 1A0000DA 		ble	.L36
+ 276 00ec 160000EA 		b	.L41
+ 277              	.LVL8:
+ 278              	.L13:
+ 279              	.LBE21:
+ 280              	.LBE25:
+ 281              	.LBB26:
+ 282              	.LBB18:
+ 339:battery/compal_e88.c **** 		if(!(battery_info.flags & BATTERY_CHG_CONNECTED)){
+ 283              		.loc 1 339 0
+ 284 00f0 54329FE5 		ldr	r3, .L42+8
+ 285 00f4 003093E5 		ldr	r3, [r3, #0]
+ 286 00f8 010013E3 		tst	r3, #1
+ 287 00fc 0500001A 		bne	.L19
+ 340:battery/compal_e88.c **** 			twl3025_unit_enable(TWL3025_UNIT_MAD,1);
+ 288              		.loc 1 340 0
+ 289 0100 0100A0E3 		mov	r0, #1
+ 290 0104 0010A0E1 		mov	r1, r0
+ 291 0108 FEFFFFEB 		bl	twl3025_unit_enable
+ 341:battery/compal_e88.c **** 			twl3025_reg_write(BCICTL1,BATTERY_ALL_SENSE);
+ 292              		.loc 1 341 0
+ 293 010c 1C00A0E3 		mov	r0, #28
+ 294 0110 F910A0E3 		mov	r1, #249
+ 295 0114 FEFFFFEB 		bl	twl3025_reg_write
+ 296              	.L19:
+ 344:battery/compal_e88.c **** 		twl3025_reg_write(MADCTRL,0xff); /* convert all channels */
+ 297              		.loc 1 344 0
+ 298 0118 0D00A0E3 		mov	r0, #13
+ 299 011c FF10A0E3 		mov	r1, #255
+ 300 0120 FEFFFFEB 		bl	twl3025_reg_write
+ 345:battery/compal_e88.c **** 		twl3025_reg_write(VBATREG,0);    /* trigger conversion */
+ 301              		.loc 1 345 0
+ 302 0124 0F00A0E3 		mov	r0, #15
+ 303 0128 0010A0E3 		mov	r1, #0
+ 304 012c FEFFFFEB 		bl	twl3025_reg_write
+ 347:battery/compal_e88.c **** 		bat_compal_e88_madc_stat |= ADC_CONVERSION;
+ 305              		.loc 1 347 0
+ 306 0130 0C329FE5 		ldr	r3, .L42
+ 307 0134 042093E5 		ldr	r2, [r3, #4]
+ 308 0138 012082E3 		orr	r2, r2, #1
+ 309 013c 042083E5 		str	r2, [r3, #4]
+ 310              	.L14:
+ 311              	.LBE18:
+ 312              	.LBE26:
+ 354:battery/compal_e88.c **** 	struct osmo_timer_list *tmr = (struct osmo_timer_list*)p;
+ 355:battery/compal_e88.c **** 
+ 356:battery/compal_e88.c **** 	if(bat_compal_e88_adc_read()){ /* read back ADCs after a brief delay */
+ 357:battery/compal_e88.c **** 		osmo_timer_schedule(tmr,ADC_TIMER_DELAY);
+ 313              		.loc 1 357 0
+ 314 0140 0500A0E1 		mov	r0, r5
+ 315 0144 6410A0E3 		mov	r1, #100
+ 316 0148 7B0000EA 		b	.L38
+ 317              	.LVL9:
+ 318              	.L41:
+ 319              	.LBB27:
+ 320              	.LBB23:
+ 275:battery/compal_e88.c **** 	} else if (adc >= VBAT_full){
+ 321              		.loc 1 275 0
+ 322 014c 920F57E3 		cmp	r7, #584
+ 323 0150 020000DA 		ble	.L21
+ 276:battery/compal_e88.c **** 		battery_info.battery_percent = 100;
+ 324              		.loc 1 276 0
+ 325 0154 6430A0E3 		mov	r3, #100
+ 326              	.L36:
+ 327 0158 103084E5 		str	r3, [r4, #16]
+ 328 015c 060000EA 		b	.L20
+ 329              	.L21:
+ 279:battery/compal_e88.c **** 			(50+100*(adc-VBAT_empty))/(VBAT_full-VBAT_empty);
+ 330              		.loc 1 279 0
+ 331 0160 6430A0E3 		mov	r3, #100
+ 332 0164 930707E0 		mul	r7, r3, r7
+ 333              	.LVL10:
+ 334 0168 B60C47E2 		sub	r0, r7, #46592
+ 335 016c 9E0040E2 		sub	r0, r0, #158
+ 336 0170 7510A0E3 		mov	r1, #117
+ 337 0174 FEFFFFEB 		bl	__divsi3
+ 278:battery/compal_e88.c **** 		battery_info.battery_percent =
+ 338              		.loc 1 278 0
+ 339 0178 100084E5 		str	r0, [r4, #16]
+ 340              	.L20:
+ 283:battery/compal_e88.c ****         printf("BAT-ADC: ");
+ 341              		.loc 1 283 0
+ 342 017c DC019FE5 		ldr	r0, .L42+28
+ 343 0180 FEFFFFEB 		bl	printf
+ 344              	.LVL11:
+ 353:battery/compal_e88.c **** battery_compal_e88_timer_cb(void *p){
+ 345              		.loc 1 353 0
+ 346 0184 D8419FE5 		ldr	r4, .L42+32
+ 347              	.LVL12:
+ 348              	.L22:
+ 285:battery/compal_e88.c ****                 printf("%3d ",bat_compal_e88_madc[i]);
+ 349              		.loc 1 285 0
+ 350 0188 B210F6E1 		ldrh	r1, [r6, #2]!
+ 351 018c D4019FE5 		ldr	r0, .L42+36
+ 352 0190 FEFFFFEB 		bl	printf
+ 284:battery/compal_e88.c ****         for(i=0;i<MADC_NUM_CHANNELS;i++)
+ 353              		.loc 1 284 0
+ 354 0194 040056E1 		cmp	r6, r4
+ 355 0198 FAFFFF1A 		bne	.L22
+ 287:battery/compal_e88.c ****         printf("\tCharger at %u mV.\n",battery_info.charger_volt_mV);
+ 356              		.loc 1 287 0
+ 357 019c A8419FE5 		ldr	r4, .L42+8
+ 286:battery/compal_e88.c ****         printf("%c\n",32);
+ 358              		.loc 1 286 0
+ 359 01a0 2010A0E3 		mov	r1, #32
+ 360 01a4 C0019FE5 		ldr	r0, .L42+40
+ 361 01a8 FEFFFFEB 		bl	printf
+ 287:battery/compal_e88.c ****         printf("\tCharger at %u mV.\n",battery_info.charger_volt_mV);
+ 362              		.loc 1 287 0
+ 363 01ac 041094E5 		ldr	r1, [r4, #4]
+ 364 01b0 B8019FE5 		ldr	r0, .L42+44
+ 365 01b4 FEFFFFEB 		bl	printf
+ 288:battery/compal_e88.c ****         printf("\tBattery at %u mV.\n",battery_info.bat_volt_mV);
+ 366              		.loc 1 288 0
+ 367 01b8 081094E5 		ldr	r1, [r4, #8]
+ 368 01bc B0019FE5 		ldr	r0, .L42+48
+ 369 01c0 FEFFFFEB 		bl	printf
+ 289:battery/compal_e88.c ****         printf("\tCharging at %u mA.\n",battery_info.bat_chg_curr_mA);
+ 370              		.loc 1 289 0
+ 371 01c4 0C1094E5 		ldr	r1, [r4, #12]
+ 372 01c8 A8019FE5 		ldr	r0, .L42+52
+ 373 01cc FEFFFFEB 		bl	printf
+ 290:battery/compal_e88.c ****         printf("\tBattery capacity is %u%%.\n",battery_info.battery_percent);
+ 374              		.loc 1 290 0
+ 375 01d0 101094E5 		ldr	r1, [r4, #16]
+ 376 01d4 A0019FE5 		ldr	r0, .L42+56
+ 377 01d8 FEFFFFEB 		bl	printf
+ 291:battery/compal_e88.c **** 	printf("\tBattery range is %d..%d mV.\n",
+ 378              		.loc 1 291 0
+ 379 01dc 9C119FE5 		ldr	r1, .L42+60
+ 380 01e0 9C219FE5 		ldr	r2, .L42+64
+ 381 01e4 9C019FE5 		ldr	r0, .L42+68
+ 382 01e8 FEFFFFEB 		bl	printf
+ 294:battery/compal_e88.c ****         printf("\tBattery full at %d LSB .. full at %d LSB\n",VBAT_empty,VBAT_full);
+ 383              		.loc 1 294 0
+ 384 01ec 751FA0E3 		mov	r1, #468
+ 385 01f0 94219FE5 		ldr	r2, .L42+72
+ 386 01f4 94019FE5 		ldr	r0, .L42+76
+ 387 01f8 FEFFFFEB 		bl	printf
+ 295:battery/compal_e88.c ****         printf("\tCharging at %d LSB (%d mA).\n",ICHG_set,
+ 388              		.loc 1 295 0
+ 389 01fc CC20A0E3 		mov	r2, #204
+ 390 0200 EF10A0E3 		mov	r1, #239
+ 391 0204 88019FE5 		ldr	r0, .L42+80
+ 392 0208 FEFFFFEB 		bl	printf
+ 297:battery/compal_e88.c ****         i = twl3025_reg_read(BCICTL2);
+ 393              		.loc 1 297 0
+ 394 020c 1D00A0E3 		mov	r0, #29
+ 395 0210 FEFFFFEB 		bl	twl3025_reg_read
+ 396 0214 0010A0E1 		mov	r1, r0
+ 397              	.LVL13:
+ 298:battery/compal_e88.c ****         printf("\tBCICTL2=0x%03x\n",i);      
+ 398              		.loc 1 298 0
+ 399 0218 78019FE5 		ldr	r0, .L42+84
+ 400              	.LVL14:
+ 401 021c FEFFFFEB 		bl	printf
+ 402              	.LVL15:
+ 299:battery/compal_e88.c **** 	printf("\tbattery-info.flags=0x%08x\n",battery_info.flags);
+ 403              		.loc 1 299 0
+ 404 0220 001094E5 		ldr	r1, [r4, #0]
+ 405 0224 70019FE5 		ldr	r0, .L42+88
+ 406 0228 FEFFFFEB 		bl	printf
+ 300:battery/compal_e88.c **** 	printf("\tbat_compal_e88_chg_state=%d\n",bat_compal_e88_chg_state);
+ 407              		.loc 1 300 0
+ 408 022c 10319FE5 		ldr	r3, .L42
+ 409 0230 68019FE5 		ldr	r0, .L42+92
+ 410 0234 001093E5 		ldr	r1, [r3, #0]
+ 411 0238 FEFFFFEB 		bl	printf
+ 412              	.LBE23:
+ 413              	.LBE27:
+ 414              	.LBB28:
+ 415              	.LBB29:
+ 236:battery/compal_e88.c **** 	int vrpcsts = twl3025_reg_read(VRPCSTS);
+ 416              		.loc 1 236 0
+ 417 023c 1F00A0E3 		mov	r0, #31
+ 418 0240 FEFFFFEB 		bl	twl3025_reg_read
+ 419              	.LVL16:
+ 239:battery/compal_e88.c **** 	if(!(battery_info.flags & BATTERY_CHG_CONNECTED)){
+ 420              		.loc 1 239 0
+ 421 0244 003094E5 		ldr	r3, [r4, #0]
+ 422 0248 010013E3 		tst	r3, #1
+ 423 024c 406000E2 		and	r6, r0, #64
+ 424 0250 0D00001A 		bne	.L23
+ 240:battery/compal_e88.c **** 		if(vrpcsts & CHGPRES){
+ 425              		.loc 1 240 0
+ 426 0254 000056E3 		cmp	r6, #0
+ 427 0258 1800000A 		beq	.L24
+ 241:battery/compal_e88.c **** 			puts("\033[34;1mCHARGER: external voltage connected!\033[0m\n");
+ 428              		.loc 1 241 0
+ 429 025c 40019FE5 		ldr	r0, .L42+96
+ 430              	.LVL17:
+ 431 0260 FEFFFFEB 		bl	puts
+ 242:battery/compal_e88.c **** 			battery_info.flags |= BATTERY_CHG_CONNECTED;
+ 432              		.loc 1 242 0
+ 433 0264 003094E5 		ldr	r3, [r4, #0]
+ 245:battery/compal_e88.c **** 			twl3025_unit_enable(TWL3025_UNIT_MAD,1);
+ 434              		.loc 1 245 0
+ 435 0268 0100A0E3 		mov	r0, #1
+ 242:battery/compal_e88.c **** 			battery_info.flags |= BATTERY_CHG_CONNECTED;
+ 436              		.loc 1 242 0
+ 437 026c 013083E3 		orr	r3, r3, #1
+ 245:battery/compal_e88.c **** 			twl3025_unit_enable(TWL3025_UNIT_MAD,1);
+ 438              		.loc 1 245 0
+ 439 0270 0010A0E1 		mov	r1, r0
+ 242:battery/compal_e88.c **** 			battery_info.flags |= BATTERY_CHG_CONNECTED;
+ 440              		.loc 1 242 0
+ 441 0274 003084E5 		str	r3, [r4, #0]
+ 245:battery/compal_e88.c **** 			twl3025_unit_enable(TWL3025_UNIT_MAD,1);
+ 442              		.loc 1 245 0
+ 443 0278 FEFFFFEB 		bl	twl3025_unit_enable
+ 246:battery/compal_e88.c **** 			twl3025_reg_write(BCICTL1,BATTERY_ALL_SENSE);
+ 444              		.loc 1 246 0
+ 445 027c 1C00A0E3 		mov	r0, #28
+ 446 0280 F910A0E3 		mov	r1, #249
+ 447 0284 FEFFFFEB 		bl	twl3025_reg_write
+ 448 0288 0C0000EA 		b	.L24
+ 449              	.LVL18:
+ 450              	.L23:
+ 249:battery/compal_e88.c **** 		if(!(vrpcsts & CHGPRES)){
+ 451              		.loc 1 249 0
+ 452 028c 000056E3 		cmp	r6, #0
+ 453 0290 0A00001A 		bne	.L24
+ 251:battery/compal_e88.c **** 			twl3025_unit_enable(TWL3025_UNIT_MAD,0);
+ 454              		.loc 1 251 0
+ 455 0294 0100A0E3 		mov	r0, #1
+ 456              	.LVL19:
+ 457 0298 0610A0E1 		mov	r1, r6
+ 458 029c FEFFFFEB 		bl	twl3025_unit_enable
+ 252:battery/compal_e88.c **** 			twl3025_reg_write(BCICTL1,0);
+ 459              		.loc 1 252 0
+ 460 02a0 1C00A0E3 		mov	r0, #28
+ 461 02a4 0610A0E1 		mov	r1, r6
+ 462 02a8 FEFFFFEB 		bl	twl3025_reg_write
+ 254:battery/compal_e88.c **** 			battery_info.flags &= ~ BATTERY_CHG_CONNECTED;
+ 463              		.loc 1 254 0
+ 464 02ac 003094E5 		ldr	r3, [r4, #0]
+ 465 02b0 0130C3E3 		bic	r3, r3, #1
+ 466 02b4 003084E5 		str	r3, [r4, #0]
+ 255:battery/compal_e88.c **** 			puts("\033[34;1mCHARGER: external voltage disconnected!\033[0m\n");
+ 467              		.loc 1 255 0
+ 468 02b8 E8009FE5 		ldr	r0, .L42+100
+ 469 02bc FEFFFFEB 		bl	puts
+ 470              	.L24:
+ 471              	.LBE29:
+ 472              	.LBE28:
+ 473              	.LBB30:
+ 474              	.LBB31:
+ 190:battery/compal_e88.c **** 	if(!(battery_info.flags & BATTERY_CHG_CONNECTED)){
+ 475              		.loc 1 190 0
+ 476 02c0 84309FE5 		ldr	r3, .L42+8
+ 477 02c4 000093E5 		ldr	r0, [r3, #0]
+ 478 02c8 010010E2 		ands	r0, r0, #1
+ 479 02cc 1700000A 		beq	.L37
+ 480              	.L25:
+ 196:battery/compal_e88.c **** 	if(bat_compal_e88_madc[MADC_VBAT] > VBAT_fail){
+ 481              		.loc 1 196 0
+ 482 02d0 78309FE5 		ldr	r3, .L42+12
+ 483 02d4 D0209FE5 		ldr	r2, .L42+104
+ 484 02d8 B030D3E1 		ldrh	r3, [r3, #0]
+ 485 02dc 020053E1 		cmp	r3, r2
+ 197:battery/compal_e88.c **** 		bat_compal_e88_goto_state(CHARG_FAIL);
+ 486              		.loc 1 197 0
+ 487 02e0 0300A083 		movhi	r0, #3
+ 196:battery/compal_e88.c **** 	if(bat_compal_e88_madc[MADC_VBAT] > VBAT_fail){
+ 488              		.loc 1 196 0
+ 489 02e4 1100008A 		bhi	.L37
+ 203:battery/compal_e88.c **** 	switch(bat_compal_e88_chg_state){
+ 490              		.loc 1 203 0
+ 491 02e8 54209FE5 		ldr	r2, .L42
+ 492 02ec 002092E5 		ldr	r2, [r2, #0]
+ 493 02f0 010052E3 		cmp	r2, #1
+ 494 02f4 0600000A 		beq	.L30
+ 495 02f8 0200003A 		bcc	.L29
+ 496 02fc 020052E3 		cmp	r2, #2
+ 497 0300 0700001A 		bne	.L35
+ 498 0304 0A0000EA 		b	.L26
+ 499              	.L29:
+ 205:battery/compal_e88.c **** 		if(bat_compal_e88_madc[MADC_VBAT] >= VBAT_full)
+ 500              		.loc 1 205 0
+ 501 0308 920F53E3 		cmp	r3, #584
+ 502 030c 0600009A 		bls	.L40
+ 503 0310 010000EA 		b	.L39
+ 504              	.L30:
+ 211:battery/compal_e88.c **** 		if(bat_compal_e88_madc[MADC_VBAT] >= VBAT_full)
+ 505              		.loc 1 211 0
+ 506 0314 920F53E3 		cmp	r3, #584
+ 507 0318 0500009A 		bls	.L26
+ 508              	.L39:
+ 212:battery/compal_e88.c **** 			bat_compal_e88_goto_state(CHARG_CONST_VOLT);
+ 509              		.loc 1 212 0
+ 510 031c 0200A0E3 		mov	r0, #2
+ 511 0320 020000EA 		b	.L37
+ 512              	.L35:
+ 218:battery/compal_e88.c **** 		if(bat_compal_e88_madc[MADC_VBAT] < VBAT_full)
+ 513              		.loc 1 218 0
+ 514 0324 920F53E3 		cmp	r3, #584
+ 515 0328 0100008A 		bhi	.L26
+ 516              	.L40:
+ 219:battery/compal_e88.c **** 			bat_compal_e88_goto_state(CHARG_CONST_CURR);
+ 517              		.loc 1 219 0
+ 518 032c 0100A0E3 		mov	r0, #1
+ 519              	.L37:
+ 520 0330 FEFFFFEB 		bl	bat_compal_e88_goto_state
+ 521              	.L26:
+ 522              	.LBE31:
+ 523              	.LBE30:
+ 358:battery/compal_e88.c **** 		return;
+ 359:battery/compal_e88.c **** 	}
+ 360:battery/compal_e88.c **** 
+ 361:battery/compal_e88.c **** 	bat_compal_e88_upd_measurements();	/* convert user-accessible information */
+ 362:battery/compal_e88.c **** 	bat_compal_e88_chk_ac_presence();	/* detect AC charger presence */
+ 363:battery/compal_e88.c **** 	bat_compal_e88_chg_control();	/* battery charger state machine */
+ 364:battery/compal_e88.c **** 
+ 365:battery/compal_e88.c **** 	osmo_timer_schedule(tmr,BATTERY_TIMER_DELAY);
+ 524              		.loc 1 365 0
+ 525 0334 74109FE5 		ldr	r1, .L42+108
+ 526 0338 0500A0E1 		mov	r0, r5
+ 527              	.L38:
+ 366:battery/compal_e88.c **** }
+ 528              		.loc 1 366 0
+ 529 033c F041BDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, lr}
+ 365:battery/compal_e88.c **** 	osmo_timer_schedule(tmr,BATTERY_TIMER_DELAY);
+ 530              		.loc 1 365 0
+ 531 0340 FEFFFFEA 		b	osmo_timer_schedule
+ 532              	.L43:
+ 533              		.align	2
+ 534              	.L42:
+ 535 0344 00000000 		.word	.LANCHOR0
+ 536 0348 FEFFFFFF 		.word	bat_compal_e88_madc-2
+ 537 034c 00000000 		.word	battery_info
+ 538 0350 00000000 		.word	bat_compal_e88_madc
+ 539 0354 61210000 		.word	8545
+ 540 0358 B41A0000 		.word	6836
+ 541 035c 56030000 		.word	854
+ 542 0360 3E000000 		.word	.LC2
+ 543 0364 0E000000 		.word	bat_compal_e88_madc+14
+ 544 0368 48000000 		.word	.LC3
+ 545 036c 4D000000 		.word	.LC4
+ 546 0370 51000000 		.word	.LC5
+ 547 0374 65000000 		.word	.LC6
+ 548 0378 79000000 		.word	.LC7
+ 549 037c 8E000000 		.word	.LC8
+ 550 0380 7F0C0000 		.word	3199
+ 551 0384 9F0F0000 		.word	3999
+ 552 0388 AA000000 		.word	.LC9
+ 553 038c 49020000 		.word	585
+ 554 0390 C8000000 		.word	.LC10
+ 555 0394 F3000000 		.word	.LC11
+ 556 0398 11010000 		.word	.LC12
+ 557 039c 22010000 		.word	.LC13
+ 558 03a0 3E010000 		.word	.LC14
+ 559 03a4 5C010000 		.word	.LC15
+ 560 03a8 8D010000 		.word	.LC16
+ 561 03ac 6E020000 		.word	622
+ 562 03b0 88130000 		.word	5000
+ 563              		.cfi_endproc
+ 564              	.LFE18:
+ 566              		.section	.text.battery_compal_e88_init,"ax",%progbits
+ 567              		.align	2
+ 568              		.global	battery_compal_e88_init
+ 570              	battery_compal_e88_init:
+ 571              	.LFB19:
+ 367:battery/compal_e88.c **** 
+ 368:battery/compal_e88.c **** /* timer that fires the charging loop regularly */
+ 369:battery/compal_e88.c **** static struct osmo_timer_list battery_compal88_timer = {
+ 370:battery/compal_e88.c **** 	.cb = &battery_compal_e88_timer_cb,
+ 371:battery/compal_e88.c **** 	.data = &battery_compal88_timer
+ 372:battery/compal_e88.c **** };
+ 373:battery/compal_e88.c **** 
+ 374:battery/compal_e88.c **** void
+ 375:battery/compal_e88.c **** battery_compal_e88_init(){
+ 572              		.loc 1 375 0
+ 573              		.cfi_startproc
+ 574              		@ args = 0, pretend = 0, frame = 0
+ 575              		@ frame_needed = 0, uses_anonymous_args = 0
+ 576 0000 04E02DE5 		str	lr, [sp, #-4]!
+ 577              	.LCFI2:
+ 578              		.cfi_def_cfa_offset 4
+ 376:battery/compal_e88.c **** 	printf("%s: starting up\n",__FUNCTION__);
+ 579              		.loc 1 376 0
+ 580 0004 14109FE5 		ldr	r1, .L45
+ 581 0008 14009FE5 		ldr	r0, .L45+4
+ 582              		.cfi_offset 14, -4
+ 583 000c FEFFFFEB 		bl	printf
+ 377:battery/compal_e88.c **** 	osmo_timer_schedule(&battery_compal88_timer,BATTERY_TIMER_DELAY);
+ 584              		.loc 1 377 0
+ 585 0010 10009FE5 		ldr	r0, .L45+8
+ 586 0014 10109FE5 		ldr	r1, .L45+12
+ 378:battery/compal_e88.c **** }
+ 587              		.loc 1 378 0
+ 588 0018 04E09DE4 		ldr	lr, [sp], #4
+ 377:battery/compal_e88.c **** 	osmo_timer_schedule(&battery_compal88_timer,BATTERY_TIMER_DELAY);
+ 589              		.loc 1 377 0
+ 590 001c FEFFFFEA 		b	osmo_timer_schedule
+ 591              	.L46:
+ 592              		.align	2
+ 593              	.L45:
+ 594 0020 10000000 		.word	.LANCHOR1+16
+ 595 0024 C1010000 		.word	.LC17
+ 596 0028 00000000 		.word	.LANCHOR2
+ 597 002c 88130000 		.word	5000
+ 598              		.cfi_endproc
+ 599              	.LFE19:
+ 601              		.comm	battery_info,20,4
+ 602              		.comm	bat_compal_e88_madc,16,4
+ 603              		.section	.rodata
+ 604              		.align	2
+ 605              		.set	.LANCHOR1,. + 0
+ 608              	bat_compal_e88_chg_state_names:
+ 609 0000 D2010000 		.word	.LC18
+ 610 0004 D6010000 		.word	.LC19
+ 611 0008 E7010000 		.word	.LC20
+ 612 000c F8010000 		.word	.LC21
+ 615              	__FUNCTION__.1660:
+ 616 0010 62617474 		.ascii	"battery_compal_e88_init\000"
+ 616      6572795F 
+ 616      636F6D70 
+ 616      616C5F65 
+ 616      38385F69 
+ 617              		.section	.rodata.str1.1,"aMS",%progbits,1
+ 618              	.LC0:
+ 619 0000 1B5B3334 		.ascii	"\033[34;1mCHARGER: %s --> %s.\033[0m\012\000"
+ 619      3B316D43 
+ 619      48415247 
+ 619      45523A20 
+ 619      2573202D 
+ 620              	.LC1:
+ 621 0020 42434943 		.ascii	"BCICTL2 is 0x%03x, CHGREG=%d\012\000"
+ 621      544C3220 
+ 621      69732030 
+ 621      78253033 
+ 621      782C2043 
+ 622              	.LC2:
+ 623 003e 4241542D 		.ascii	"BAT-ADC: \000"
+ 623      4144433A 
+ 623      2000
+ 624              	.LC3:
+ 625 0048 25336420 		.ascii	"%3d \000"
+ 625      00
+ 626              	.LC4:
+ 627 004d 25630A00 		.ascii	"%c\012\000"
+ 628              	.LC5:
+ 629 0051 09436861 		.ascii	"\011Charger at %u mV.\012\000"
+ 629      72676572 
+ 629      20617420 
+ 629      2575206D 
+ 629      562E0A00 
+ 630              	.LC6:
+ 631 0065 09426174 		.ascii	"\011Battery at %u mV.\012\000"
+ 631      74657279 
+ 631      20617420 
+ 631      2575206D 
+ 631      562E0A00 
+ 632              	.LC7:
+ 633 0079 09436861 		.ascii	"\011Charging at %u mA.\012\000"
+ 633      7267696E 
+ 633      67206174 
+ 633      20257520 
+ 633      6D412E0A 
+ 634              	.LC8:
+ 635 008e 09426174 		.ascii	"\011Battery capacity is %u%%.\012\000"
+ 635      74657279 
+ 635      20636170 
+ 635      61636974 
+ 635      79206973 
+ 636              	.LC9:
+ 637 00aa 09426174 		.ascii	"\011Battery range is %d..%d mV.\012\000"
+ 637      74657279 
+ 637      2072616E 
+ 637      67652069 
+ 637      73202564 
+ 638              	.LC10:
+ 639 00c8 09426174 		.ascii	"\011Battery full at %d LSB .. full at %d LSB\012\000"
+ 639      74657279 
+ 639      2066756C 
+ 639      6C206174 
+ 639      20256420 
+ 640              	.LC11:
+ 641 00f3 09436861 		.ascii	"\011Charging at %d LSB (%d mA).\012\000"
+ 641      7267696E 
+ 641      67206174 
+ 641      20256420 
+ 641      4C534220 
+ 642              	.LC12:
+ 643 0111 09424349 		.ascii	"\011BCICTL2=0x%03x\012\000"
+ 643      43544C32 
+ 643      3D307825 
+ 643      3033780A 
+ 643      00
+ 644              	.LC13:
+ 645 0122 09626174 		.ascii	"\011battery-info.flags=0x%08x\012\000"
+ 645      74657279 
+ 645      2D696E66 
+ 645      6F2E666C 
+ 645      6167733D 
+ 646              	.LC14:
+ 647 013e 09626174 		.ascii	"\011bat_compal_e88_chg_state=%d\012\000"
+ 647      5F636F6D 
+ 647      70616C5F 
+ 647      6538385F 
+ 647      6368675F 
+ 648              	.LC15:
+ 649 015c 1B5B3334 		.ascii	"\033[34;1mCHARGER: external voltage connected!\033["
+ 649      3B316D43 
+ 649      48415247 
+ 649      45523A20 
+ 649      65787465 
+ 650 0189 306D0A00 		.ascii	"0m\012\000"
+ 651              	.LC16:
+ 652 018d 1B5B3334 		.ascii	"\033[34;1mCHARGER: external voltage disconnected!\033"
+ 652      3B316D43 
+ 652      48415247 
+ 652      45523A20 
+ 652      65787465 
+ 653 01bc 5B306D0A 		.ascii	"[0m\012\000"
+ 653      00
+ 654              	.LC17:
+ 655 01c1 25733A20 		.ascii	"%s: starting up\012\000"
+ 655      73746172 
+ 655      74696E67 
+ 655      2075700A 
+ 655      00
+ 656              	.LC18:
+ 657 01d2 4F666600 		.ascii	"Off\000"
+ 658              	.LC19:
+ 659 01d6 436F6E73 		.ascii	"Constant Current\000"
+ 659      74616E74 
+ 659      20437572 
+ 659      72656E74 
+ 659      00
+ 660              	.LC20:
+ 661 01e7 436F6E73 		.ascii	"Constant Voltage\000"
+ 661      74616E74 
+ 661      20566F6C 
+ 661      74616765 
+ 661      00
+ 662              	.LC21:
+ 663 01f8 42617474 		.ascii	"Battery Failure\000"
+ 663      65727920 
+ 663      4661696C 
+ 663      75726500 
+ 664              		.data
+ 665              		.align	2
+ 666              		.set	.LANCHOR2,. + 0
+ 669              	battery_compal88_timer:
+ 670 0000 00000000 		.space	16
+ 670      00000000 
+ 670      00000000 
+ 670      00000000 
+ 671 0010 00000000 		.word	battery_compal_e88_timer_cb
+ 672 0014 00000000 		.word	battery_compal88_timer
+ 673              		.bss
+ 674              		.align	2
+ 675              		.set	.LANCHOR0,. + 0
+ 678              	bat_compal_e88_chg_state:
+ 679 0000 00000000 		.space	4
+ 682              	bat_compal_e88_madc_stat:
+ 683 0004 00000000 		.space	4
+ 684              		.text
+ 685              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 compal_e88.c
+     /tmp/ccECGHTF.s:12     .text.bat_compal_e88_goto_state:0000000000000000 $a
+     /tmp/ccECGHTF.s:14     .text.bat_compal_e88_goto_state:0000000000000000 bat_compal_e88_goto_state
+     /tmp/ccECGHTF.s:136    .text.bat_compal_e88_goto_state:000000000000011c $d
+                            *COM*:0000000000000014 battery_info
+     /tmp/ccECGHTF.s:147    .text.battery_compal_e88_timer_cb:0000000000000000 $a
+     /tmp/ccECGHTF.s:149    .text.battery_compal_e88_timer_cb:0000000000000000 battery_compal_e88_timer_cb
+     /tmp/ccECGHTF.s:535    .text.battery_compal_e88_timer_cb:0000000000000344 $d
+                            *COM*:0000000000000010 bat_compal_e88_madc
+     /tmp/ccECGHTF.s:567    .text.battery_compal_e88_init:0000000000000000 $a
+     /tmp/ccECGHTF.s:570    .text.battery_compal_e88_init:0000000000000000 battery_compal_e88_init
+     /tmp/ccECGHTF.s:594    .text.battery_compal_e88_init:0000000000000020 $d
+     /tmp/ccECGHTF.s:604    .rodata:0000000000000000 $d
+     /tmp/ccECGHTF.s:608    .rodata:0000000000000000 bat_compal_e88_chg_state_names
+     /tmp/ccECGHTF.s:615    .rodata:0000000000000010 __FUNCTION__.1660
+     /tmp/ccECGHTF.s:665    .data:0000000000000000 $d
+     /tmp/ccECGHTF.s:669    .data:0000000000000000 battery_compal88_timer
+     /tmp/ccECGHTF.s:674    .bss:0000000000000000 $d
+     /tmp/ccECGHTF.s:678    .bss:0000000000000000 bat_compal_e88_chg_state
+     /tmp/ccECGHTF.s:682    .bss:0000000000000004 bat_compal_e88_madc_stat
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+printf
+twl3025_reg_write
+twl3025_reg_read
+__divsi3
+twl3025_unit_enable
+puts
+osmo_timer_schedule

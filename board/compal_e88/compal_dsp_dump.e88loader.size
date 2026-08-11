@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  24986	   2272	  26891	  54149	   d385	board/compal_e88/compal_dsp_dump.e88loader.elf
+  26310	    924	  26919	  54153	   d389	board/compal_e88/compal_dsp_dump.e88loader.elf

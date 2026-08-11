@@ -1,0 +1,844 @@
+   1              		.file	"init.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.board_init,"ax",%progbits
+  12              		.align	2
+  13              		.global	board_init
+  15              	board_init:
+  16              	.LFB42:
+  17              		.file 1 "board/tr800/init.c"
+   1:board/tr800/init.c **** /* Initialization for the iWOW TR-800 modem */
+   2:board/tr800/init.c **** 
+   3:board/tr800/init.c **** /*
+   4:board/tr800/init.c ****  * This code was written by Mychaela Falconia <falcon@freecalypso.org>
+   5:board/tr800/init.c ****  * who refuses to claim copyright on it and has released it as public domain
+   6:board/tr800/init.c ****  * instead. NO rights reserved, all rights relinquished.
+   7:board/tr800/init.c ****  *
+   8:board/tr800/init.c ****  * This program is free software; you can redistribute it and/or modify
+   9:board/tr800/init.c ****  * it under the terms of the GNU General Public License as published by
+  10:board/tr800/init.c ****  * the Free Software Foundation; either version 2 of the License, or
+  11:board/tr800/init.c ****  * (at your option) any later version.
+  12:board/tr800/init.c ****  *
+  13:board/tr800/init.c ****  * This program is distributed in the hope that it will be useful,
+  14:board/tr800/init.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  15:board/tr800/init.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  16:board/tr800/init.c ****  * GNU General Public License for more details.
+  17:board/tr800/init.c ****  */
+  18:board/tr800/init.c **** 
+  19:board/tr800/init.c **** #include <stdint.h>
+  20:board/tr800/init.c **** #include <stdio.h>
+  21:board/tr800/init.c **** 
+  22:board/tr800/init.c **** #include <debug.h>
+  23:board/tr800/init.c **** #include <ctors.h>
+  24:board/tr800/init.c **** #include <memory.h>
+  25:board/tr800/init.c **** #include <board.h>
+  26:board/tr800/init.c **** #include <keypad.h>
+  27:board/tr800/init.c **** #include <console.h>
+  28:board/tr800/init.c **** #include <flash/cfi_flash.h>
+  29:board/tr800/init.c **** #include <tiffs.h>
+  30:board/tr800/init.c **** 
+  31:board/tr800/init.c **** #include <calypso/irq.h>
+  32:board/tr800/init.c **** #include <calypso/clock.h>
+  33:board/tr800/init.c **** #include <calypso/dma.h>
+  34:board/tr800/init.c **** #include <calypso/rtc.h>
+  35:board/tr800/init.c **** #include <calypso/timer.h>
+  36:board/tr800/init.c **** #include <uart.h>
+  37:board/tr800/init.c **** 
+  38:board/tr800/init.c **** #include <comm/sercomm.h>
+  39:board/tr800/init.c **** #include <comm/timer.h>
+  40:board/tr800/init.c **** 
+  41:board/tr800/init.c **** #include <abb/twl3025.h>
+  42:board/tr800/init.c **** #include <rf/trf6151.h>
+  43:board/tr800/init.c **** #include "keymap.h"
+  44:board/tr800/init.c **** 
+  45:board/tr800/init.c **** #define ARMIO_LATCH_OUT 0xfffe4802
+  46:board/tr800/init.c **** #define IO_CNTL_REG	0xfffe4804
+  47:board/tr800/init.c **** #define ARM_CONF_REG	0xfffef006
+  48:board/tr800/init.c **** #define ASIC_CONF_REG	0xfffef008
+  49:board/tr800/init.c **** #define IO_CONF_REG	0xfffef00a
+  50:board/tr800/init.c **** 
+  51:board/tr800/init.c **** static void board_io_init(void)
+  52:board/tr800/init.c **** {
+  53:board/tr800/init.c **** 	uint16_t reg;
+  54:board/tr800/init.c **** 
+  55:board/tr800/init.c **** 	reg = readw(ASIC_CONF_REG);
+  56:board/tr800/init.c **** 	/* DSR_MODEM/LPG pin is unconnected - make it LPG dummy output */
+  57:board/tr800/init.c **** 	reg |= (1 << 6);
+  58:board/tr800/init.c **** 	/* TWL3025: Set SPI+RIF RX clock to rising edge */
+  59:board/tr800/init.c **** 	reg |= (1 << 13) | (1 << 14);
+  60:board/tr800/init.c **** 	writew(reg, ASIC_CONF_REG);
+  61:board/tr800/init.c **** 
+  62:board/tr800/init.c **** 	/*
+  63:board/tr800/init.c **** 	 * Calypso signals GPIO0, TSPDI/GPIO4, BCLKX/GPIO6, MCUEN1/GPIO8 and
+  64:board/tr800/init.c **** 	 * MCUEN2/GPIO13 are unused and unconnected inside the TR-800 module.
+  65:board/tr800/init.c **** 	 * Configure them as dummy outputs in order to prevent floating inputs.
+  66:board/tr800/init.c **** 	 */
+  67:board/tr800/init.c **** 	writew(0x0215, IO_CONF_REG);
+  68:board/tr800/init.c **** 	writew(0xDC0E, IO_CNTL_REG);
+  69:board/tr800/init.c **** 	writew(0x0000, ARMIO_LATCH_OUT);
+  70:board/tr800/init.c **** 
+  71:board/tr800/init.c **** 	/* configure ADD(22), needed for second half of flash */
+  72:board/tr800/init.c **** 	reg = readw(ARM_CONF_REG);
+  73:board/tr800/init.c **** 	reg |= (1 << 3);
+  74:board/tr800/init.c **** 	writew(reg, ARM_CONF_REG);
+  75:board/tr800/init.c **** }
+  76:board/tr800/init.c **** 
+  77:board/tr800/init.c **** /*
+  78:board/tr800/init.c ****  * A total of 8 Calypso GPIO/multifunction pins (3 pure GPIO, 5 multifunction)
+  79:board/tr800/init.c ****  * are brought out on the TR-800 module, with module users (application board
+  80:board/tr800/init.c ****  * designers) explicitly allowed to wire them in whichever way is needed for
+  81:board/tr800/init.c ****  * the custom application at hand.  6 of these pins power up as inputs.
+  82:board/tr800/init.c ****  * Should the firmware leave them as inputs, or switch them to dummy outputs
+  83:board/tr800/init.c ****  * to prevent floating inputs?  The answer in FreeCalypso (for TR-800 modules
+  84:board/tr800/init.c ****  * rebranded as FC Tango) is a special file written into FFS: /etc/tango-pinmux.
+  85:board/tr800/init.c ****  * This board wiring config file tells the firmware what it should do with each
+  86:board/tr800/init.c ****  * of the 8 GPIO/multifunction pins in question; the format is defined here:
+  87:board/tr800/init.c ****  *
+  88:board/tr800/init.c ****  * https://www.freecalypso.org/hg/freecalypso-docs/file/tip/Tango-pinmux
+  89:board/tr800/init.c ****  *
+  90:board/tr800/init.c ****  * The following function reads /etc/tango-pinmux from FFS and applies the pin
+  91:board/tr800/init.c ****  * multiplexing configuration encoded therein.  If this file is missing, all
+  92:board/tr800/init.c ****  * pins in question are left in their default power-up state.
+  93:board/tr800/init.c ****  */
+  94:board/tr800/init.c **** static void board_pinmux_init(void)
+  95:board/tr800/init.c **** {
+  96:board/tr800/init.c **** 	uint8_t pinmux[4];
+  97:board/tr800/init.c **** 	int rc;
+  98:board/tr800/init.c **** 	uint16_t conf_reg, cntl_reg, out_reg;
+  99:board/tr800/init.c **** 
+ 100:board/tr800/init.c **** 	rc = tiffs_read_file_fixedlen("/etc/tango-pinmux", pinmux, 4);
+ 101:board/tr800/init.c **** 	if (rc < 0)
+ 102:board/tr800/init.c **** 		return;		/* error msg already printed */
+ 103:board/tr800/init.c **** 	if (rc == 0) {
+ 104:board/tr800/init.c **** 		puts("Warning: /etc/tango-pinmux not found, pins left in default power-up state\n");
+ 105:board/tr800/init.c **** 		return;
+ 106:board/tr800/init.c **** 	}
+ 107:board/tr800/init.c **** 	/* read-modify-write registers */
+ 108:board/tr800/init.c **** 	conf_reg = readw(IO_CONF_REG);
+ 109:board/tr800/init.c **** 	cntl_reg = readw(IO_CNTL_REG);
+ 110:board/tr800/init.c **** 	out_reg = readw(ARMIO_LATCH_OUT);
+ 111:board/tr800/init.c **** 	/* GPIO1 */
+ 112:board/tr800/init.c **** 	if (pinmux[0] & 0x80) {
+ 113:board/tr800/init.c **** 		cntl_reg &= ~(1 << 1);
+ 114:board/tr800/init.c **** 		if (pinmux[0] & 0x01)
+ 115:board/tr800/init.c **** 			out_reg |= (1 << 1);
+ 116:board/tr800/init.c **** 		else
+ 117:board/tr800/init.c **** 			out_reg &= ~(1 << 1);
+ 118:board/tr800/init.c **** 	}
+ 119:board/tr800/init.c **** 	/* GPIO2 */
+ 120:board/tr800/init.c **** 	if (pinmux[1] & 0x08) {
+ 121:board/tr800/init.c **** 		/* pinmux says it's DCD output - set it high */
+ 122:board/tr800/init.c **** 		cntl_reg &= ~(1 << 2);
+ 123:board/tr800/init.c **** 		out_reg |= (1 << 2);
+ 124:board/tr800/init.c **** 	} else if (pinmux[1] & 0x02) {
+ 125:board/tr800/init.c **** 		/* generic output */
+ 126:board/tr800/init.c **** 		cntl_reg &= ~(1 << 2);
+ 127:board/tr800/init.c **** 		if (pinmux[1] & 0x01)
+ 128:board/tr800/init.c **** 			out_reg |= (1 << 2);
+ 129:board/tr800/init.c **** 		else
+ 130:board/tr800/init.c **** 			out_reg &= ~(1 << 2);
+ 131:board/tr800/init.c **** 	}
+ 132:board/tr800/init.c **** 	/* GPIO3 */
+ 133:board/tr800/init.c **** 	if (pinmux[1] & 0x20) {
+ 134:board/tr800/init.c **** 		/* generic output */
+ 135:board/tr800/init.c **** 		cntl_reg &= ~(1 << 3);
+ 136:board/tr800/init.c **** 		if (pinmux[1] & 0x10)
+ 137:board/tr800/init.c **** 			out_reg |= (1 << 3);
+ 138:board/tr800/init.c **** 		else
+ 139:board/tr800/init.c **** 			out_reg &= ~(1 << 3);
+ 140:board/tr800/init.c **** 	}
+ 141:board/tr800/init.c **** 	/* MCSI or GPIO? */
+ 142:board/tr800/init.c **** 	if (pinmux[2] & 0x80) {
+ 143:board/tr800/init.c **** 		/* MCSI pins switch to GPIO */
+ 144:board/tr800/init.c **** 		conf_reg |= 0x1E0;
+ 145:board/tr800/init.c **** 		writew(conf_reg, IO_CONF_REG);
+ 146:board/tr800/init.c **** 		/* GPIO9 */
+ 147:board/tr800/init.c **** 		if (pinmux[3] & 0x10) {
+ 148:board/tr800/init.c **** 			cntl_reg &= ~(1 << 9);
+ 149:board/tr800/init.c **** 			if (pinmux[3] & 0x01)
+ 150:board/tr800/init.c **** 				out_reg |= (1 << 9);
+ 151:board/tr800/init.c **** 			else
+ 152:board/tr800/init.c **** 				out_reg &= ~(1 << 9);
+ 153:board/tr800/init.c **** 		} else
+ 154:board/tr800/init.c **** 			cntl_reg |= (1 << 9);
+ 155:board/tr800/init.c **** 		/* GPIO10 */
+ 156:board/tr800/init.c **** 		if (pinmux[3] & 0x20) {
+ 157:board/tr800/init.c **** 			cntl_reg &= ~(1 << 10);
+ 158:board/tr800/init.c **** 			if (pinmux[3] & 0x02)
+ 159:board/tr800/init.c **** 				out_reg |= (1 << 10);
+ 160:board/tr800/init.c **** 			else
+ 161:board/tr800/init.c **** 				out_reg &= ~(1 << 10);
+ 162:board/tr800/init.c **** 		}
+ 163:board/tr800/init.c **** 		/* GPIO11 */
+ 164:board/tr800/init.c **** 		if (pinmux[3] & 0x40) {
+ 165:board/tr800/init.c **** 			cntl_reg &= ~(1 << 11);
+ 166:board/tr800/init.c **** 			if (pinmux[3] & 0x04)
+ 167:board/tr800/init.c **** 				out_reg |= (1 << 11);
+ 168:board/tr800/init.c **** 			else
+ 169:board/tr800/init.c **** 				out_reg &= ~(1 << 11);
+ 170:board/tr800/init.c **** 		}
+ 171:board/tr800/init.c **** 		/* GPIO12 */
+ 172:board/tr800/init.c **** 		if (pinmux[3] & 0x80) {
+ 173:board/tr800/init.c **** 			cntl_reg &= ~(1 << 12);
+ 174:board/tr800/init.c **** 			if (pinmux[3] & 0x08)
+ 175:board/tr800/init.c **** 				out_reg |= (1 << 12);
+ 176:board/tr800/init.c **** 			else
+ 177:board/tr800/init.c **** 				out_reg &= ~(1 << 12);
+ 178:board/tr800/init.c **** 		}
+ 179:board/tr800/init.c **** 	}
+ 180:board/tr800/init.c **** 	writew(out_reg, ARMIO_LATCH_OUT);
+ 181:board/tr800/init.c **** 	writew(cntl_reg, IO_CNTL_REG);
+ 182:board/tr800/init.c **** }
+ 183:board/tr800/init.c **** 
+ 184:board/tr800/init.c **** void board_init(int with_irq)
+ 185:board/tr800/init.c **** {
+  18              		.loc 1 185 0
+  19              		.cfi_startproc
+  20              		@ args = 0, pretend = 0, frame = 4
+  21              		@ frame_needed = 0, uses_anonymous_args = 0
+  22              	.LVL0:
+  23 0000 3F402DE9 		stmfd	sp!, {r0, r1, r2, r3, r4, r5, lr}
+  24              	.LCFI0:
+  25              		.cfi_def_cfa_offset 28
+ 186:board/tr800/init.c **** 	/*
+ 187:board/tr800/init.c **** 	 * Configure the memory interface.
+ 188:board/tr800/init.c **** 	 * nCS0 and nCS1 are internal flash and RAM - please refer to
+ 189:board/tr800/init.c **** 	 * this technical article for an explanation of timing parameters:
+ 190:board/tr800/init.c **** https://www.freecalypso.org/hg/freecalypso-docs/file/tip/MEMIF-wait-states
+ 191:board/tr800/init.c **** 	 */
+ 192:board/tr800/init.c **** 	calypso_mem_cfg(CALYPSO_nCS0, 4, CALYPSO_MEM_16bit, 1);
+  26              		.loc 1 192 0
+  27 0004 0120A0E3 		mov	r2, #1
+  28              		.cfi_offset 14, -4
+  29              		.cfi_offset 5, -8
+  30              		.cfi_offset 4, -12
+  31              		.cfi_offset 3, -16
+  32              		.cfi_offset 2, -20
+  33              		.cfi_offset 1, -24
+  34              		.cfi_offset 0, -28
+ 185:board/tr800/init.c **** {
+  35              		.loc 1 185 0
+  36 0008 0050A0E1 		mov	r5, r0
+  37              		.loc 1 192 0
+  38 000c 0230A0E1 		mov	r3, r2
+  39 0010 0000A0E3 		mov	r0, #0
+  40              	.LVL1:
+  41 0014 0410A0E3 		mov	r1, #4
+  42 0018 FEFFFFEB 		bl	calypso_mem_cfg
+ 193:board/tr800/init.c **** 	calypso_mem_cfg(CALYPSO_nCS1, 4, CALYPSO_MEM_16bit, 1);
+  43              		.loc 1 193 0
+  44 001c 0120A0E3 		mov	r2, #1
+  45 0020 0230A0E1 		mov	r3, r2
+  46 0024 0200A0E3 		mov	r0, #2
+  47 0028 0410A0E3 		mov	r1, #4
+  48 002c FEFFFFEB 		bl	calypso_mem_cfg
+ 194:board/tr800/init.c **** 	/* nCS2 and nCS3 are brought out for user-added custom hw */
+ 195:board/tr800/init.c **** 	calypso_mem_cfg(CALYPSO_nCS2, 5, CALYPSO_MEM_16bit, 1);
+  49              		.loc 1 195 0
+  50 0030 0120A0E3 		mov	r2, #1
+  51 0034 0230A0E1 		mov	r3, r2
+  52 0038 0400A0E3 		mov	r0, #4
+  53 003c 0510A0E3 		mov	r1, #5
+  54 0040 FEFFFFEB 		bl	calypso_mem_cfg
+ 196:board/tr800/init.c **** 	calypso_mem_cfg(CALYPSO_nCS3, 5, CALYPSO_MEM_16bit, 1);
+  55              		.loc 1 196 0
+  56 0044 0120A0E3 		mov	r2, #1
+  57 0048 0230A0E1 		mov	r3, r2
+  58 004c 0600A0E3 		mov	r0, #6
+  59 0050 0510A0E3 		mov	r1, #5
+  60 0054 FEFFFFEB 		bl	calypso_mem_cfg
+ 197:board/tr800/init.c **** 	/* Calypso nCS4 is not brought out on TR-800, hence a dummy */
+ 198:board/tr800/init.c **** 	calypso_mem_cfg(CALYPSO_CS4, 0, CALYPSO_MEM_8bit, 1);
+  61              		.loc 1 198 0
+  62 0058 0010A0E3 		mov	r1, #0
+  63 005c 0120A0E1 		mov	r2, r1
+  64 0060 0A00A0E3 		mov	r0, #10
+  65 0064 0130A0E3 		mov	r3, #1
+  66 0068 FEFFFFEB 		bl	calypso_mem_cfg
+ 199:board/tr800/init.c **** 	calypso_mem_cfg(CALYPSO_nCS6, 0, CALYPSO_MEM_32bit, 1);
+  67              		.loc 1 199 0
+  68 006c 0C00A0E3 		mov	r0, #12
+  69 0070 0010A0E3 		mov	r1, #0
+  70 0074 0220A0E3 		mov	r2, #2
+  71 0078 0130A0E3 		mov	r3, #1
+  72 007c FEFFFFEB 		bl	calypso_mem_cfg
+ 200:board/tr800/init.c **** 	calypso_mem_cfg(CALYPSO_nCS7, 0, CALYPSO_MEM_32bit, 0);
+  73              		.loc 1 200 0
+  74 0080 0010A0E3 		mov	r1, #0
+  75 0084 0130A0E1 		mov	r3, r1
+  76 0088 0800A0E3 		mov	r0, #8
+  77 008c 0220A0E3 		mov	r2, #2
+  78 0090 FEFFFFEB 		bl	calypso_mem_cfg
+ 201:board/tr800/init.c **** 
+ 202:board/tr800/init.c **** 	/* Set VTCXO_DIV2 = 1, configure PLL for 104 MHz and give ARM half of that */
+ 203:board/tr800/init.c **** 	calypso_clock_set(2, CALYPSO_PLL13_104_MHZ, ARM_MCLK_DIV_2);
+  79              		.loc 1 203 0
+  80 0094 0200A0E3 		mov	r0, #2
+  81 0098 0020A0E1 		mov	r2, r0
+  82 009c 021BA0E3 		mov	r1, #2048
+  83 00a0 FEFFFFEB 		bl	calypso_clock_set
+ 204:board/tr800/init.c **** 
+ 205:board/tr800/init.c **** 	/* Configure the RHEA bridge with some sane default values */
+ 206:board/tr800/init.c **** 	calypso_rhea_cfg(0, 0, 0xff, 0, 1, 0, 0);
+  84              		.loc 1 206 0
+  85 00a4 0040A0E3 		mov	r4, #0
+  86 00a8 0130A0E3 		mov	r3, #1
+  87 00ac 00308DE5 		str	r3, [sp, #0]
+  88 00b0 0400A0E1 		mov	r0, r4
+  89 00b4 0410A0E1 		mov	r1, r4
+  90 00b8 FF20A0E3 		mov	r2, #255
+  91 00bc 0430A0E1 		mov	r3, r4
+  92 00c0 04408DE5 		str	r4, [sp, #4]
+  93 00c4 08408DE5 		str	r4, [sp, #8]
+  94 00c8 FEFFFFEB 		bl	calypso_rhea_cfg
+  95              	.LBB8:
+  96              	.LBB9:
+  55:board/tr800/init.c **** 	reg = readw(ASIC_CONF_REG);
+  97              		.loc 1 55 0
+  98 00cc 58329FE5 		ldr	r3, .L22
+  99 00d0 B72F53E1 		ldrh	r2, [r3, #-247]
+ 100              	.LVL2:
+  59:board/tr800/init.c **** 	reg |= (1 << 13) | (1 << 14);
+ 101              		.loc 1 59 0
+ 102 00d4 062A82E3 		orr	r2, r2, #24576
+ 103              	.LVL3:
+ 104 00d8 402082E3 		orr	r2, r2, #64
+ 105              	.LVL4:
+  60:board/tr800/init.c **** 	writew(reg, ASIC_CONF_REG);
+ 106              		.loc 1 60 0
+ 107 00dc B72F43E1 		strh	r2, [r3, #-247]	@ movhi
+  67:board/tr800/init.c **** 	writew(0x0215, IO_CONF_REG);
+ 108              		.loc 1 67 0
+ 109 00e0 48229FE5 		ldr	r2, .L22+4
+ 110              	.LVL5:
+  68:board/tr800/init.c **** 	writew(0xDC0E, IO_CNTL_REG);
+ 111              		.loc 1 68 0
+ 112 00e4 48129FE5 		ldr	r1, .L22+8
+  67:board/tr800/init.c **** 	writew(0x0215, IO_CONF_REG);
+ 113              		.loc 1 67 0
+ 114 00e8 B52F43E1 		strh	r2, [r3, #-245]	@ movhi
+  68:board/tr800/init.c **** 	writew(0xDC0E, IO_CNTL_REG);
+ 115              		.loc 1 68 0
+ 116 00ec 44229FE5 		ldr	r2, .L22+12
+ 117 00f0 BB1F42E1 		strh	r1, [r2, #-251]	@ movhi
+  69:board/tr800/init.c **** 	writew(0x0000, ARMIO_LATCH_OUT);
+ 118              		.loc 1 69 0
+ 119 00f4 BD4F42E1 		strh	r4, [r2, #-253]	@ movhi
+  72:board/tr800/init.c **** 	reg = readw(ARM_CONF_REG);
+ 120              		.loc 1 72 0
+ 121 00f8 B92F53E1 		ldrh	r2, [r3, #-249]
+ 122              	.LVL6:
+  73:board/tr800/init.c **** 	reg |= (1 << 3);
+ 123              		.loc 1 73 0
+ 124 00fc 082082E3 		orr	r2, r2, #8
+ 125              	.LVL7:
+  74:board/tr800/init.c **** 	writew(reg, ARM_CONF_REG);
+ 126              		.loc 1 74 0
+ 127 0100 B92F43E1 		strh	r2, [r3, #-249]	@ movhi
+ 128              	.LBE9:
+ 129              	.LBE8:
+ 207:board/tr800/init.c **** 
+ 208:board/tr800/init.c **** 	/* Initialize board-specific GPIO */
+ 209:board/tr800/init.c **** 	board_io_init();
+ 210:board/tr800/init.c **** 
+ 211:board/tr800/init.c **** 	/* Enable bootrom mapping to route exception vectors to RAM */
+ 212:board/tr800/init.c **** 	calypso_bootrom(with_irq);
+ 130              		.loc 1 212 0
+ 131 0104 0500A0E1 		mov	r0, r5
+ 132 0108 FEFFFFEB 		bl	calypso_bootrom
+ 133              	.LVL8:
+ 213:board/tr800/init.c **** 	calypso_exceptions_install();
+ 134              		.loc 1 213 0
+ 135 010c FEFFFFEB 		bl	calypso_exceptions_install
+ 214:board/tr800/init.c **** 
+ 215:board/tr800/init.c **** 	/* Initialize interrupt controller */
+ 216:board/tr800/init.c **** 	if (with_irq)
+ 136              		.loc 1 216 0
+ 137 0110 040055E1 		cmp	r5, r4
+ 217:board/tr800/init.c **** 		irq_init();
+ 138              		.loc 1 217 0
+ 139 0114 FEFFFF1B 		blne	irq_init
+ 140              	.L2:
+ 218:board/tr800/init.c **** 
+ 219:board/tr800/init.c **** 	/*
+ 220:board/tr800/init.c **** 	 * The choice of which UART should be used for what is arbitrary -
+ 221:board/tr800/init.c **** 	 * change to taste!
+ 222:board/tr800/init.c **** 	 */
+ 223:board/tr800/init.c **** 	sercomm_bind_uart(UART_MODEM);
+ 141              		.loc 1 223 0
+ 142 0118 0100A0E3 		mov	r0, #1
+ 143 011c FEFFFFEB 		bl	sercomm_bind_uart
+ 224:board/tr800/init.c **** 	cons_bind_uart(UART_IRDA);
+ 225:board/tr800/init.c **** 
+ 226:board/tr800/init.c **** 	/* initialize MODEM UART to be used for sercomm */
+ 227:board/tr800/init.c **** 	uart_init(UART_MODEM, with_irq);
+ 144              		.loc 1 227 0
+ 145 0120 FF5005E2 		and	r5, r5, #255
+ 146              	.LVL9:
+ 224:board/tr800/init.c **** 	cons_bind_uart(UART_IRDA);
+ 147              		.loc 1 224 0
+ 148 0124 0000A0E3 		mov	r0, #0
+ 149 0128 FEFFFFEB 		bl	cons_bind_uart
+ 150              		.loc 1 227 0
+ 151 012c 0100A0E3 		mov	r0, #1
+ 152 0130 0510A0E1 		mov	r1, r5
+ 153 0134 FEFFFFEB 		bl	uart_init
+ 228:board/tr800/init.c **** 	uart_baudrate(UART_MODEM, UART_115200);
+ 154              		.loc 1 228 0
+ 155 0138 0210A0E3 		mov	r1, #2
+ 156 013c 0100A0E3 		mov	r0, #1
+ 157 0140 FEFFFFEB 		bl	uart_baudrate
+ 229:board/tr800/init.c **** 
+ 230:board/tr800/init.c **** 	/* Initialize IRDA UART to be used for old-school console code. */
+ 231:board/tr800/init.c **** 	uart_init(UART_IRDA, with_irq);
+ 158              		.loc 1 231 0
+ 159 0144 0000A0E3 		mov	r0, #0
+ 160 0148 0510A0E1 		mov	r1, r5
+ 161 014c FEFFFFEB 		bl	uart_init
+ 232:board/tr800/init.c **** 	uart_baudrate(UART_IRDA, UART_115200);
+ 162              		.loc 1 232 0
+ 163 0150 0210A0E3 		mov	r1, #2
+ 164 0154 0000A0E3 		mov	r0, #0
+ 165 0158 FEFFFFEB 		bl	uart_baudrate
+ 233:board/tr800/init.c **** 
+ 234:board/tr800/init.c **** 	/* Initialize hardware timers */
+ 235:board/tr800/init.c **** 	hwtimer_init();
+ 166              		.loc 1 235 0
+ 167 015c FEFFFFEB 		bl	hwtimer_init
+ 236:board/tr800/init.c **** 
+ 237:board/tr800/init.c **** 	/* Initialize DMA controller */
+ 238:board/tr800/init.c **** 	dma_init();
+ 168              		.loc 1 238 0
+ 169 0160 FEFFFFEB 		bl	dma_init
+ 239:board/tr800/init.c **** 
+ 240:board/tr800/init.c **** 	/* Initialize real time clock */
+ 241:board/tr800/init.c **** 	rtc_init();
+ 170              		.loc 1 241 0
+ 171 0164 FEFFFFEB 		bl	rtc_init
+ 242:board/tr800/init.c **** 
+ 243:board/tr800/init.c **** 	/* Initialize system timers (uses hwtimer 2) */
+ 244:board/tr800/init.c **** 	timer_init();
+ 172              		.loc 1 244 0
+ 173 0168 FEFFFFEB 		bl	timer_init
+ 245:board/tr800/init.c **** 
+ 246:board/tr800/init.c **** 	/* Initialize keypad driver */
+ 247:board/tr800/init.c **** 	keypad_init(keymap, with_irq);
+ 174              		.loc 1 247 0
+ 175 016c C8019FE5 		ldr	r0, .L22+16
+ 176 0170 0510A0E1 		mov	r1, r5
+ 177 0174 FEFFFFEB 		bl	keypad_init
+ 248:board/tr800/init.c **** 
+ 249:board/tr800/init.c **** 	/* Initialize ABB driver (uses SPI) */
+ 250:board/tr800/init.c **** 	twl3025_init();
+ 178              		.loc 1 250 0
+ 179 0178 FEFFFFEB 		bl	twl3025_init
+ 251:board/tr800/init.c **** 
+ 252:board/tr800/init.c **** 	/* Initialize TIFFS reader (15 sectors of 64 KiB each) */
+ 253:board/tr800/init.c **** 	tiffs_init(0x700000, 0x10000, 15);
+ 180              		.loc 1 253 0
+ 181 017c 0118A0E3 		mov	r1, #65536
+ 182 0180 0F20A0E3 		mov	r2, #15
+ 183 0184 0706A0E3 		mov	r0, #7340032
+ 184 0188 FEFFFFEB 		bl	tiffs_init
+ 185              	.LBB10:
+ 186              	.LBB11:
+ 100:board/tr800/init.c **** 	rc = tiffs_read_file_fixedlen("/etc/tango-pinmux", pinmux, 4);
+ 187              		.loc 1 100 0
+ 188 018c AC019FE5 		ldr	r0, .L22+20
+ 189 0190 0C108DE2 		add	r1, sp, #12
+ 190 0194 0420A0E3 		mov	r2, #4
+ 191 0198 FEFFFFEB 		bl	tiffs_read_file_fixedlen
+ 192              	.LVL10:
+ 101:board/tr800/init.c **** 	if (rc < 0)
+ 193              		.loc 1 101 0
+ 194 019c 000050E3 		cmp	r0, #0
+ 195 01a0 600000BA 		blt	.L1
+ 103:board/tr800/init.c **** 	if (rc == 0) {
+ 196              		.loc 1 103 0
+ 197 01a4 0200001A 		bne	.L4
+ 104:board/tr800/init.c **** 		puts("Warning: /etc/tango-pinmux not found, pins left in default power-up state\n");
+ 198              		.loc 1 104 0
+ 199 01a8 94019FE5 		ldr	r0, .L22+24
+ 200              	.LVL11:
+ 201 01ac FEFFFFEB 		bl	puts
+ 202 01b0 5C0000EA 		b	.L1
+ 203              	.LVL12:
+ 204              	.L4:
+ 108:board/tr800/init.c **** 	conf_reg = readw(IO_CONF_REG);
+ 205              		.loc 1 108 0
+ 206 01b4 70319FE5 		ldr	r3, .L22
+ 112:board/tr800/init.c **** 	if (pinmux[0] & 0x80) {
+ 207              		.loc 1 112 0
+ 208 01b8 DCC0DDE1 		ldrsb	ip, [sp, #12]
+ 108:board/tr800/init.c **** 	conf_reg = readw(IO_CONF_REG);
+ 209              		.loc 1 108 0
+ 210 01bc B50F53E1 		ldrh	r0, [r3, #-245]
+ 211              	.LVL13:
+ 112:board/tr800/init.c **** 	if (pinmux[0] & 0x80) {
+ 212              		.loc 1 112 0
+ 213 01c0 00005CE3 		cmp	ip, #0
+ 109:board/tr800/init.c **** 	cntl_reg = readw(IO_CNTL_REG);
+ 214              		.loc 1 109 0
+ 215 01c4 2A3B43E2 		sub	r3, r3, #43008
+ 216 01c8 BB2F53E1 		ldrh	r2, [r3, #-251]
+ 217              	.LVL14:
+ 112:board/tr800/init.c **** 	if (pinmux[0] & 0x80) {
+ 218              		.loc 1 112 0
+ 219 01cc 0C10DDE5 		ldrb	r1, [sp, #12]	@ zero_extendqisi2
+ 110:board/tr800/init.c **** 	out_reg = readw(ARMIO_LATCH_OUT);
+ 220              		.loc 1 110 0
+ 221 01d0 BD3F53E1 		ldrh	r3, [r3, #-253]
+ 222              	.LVL15:
+ 112:board/tr800/init.c **** 	if (pinmux[0] & 0x80) {
+ 223              		.loc 1 112 0
+ 224 01d4 050000AA 		bge	.L5
+ 114:board/tr800/init.c **** 		if (pinmux[0] & 0x01)
+ 225              		.loc 1 114 0
+ 226 01d8 010011E3 		tst	r1, #1
+ 117:board/tr800/init.c **** 			out_reg &= ~(1 << 1);
+ 227              		.loc 1 117 0
+ 228 01dc 0230C303 		biceq	r3, r3, #2
+ 229              	.LVL16:
+ 230 01e0 0338A001 		moveq	r3, r3, asl #16
+ 113:board/tr800/init.c **** 		cntl_reg &= ~(1 << 1);
+ 231              		.loc 1 113 0
+ 232 01e4 0220C2E3 		bic	r2, r2, #2
+ 233              	.LVL17:
+ 115:board/tr800/init.c **** 			out_reg |= (1 << 1);
+ 234              		.loc 1 115 0
+ 235 01e8 02308313 		orrne	r3, r3, #2
+ 117:board/tr800/init.c **** 			out_reg &= ~(1 << 1);
+ 236              		.loc 1 117 0
+ 237 01ec 2338A001 		moveq	r3, r3, lsr #16
+ 238              	.LVL18:
+ 239              	.L5:
+ 120:board/tr800/init.c **** 	if (pinmux[1] & 0x08) {
+ 240              		.loc 1 120 0
+ 241 01f0 0D10DDE5 		ldrb	r1, [sp, #13]	@ zero_extendqisi2
+ 242 01f4 080011E3 		tst	r1, #8
+ 122:board/tr800/init.c **** 		cntl_reg &= ~(1 << 2);
+ 243              		.loc 1 122 0
+ 244 01f8 0420C213 		bicne	r2, r2, #4
+ 245              	.LVL19:
+ 246 01fc 0228A011 		movne	r2, r2, asl #16
+ 247 0200 2228A011 		movne	r2, r2, lsr #16
+ 120:board/tr800/init.c **** 	if (pinmux[1] & 0x08) {
+ 248              		.loc 1 120 0
+ 249 0204 0900001A 		bne	.L21
+ 124:board/tr800/init.c **** 	} else if (pinmux[1] & 0x02) {
+ 250              		.loc 1 124 0
+ 251 0208 020011E3 		tst	r1, #2
+ 252 020c 0800000A 		beq	.L8
+ 127:board/tr800/init.c **** 		if (pinmux[1] & 0x01)
+ 253              		.loc 1 127 0
+ 254 0210 010011E3 		tst	r1, #1
+ 130:board/tr800/init.c **** 			out_reg &= ~(1 << 2);
+ 255              		.loc 1 130 0
+ 256 0214 0430C303 		biceq	r3, r3, #4
+ 257              	.LVL20:
+ 126:board/tr800/init.c **** 		cntl_reg &= ~(1 << 2);
+ 258              		.loc 1 126 0
+ 259 0218 0420C2E3 		bic	r2, r2, #4
+ 260 021c 0228A0E1 		mov	r2, r2, asl #16
+ 130:board/tr800/init.c **** 			out_reg &= ~(1 << 2);
+ 261              		.loc 1 130 0
+ 262 0220 0338A001 		moveq	r3, r3, asl #16
+ 126:board/tr800/init.c **** 		cntl_reg &= ~(1 << 2);
+ 263              		.loc 1 126 0
+ 264 0224 2228A0E1 		mov	r2, r2, lsr #16
+ 265              	.LVL21:
+ 130:board/tr800/init.c **** 			out_reg &= ~(1 << 2);
+ 266              		.loc 1 130 0
+ 267 0228 2338A001 		moveq	r3, r3, lsr #16
+ 127:board/tr800/init.c **** 		if (pinmux[1] & 0x01)
+ 268              		.loc 1 127 0
+ 269 022c 0000000A 		beq	.L8
+ 270              	.LVL22:
+ 271              	.L21:
+ 128:board/tr800/init.c **** 			out_reg |= (1 << 2);
+ 272              		.loc 1 128 0
+ 273 0230 043083E3 		orr	r3, r3, #4
+ 274              	.LVL23:
+ 275              	.L8:
+ 133:board/tr800/init.c **** 	if (pinmux[1] & 0x20) {
+ 276              		.loc 1 133 0
+ 277 0234 200011E3 		tst	r1, #32
+ 278 0238 0700000A 		beq	.L10
+ 136:board/tr800/init.c **** 		if (pinmux[1] & 0x10)
+ 279              		.loc 1 136 0
+ 280 023c 100011E3 		tst	r1, #16
+ 139:board/tr800/init.c **** 			out_reg &= ~(1 << 3);
+ 281              		.loc 1 139 0
+ 282 0240 0830C303 		biceq	r3, r3, #8
+ 283              	.LVL24:
+ 135:board/tr800/init.c **** 		cntl_reg &= ~(1 << 3);
+ 284              		.loc 1 135 0
+ 285 0244 0820C2E3 		bic	r2, r2, #8
+ 286              	.LVL25:
+ 287 0248 0228A0E1 		mov	r2, r2, asl #16
+ 139:board/tr800/init.c **** 			out_reg &= ~(1 << 3);
+ 288              		.loc 1 139 0
+ 289 024c 0338A001 		moveq	r3, r3, asl #16
+ 135:board/tr800/init.c **** 		cntl_reg &= ~(1 << 3);
+ 290              		.loc 1 135 0
+ 291 0250 2228A0E1 		mov	r2, r2, lsr #16
+ 292              	.LVL26:
+ 137:board/tr800/init.c **** 			out_reg |= (1 << 3);
+ 293              		.loc 1 137 0
+ 294 0254 08308313 		orrne	r3, r3, #8
+ 139:board/tr800/init.c **** 			out_reg &= ~(1 << 3);
+ 295              		.loc 1 139 0
+ 296 0258 2338A001 		moveq	r3, r3, lsr #16
+ 297              	.LVL27:
+ 298              	.L10:
+ 142:board/tr800/init.c **** 	if (pinmux[2] & 0x80) {
+ 299              		.loc 1 142 0
+ 300 025c DE10DDE1 		ldrsb	r1, [sp, #14]
+ 301 0260 000051E3 		cmp	r1, #0
+ 302 0264 2C0000AA 		bge	.L12
+ 145:board/tr800/init.c **** 		writew(conf_reg, IO_CONF_REG);
+ 303              		.loc 1 145 0
+ 304 0268 BC109FE5 		ldr	r1, .L22
+ 144:board/tr800/init.c **** 		conf_reg |= 0x1E0;
+ 305              		.loc 1 144 0
+ 306 026c 1E0E80E3 		orr	r0, r0, #480
+ 307              	.LVL28:
+ 145:board/tr800/init.c **** 		writew(conf_reg, IO_CONF_REG);
+ 308              		.loc 1 145 0
+ 309 0270 B50F41E1 		strh	r0, [r1, #-245]	@ movhi
+ 147:board/tr800/init.c **** 		if (pinmux[3] & 0x10) {
+ 310              		.loc 1 147 0
+ 311 0274 0F10DDE5 		ldrb	r1, [sp, #15]	@ zero_extendqisi2
+ 312 0278 100011E3 		tst	r1, #16
+ 154:board/tr800/init.c **** 			cntl_reg |= (1 << 9);
+ 313              		.loc 1 154 0
+ 314 027c 022C8203 		orreq	r2, r2, #512
+ 315              	.LVL29:
+ 147:board/tr800/init.c **** 		if (pinmux[3] & 0x10) {
+ 316              		.loc 1 147 0
+ 317 0280 0700000A 		beq	.L15
+ 149:board/tr800/init.c **** 			if (pinmux[3] & 0x01)
+ 318              		.loc 1 149 0
+ 319 0284 010011E3 		tst	r1, #1
+ 152:board/tr800/init.c **** 				out_reg &= ~(1 << 9);
+ 320              		.loc 1 152 0
+ 321 0288 023CC303 		biceq	r3, r3, #512
+ 322              	.LVL30:
+ 148:board/tr800/init.c **** 			cntl_reg &= ~(1 << 9);
+ 323              		.loc 1 148 0
+ 324 028c 022CC2E3 		bic	r2, r2, #512
+ 325 0290 0228A0E1 		mov	r2, r2, asl #16
+ 152:board/tr800/init.c **** 				out_reg &= ~(1 << 9);
+ 326              		.loc 1 152 0
+ 327 0294 0338A001 		moveq	r3, r3, asl #16
+ 148:board/tr800/init.c **** 			cntl_reg &= ~(1 << 9);
+ 328              		.loc 1 148 0
+ 329 0298 2228A0E1 		mov	r2, r2, lsr #16
+ 330              	.LVL31:
+ 150:board/tr800/init.c **** 				out_reg |= (1 << 9);
+ 331              		.loc 1 150 0
+ 332 029c 023C8313 		orrne	r3, r3, #512
+ 152:board/tr800/init.c **** 				out_reg &= ~(1 << 9);
+ 333              		.loc 1 152 0
+ 334 02a0 2338A001 		moveq	r3, r3, lsr #16
+ 335              	.LVL32:
+ 336              	.L15:
+ 156:board/tr800/init.c **** 		if (pinmux[3] & 0x20) {
+ 337              		.loc 1 156 0
+ 338 02a4 200011E3 		tst	r1, #32
+ 339 02a8 0700000A 		beq	.L16
+ 158:board/tr800/init.c **** 			if (pinmux[3] & 0x02)
+ 340              		.loc 1 158 0
+ 341 02ac 020011E3 		tst	r1, #2
+ 161:board/tr800/init.c **** 				out_reg &= ~(1 << 10);
+ 342              		.loc 1 161 0
+ 343 02b0 013BC303 		biceq	r3, r3, #1024
+ 344              	.LVL33:
+ 157:board/tr800/init.c **** 			cntl_reg &= ~(1 << 10);
+ 345              		.loc 1 157 0
+ 346 02b4 012BC2E3 		bic	r2, r2, #1024
+ 347              	.LVL34:
+ 348 02b8 0228A0E1 		mov	r2, r2, asl #16
+ 161:board/tr800/init.c **** 				out_reg &= ~(1 << 10);
+ 349              		.loc 1 161 0
+ 350 02bc 0338A001 		moveq	r3, r3, asl #16
+ 157:board/tr800/init.c **** 			cntl_reg &= ~(1 << 10);
+ 351              		.loc 1 157 0
+ 352 02c0 2228A0E1 		mov	r2, r2, lsr #16
+ 353              	.LVL35:
+ 159:board/tr800/init.c **** 				out_reg |= (1 << 10);
+ 354              		.loc 1 159 0
+ 355 02c4 013B8313 		orrne	r3, r3, #1024
+ 161:board/tr800/init.c **** 				out_reg &= ~(1 << 10);
+ 356              		.loc 1 161 0
+ 357 02c8 2338A001 		moveq	r3, r3, lsr #16
+ 358              	.LVL36:
+ 359              	.L16:
+ 164:board/tr800/init.c **** 		if (pinmux[3] & 0x40) {
+ 360              		.loc 1 164 0
+ 361 02cc 400011E3 		tst	r1, #64
+ 362 02d0 0700000A 		beq	.L18
+ 166:board/tr800/init.c **** 			if (pinmux[3] & 0x04)
+ 363              		.loc 1 166 0
+ 364 02d4 040011E3 		tst	r1, #4
+ 169:board/tr800/init.c **** 				out_reg &= ~(1 << 11);
+ 365              		.loc 1 169 0
+ 366 02d8 023BC303 		biceq	r3, r3, #2048
+ 367              	.LVL37:
+ 165:board/tr800/init.c **** 			cntl_reg &= ~(1 << 11);
+ 368              		.loc 1 165 0
+ 369 02dc 022BC2E3 		bic	r2, r2, #2048
+ 370              	.LVL38:
+ 371 02e0 0228A0E1 		mov	r2, r2, asl #16
+ 169:board/tr800/init.c **** 				out_reg &= ~(1 << 11);
+ 372              		.loc 1 169 0
+ 373 02e4 0338A001 		moveq	r3, r3, asl #16
+ 165:board/tr800/init.c **** 			cntl_reg &= ~(1 << 11);
+ 374              		.loc 1 165 0
+ 375 02e8 2228A0E1 		mov	r2, r2, lsr #16
+ 376              	.LVL39:
+ 167:board/tr800/init.c **** 				out_reg |= (1 << 11);
+ 377              		.loc 1 167 0
+ 378 02ec 023B8313 		orrne	r3, r3, #2048
+ 169:board/tr800/init.c **** 				out_reg &= ~(1 << 11);
+ 379              		.loc 1 169 0
+ 380 02f0 2338A001 		moveq	r3, r3, lsr #16
+ 381              	.LVL40:
+ 382              	.L18:
+ 172:board/tr800/init.c **** 		if (pinmux[3] & 0x80) {
+ 383              		.loc 1 172 0
+ 384 02f4 800011E3 		tst	r1, #128
+ 385 02f8 0700000A 		beq	.L12
+ 174:board/tr800/init.c **** 			if (pinmux[3] & 0x08)
+ 386              		.loc 1 174 0
+ 387 02fc 080011E3 		tst	r1, #8
+ 177:board/tr800/init.c **** 				out_reg &= ~(1 << 12);
+ 388              		.loc 1 177 0
+ 389 0300 013AC303 		biceq	r3, r3, #4096
+ 390              	.LVL41:
+ 173:board/tr800/init.c **** 			cntl_reg &= ~(1 << 12);
+ 391              		.loc 1 173 0
+ 392 0304 012AC2E3 		bic	r2, r2, #4096
+ 393              	.LVL42:
+ 394 0308 0228A0E1 		mov	r2, r2, asl #16
+ 177:board/tr800/init.c **** 				out_reg &= ~(1 << 12);
+ 395              		.loc 1 177 0
+ 396 030c 0338A001 		moveq	r3, r3, asl #16
+ 173:board/tr800/init.c **** 			cntl_reg &= ~(1 << 12);
+ 397              		.loc 1 173 0
+ 398 0310 2228A0E1 		mov	r2, r2, lsr #16
+ 399              	.LVL43:
+ 175:board/tr800/init.c **** 				out_reg |= (1 << 12);
+ 400              		.loc 1 175 0
+ 401 0314 013A8313 		orrne	r3, r3, #4096
+ 177:board/tr800/init.c **** 				out_reg &= ~(1 << 12);
+ 402              		.loc 1 177 0
+ 403 0318 2338A001 		moveq	r3, r3, lsr #16
+ 404              	.LVL44:
+ 405              	.L12:
+ 180:board/tr800/init.c **** 	writew(out_reg, ARMIO_LATCH_OUT);
+ 406              		.loc 1 180 0
+ 407 031c 14109FE5 		ldr	r1, .L22+12
+ 408 0320 BD3F41E1 		strh	r3, [r1, #-253]	@ movhi
+ 181:board/tr800/init.c **** 	writew(cntl_reg, IO_CNTL_REG);
+ 409              		.loc 1 181 0
+ 410 0324 BB2F41E1 		strh	r2, [r1, #-251]	@ movhi
+ 411              	.LVL45:
+ 412              	.L1:
+ 413              	.LBE11:
+ 414              	.LBE10:
+ 254:board/tr800/init.c **** 
+ 255:board/tr800/init.c **** 	/* Initialize configurable pin multiplexing */
+ 256:board/tr800/init.c **** 	board_pinmux_init();
+ 257:board/tr800/init.c **** }
+ 415              		.loc 1 257 0
+ 416 0328 3F80BDE8 		ldmfd	sp!, {r0, r1, r2, r3, r4, r5, pc}
+ 417              	.L23:
+ 418              		.align	2
+ 419              	.L22:
+ 420 032c FFF0FEFF 		.word	-69377
+ 421 0330 15020000 		.word	533
+ 422 0334 0EDCFFFF 		.word	-9202
+ 423 0338 FF48FEFF 		.word	-112385
+ 424 033c 00000000 		.word	.LANCHOR0
+ 425 0340 00000000 		.word	.LC0
+ 426 0344 12000000 		.word	.LC1
+ 427              		.cfi_endproc
+ 428              	.LFE42:
+ 430              		.section	.rodata
+ 431              		.align	2
+ 432              		.set	.LANCHOR0,. + 0
+ 435              	keymap:
+ 436 0000 09       		.byte	9
+ 437 0001 01       		.byte	1
+ 438 0002 06       		.byte	6
+ 439 0003 0B       		.byte	11
+ 440 0004 02       		.byte	2
+ 441 0005 07       		.byte	7
+ 442 0006 0C       		.byte	12
+ 443 0007 03       		.byte	3
+ 444 0008 08       		.byte	8
+ 445 0009 0D       		.byte	13
+ 446 000a 04       		.byte	4
+ 447 000b 0E       		.byte	14
+ 448 000c 18       		.byte	24
+ 449 000d 0F       		.byte	15
+ 450 000e 11       		.byte	17
+ 451 000f 16       		.byte	22
+ 452 0010 17       		.byte	23
+ 453 0011 14       		.byte	20
+ 454 0012 15       		.byte	21
+ 455 0013 00       		.byte	0
+ 456 0014 1F       		.byte	31
+ 457 0015 05       		.byte	5
+ 458 0016 0A       		.byte	10
+ 459 0017 10       		.byte	16
+ 460              		.section	.rodata.str1.1,"aMS",%progbits,1
+ 461              	.LC0:
+ 462 0000 2F657463 		.ascii	"/etc/tango-pinmux\000"
+ 462      2F74616E 
+ 462      676F2D70 
+ 462      696E6D75 
+ 462      7800
+ 463              	.LC1:
+ 464 0012 5761726E 		.ascii	"Warning: /etc/tango-pinmux not found, pins left in "
+ 464      696E673A 
+ 464      202F6574 
+ 464      632F7461 
+ 464      6E676F2D 
+ 465 0045 64656661 		.ascii	"default power-up state\012\000"
+ 465      756C7420 
+ 465      706F7765 
+ 465      722D7570 
+ 465      20737461 
+ 466              		.text
+ 467              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 init.c
+     /tmp/ccHlKMjU.s:12     .text.board_init:0000000000000000 $a
+     /tmp/ccHlKMjU.s:15     .text.board_init:0000000000000000 board_init
+     /tmp/ccHlKMjU.s:420    .text.board_init:000000000000032c $d
+     /tmp/ccHlKMjU.s:431    .rodata:0000000000000000 $d
+     /tmp/ccHlKMjU.s:435    .rodata:0000000000000000 keymap
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+calypso_mem_cfg
+calypso_clock_set
+calypso_rhea_cfg
+calypso_bootrom
+calypso_exceptions_install
+irq_init
+sercomm_bind_uart
+cons_bind_uart
+uart_init
+uart_baudrate
+hwtimer_init
+dma_init
+rtc_init
+timer_init
+keypad_init
+twl3025_init
+tiffs_init
+tiffs_read_file_fixedlen
+puts

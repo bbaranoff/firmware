@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  27109	    432	  18512	  46053	   b3e5	board/compal_e88/loader.highram.elf
+  28565	    436	  18540	  47541	   b9b5	board/compal_e88/loader.highram.elf

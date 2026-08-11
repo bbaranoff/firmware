@@ -1,0 +1,283 @@
+   1              		.file	"tx_calchan.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.global	rf_tx_chan_cal_850
+  12              		.global	rf_tx_chan_cal_900
+  13              		.global	rf_tx_chan_cal_1800
+  14              		.global	rf_tx_chan_cal_1900
+  15              		.data
+  16              		.align	2
+  19              	rf_tx_chan_cal_850:
+  20 0000 8600     		.short	134
+  21 0002 8000     		.short	128
+  22 0004 9600     		.short	150
+  23 0006 8000     		.short	128
+  24 0008 A600     		.short	166
+  25 000a 8000     		.short	128
+  26 000c B600     		.short	182
+  27 000e 8000     		.short	128
+  28 0010 C500     		.short	197
+  29 0012 8000     		.short	128
+  30 0014 D500     		.short	213
+  31 0016 8000     		.short	128
+  32 0018 E500     		.short	229
+  33 001a 8000     		.short	128
+  34 001c FB00     		.short	251
+  35 001e 8000     		.short	128
+  36 0020 8600     		.short	134
+  37 0022 8000     		.short	128
+  38 0024 9600     		.short	150
+  39 0026 8000     		.short	128
+  40 0028 A600     		.short	166
+  41 002a 8000     		.short	128
+  42 002c B600     		.short	182
+  43 002e 8000     		.short	128
+  44 0030 C500     		.short	197
+  45 0032 8000     		.short	128
+  46 0034 D500     		.short	213
+  47 0036 8000     		.short	128
+  48 0038 E500     		.short	229
+  49 003a 8000     		.short	128
+  50 003c FB00     		.short	251
+  51 003e 8000     		.short	128
+  52 0040 8600     		.short	134
+  53 0042 8000     		.short	128
+  54 0044 9600     		.short	150
+  55 0046 8000     		.short	128
+  56 0048 A600     		.short	166
+  57 004a 8000     		.short	128
+  58 004c B600     		.short	182
+  59 004e 8000     		.short	128
+  60 0050 C500     		.short	197
+  61 0052 8000     		.short	128
+  62 0054 D500     		.short	213
+  63 0056 8000     		.short	128
+  64 0058 E500     		.short	229
+  65 005a 8000     		.short	128
+  66 005c FB00     		.short	251
+  67 005e 8000     		.short	128
+  68 0060 8600     		.short	134
+  69 0062 8000     		.short	128
+  70 0064 9600     		.short	150
+  71 0066 8000     		.short	128
+  72 0068 A600     		.short	166
+  73 006a 8000     		.short	128
+  74 006c B600     		.short	182
+  75 006e 8000     		.short	128
+  76 0070 C500     		.short	197
+  77 0072 8000     		.short	128
+  78 0074 D500     		.short	213
+  79 0076 8000     		.short	128
+  80 0078 E500     		.short	229
+  81 007a 8000     		.short	128
+  82 007c FB00     		.short	251
+  83 007e 8000     		.short	128
+  86              	rf_tx_chan_cal_900:
+  87 0080 1B00     		.short	27
+  88 0082 8000     		.short	128
+  89 0084 2F00     		.short	47
+  90 0086 8000     		.short	128
+  91 0088 4200     		.short	66
+  92 008a 8000     		.short	128
+  93 008c 5500     		.short	85
+  94 008e 8000     		.short	128
+  95 0090 6800     		.short	104
+  96 0092 8000     		.short	128
+  97 0094 7C00     		.short	124
+  98 0096 8000     		.short	128
+  99 0098 E203     		.short	994
+ 100 009a 8000     		.short	128
+ 101 009c FF03     		.short	1023
+ 102 009e 8000     		.short	128
+ 103 00a0 1B00     		.short	27
+ 104 00a2 8000     		.short	128
+ 105 00a4 2F00     		.short	47
+ 106 00a6 8000     		.short	128
+ 107 00a8 4200     		.short	66
+ 108 00aa 8000     		.short	128
+ 109 00ac 5500     		.short	85
+ 110 00ae 8000     		.short	128
+ 111 00b0 6800     		.short	104
+ 112 00b2 8000     		.short	128
+ 113 00b4 7C00     		.short	124
+ 114 00b6 8000     		.short	128
+ 115 00b8 E203     		.short	994
+ 116 00ba 8000     		.short	128
+ 117 00bc FF03     		.short	1023
+ 118 00be 8000     		.short	128
+ 119 00c0 1B00     		.short	27
+ 120 00c2 8000     		.short	128
+ 121 00c4 2F00     		.short	47
+ 122 00c6 8000     		.short	128
+ 123 00c8 4200     		.short	66
+ 124 00ca 8000     		.short	128
+ 125 00cc 5500     		.short	85
+ 126 00ce 8000     		.short	128
+ 127 00d0 6800     		.short	104
+ 128 00d2 8000     		.short	128
+ 129 00d4 7C00     		.short	124
+ 130 00d6 8000     		.short	128
+ 131 00d8 E203     		.short	994
+ 132 00da 8000     		.short	128
+ 133 00dc FF03     		.short	1023
+ 134 00de 8000     		.short	128
+ 135 00e0 1B00     		.short	27
+ 136 00e2 8000     		.short	128
+ 137 00e4 2F00     		.short	47
+ 138 00e6 8000     		.short	128
+ 139 00e8 4200     		.short	66
+ 140 00ea 8000     		.short	128
+ 141 00ec 5500     		.short	85
+ 142 00ee 8000     		.short	128
+ 143 00f0 6800     		.short	104
+ 144 00f2 8000     		.short	128
+ 145 00f4 7C00     		.short	124
+ 146 00f6 8000     		.short	128
+ 147 00f8 E203     		.short	994
+ 148 00fa 8000     		.short	128
+ 149 00fc FF03     		.short	1023
+ 150 00fe 8000     		.short	128
+ 153              	rf_tx_chan_cal_1800:
+ 154 0100 2902     		.short	553
+ 155 0102 8000     		.short	128
+ 156 0104 5202     		.short	594
+ 157 0106 8000     		.short	128
+ 158 0108 7C02     		.short	636
+ 159 010a 8000     		.short	128
+ 160 010c A502     		.short	677
+ 161 010e 8000     		.short	128
+ 162 0110 D002     		.short	720
+ 163 0112 8000     		.short	128
+ 164 0114 F802     		.short	760
+ 165 0116 8000     		.short	128
+ 166 0118 2203     		.short	802
+ 167 011a 8000     		.short	128
+ 168 011c 7503     		.short	885
+ 169 011e 8000     		.short	128
+ 170 0120 2902     		.short	553
+ 171 0122 8000     		.short	128
+ 172 0124 5202     		.short	594
+ 173 0126 8000     		.short	128
+ 174 0128 7C02     		.short	636
+ 175 012a 8000     		.short	128
+ 176 012c A502     		.short	677
+ 177 012e 8000     		.short	128
+ 178 0130 D002     		.short	720
+ 179 0132 8000     		.short	128
+ 180 0134 F802     		.short	760
+ 181 0136 8000     		.short	128
+ 182 0138 2203     		.short	802
+ 183 013a 8000     		.short	128
+ 184 013c 7503     		.short	885
+ 185 013e 8000     		.short	128
+ 186 0140 2902     		.short	553
+ 187 0142 8000     		.short	128
+ 188 0144 5202     		.short	594
+ 189 0146 8000     		.short	128
+ 190 0148 7C02     		.short	636
+ 191 014a 8000     		.short	128
+ 192 014c A502     		.short	677
+ 193 014e 8000     		.short	128
+ 194 0150 D002     		.short	720
+ 195 0152 8000     		.short	128
+ 196 0154 F802     		.short	760
+ 197 0156 8000     		.short	128
+ 198 0158 2203     		.short	802
+ 199 015a 8000     		.short	128
+ 200 015c 7503     		.short	885
+ 201 015e 8000     		.short	128
+ 202 0160 2902     		.short	553
+ 203 0162 8000     		.short	128
+ 204 0164 5202     		.short	594
+ 205 0166 8000     		.short	128
+ 206 0168 7C02     		.short	636
+ 207 016a 8000     		.short	128
+ 208 016c A502     		.short	677
+ 209 016e 8000     		.short	128
+ 210 0170 D002     		.short	720
+ 211 0172 8000     		.short	128
+ 212 0174 F802     		.short	760
+ 213 0176 8000     		.short	128
+ 214 0178 2203     		.short	802
+ 215 017a 8000     		.short	128
+ 216 017c 7503     		.short	885
+ 217 017e 8000     		.short	128
+ 220              	rf_tx_chan_cal_1900:
+ 221 0180 2502     		.short	549
+ 222 0182 8000     		.short	128
+ 223 0184 4A02     		.short	586
+ 224 0186 8000     		.short	128
+ 225 0188 6F02     		.short	623
+ 226 018a 8000     		.short	128
+ 227 018c B902     		.short	697
+ 228 018e 8000     		.short	128
+ 229 0190 D602     		.short	726
+ 230 0192 8000     		.short	128
+ 231 0194 F202     		.short	754
+ 232 0196 8000     		.short	128
+ 233 0198 0E03     		.short	782
+ 234 019a 8000     		.short	128
+ 235 019c 2A03     		.short	810
+ 236 019e 8000     		.short	128
+ 237 01a0 2502     		.short	549
+ 238 01a2 8000     		.short	128
+ 239 01a4 4A02     		.short	586
+ 240 01a6 8000     		.short	128
+ 241 01a8 6F02     		.short	623
+ 242 01aa 8000     		.short	128
+ 243 01ac B902     		.short	697
+ 244 01ae 8000     		.short	128
+ 245 01b0 D602     		.short	726
+ 246 01b2 8000     		.short	128
+ 247 01b4 F202     		.short	754
+ 248 01b6 8000     		.short	128
+ 249 01b8 0E03     		.short	782
+ 250 01ba 8000     		.short	128
+ 251 01bc 2A03     		.short	810
+ 252 01be 8000     		.short	128
+ 253 01c0 2502     		.short	549
+ 254 01c2 8000     		.short	128
+ 255 01c4 4A02     		.short	586
+ 256 01c6 8000     		.short	128
+ 257 01c8 6F02     		.short	623
+ 258 01ca 8000     		.short	128
+ 259 01cc B902     		.short	697
+ 260 01ce 8000     		.short	128
+ 261 01d0 D602     		.short	726
+ 262 01d2 8000     		.short	128
+ 263 01d4 F202     		.short	754
+ 264 01d6 8000     		.short	128
+ 265 01d8 0E03     		.short	782
+ 266 01da 8000     		.short	128
+ 267 01dc 2A03     		.short	810
+ 268 01de 8000     		.short	128
+ 269 01e0 2502     		.short	549
+ 270 01e2 8000     		.short	128
+ 271 01e4 4A02     		.short	586
+ 272 01e6 8000     		.short	128
+ 273 01e8 6F02     		.short	623
+ 274 01ea 8000     		.short	128
+ 275 01ec B902     		.short	697
+ 276 01ee 8000     		.short	128
+ 277 01f0 D602     		.short	726
+ 278 01f2 8000     		.short	128
+ 279 01f4 F202     		.short	754
+ 280 01f6 8000     		.short	128
+ 281 01f8 0E03     		.short	782
+ 282 01fa 8000     		.short	128
+ 283 01fc 2A03     		.short	810
+ 284 01fe 8000     		.short	128
+ 285              		.text
+ 286              	.Letext0:
+ 287              		.file 1 "/root/gnuarm/install/lib/gcc/arm-elf/4.5.2/../../../../arm-elf/sys-include/stdint.h"
+ 288              		.file 2 "include/rf/txcal.h"
+ 289              		.file 3 "board/common/tx_calchan.c"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 tx_calchan.c
+     /tmp/ccfqbj0x.s:19     .data:0000000000000000 rf_tx_chan_cal_850
+     /tmp/ccfqbj0x.s:86     .data:0000000000000080 rf_tx_chan_cal_900
+     /tmp/ccfqbj0x.s:153    .data:0000000000000100 rf_tx_chan_cal_1800
+     /tmp/ccfqbj0x.s:220    .data:0000000000000180 rf_tx_chan_cal_1900
+     /tmp/ccfqbj0x.s:16     .data:0000000000000000 $d
+
+NO UNDEFINED SYMBOLS

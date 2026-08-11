@@ -1,0 +1,616 @@
+   1              		.file	"init.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.board_init,"ax",%progbits
+  12              		.align	2
+  13              		.global	board_init
+  15              	board_init:
+  16              	.LFB42:
+  17              		.file 1 "board/gtm900b/init.c"
+   1:board/gtm900b/init.c **** /* Initialization for the Huawei GTM900-B modem */
+   2:board/gtm900b/init.c **** 
+   3:board/gtm900b/init.c **** /* (C) 2010 by Harald Welte <laforge@gnumonks.org>
+   4:board/gtm900b/init.c ****  * (C) 2010-19 by Steve Markgraf <steve@steve-m.de>
+   5:board/gtm900b/init.c ****  *
+   6:board/gtm900b/init.c ****  * All Rights Reserved
+   7:board/gtm900b/init.c ****  *
+   8:board/gtm900b/init.c ****  * This program is free software; you can redistribute it and/or modify
+   9:board/gtm900b/init.c ****  * it under the terms of the GNU General Public License as published by
+  10:board/gtm900b/init.c ****  * the Free Software Foundation; either version 2 of the License, or
+  11:board/gtm900b/init.c ****  * (at your option) any later version.
+  12:board/gtm900b/init.c ****  *
+  13:board/gtm900b/init.c ****  * This program is distributed in the hope that it will be useful,
+  14:board/gtm900b/init.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  15:board/gtm900b/init.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  16:board/gtm900b/init.c ****  * GNU General Public License for more details.
+  17:board/gtm900b/init.c ****  *
+  18:board/gtm900b/init.c ****  */
+  19:board/gtm900b/init.c **** 
+  20:board/gtm900b/init.c **** #include <stdint.h>
+  21:board/gtm900b/init.c **** #include <stdio.h>
+  22:board/gtm900b/init.c **** 
+  23:board/gtm900b/init.c **** #include <debug.h>
+  24:board/gtm900b/init.c **** #include <ctors.h>
+  25:board/gtm900b/init.c **** #include <memory.h>
+  26:board/gtm900b/init.c **** #include <board.h>
+  27:board/gtm900b/init.c **** #include <keypad.h>
+  28:board/gtm900b/init.c **** #include <console.h>
+  29:board/gtm900b/init.c **** #include <flash/cfi_flash.h>
+  30:board/gtm900b/init.c **** #include <tiffs.h>
+  31:board/gtm900b/init.c **** 
+  32:board/gtm900b/init.c **** #include <calypso/irq.h>
+  33:board/gtm900b/init.c **** #include <calypso/clock.h>
+  34:board/gtm900b/init.c **** #include <calypso/dma.h>
+  35:board/gtm900b/init.c **** #include <calypso/rtc.h>
+  36:board/gtm900b/init.c **** #include <calypso/timer.h>
+  37:board/gtm900b/init.c **** #include <uart.h>
+  38:board/gtm900b/init.c **** #include <calypso/backlight.h>
+  39:board/gtm900b/init.c **** 
+  40:board/gtm900b/init.c **** #include <comm/sercomm.h>
+  41:board/gtm900b/init.c **** #include <comm/timer.h>
+  42:board/gtm900b/init.c **** 
+  43:board/gtm900b/init.c **** #include <abb/twl3025.h>
+  44:board/gtm900b/init.c **** #include <rf/trf6151.h>
+  45:board/gtm900b/init.c **** #include "keymap.h"
+  46:board/gtm900b/init.c **** 
+  47:board/gtm900b/init.c **** #define ARMIO_LATCH_OUT 0xfffe4802
+  48:board/gtm900b/init.c **** #define IO_CNTL_REG	0xfffe4804
+  49:board/gtm900b/init.c **** #define ARM_CONF_REG	0xfffef006
+  50:board/gtm900b/init.c **** #define ASIC_CONF_REG	0xfffef008
+  51:board/gtm900b/init.c **** #define IO_CONF_REG	0xfffef00a
+  52:board/gtm900b/init.c **** #define LPG_LCR_REG	0xfffe7800
+  53:board/gtm900b/init.c **** #define LPG_PM_REG	0xfffe7801
+  54:board/gtm900b/init.c **** 
+  55:board/gtm900b/init.c **** int gtm900_hw_is_mg01gsmt;
+  56:board/gtm900b/init.c **** 
+  57:board/gtm900b/init.c **** static void board_io_init(void)
+  58:board/gtm900b/init.c **** {
+  59:board/gtm900b/init.c **** 	uint16_t reg;
+  60:board/gtm900b/init.c **** 
+  61:board/gtm900b/init.c **** 	reg = readw(ASIC_CONF_REG);
+  62:board/gtm900b/init.c **** 	/* Set LPG pin mux for power LED */
+  63:board/gtm900b/init.c **** 	reg |= (1 << 6);
+  64:board/gtm900b/init.c **** 	/* TWL3025: Set SPI+RIF RX clock to rising edge */
+  65:board/gtm900b/init.c **** 	reg |= (1 << 13) | (1 << 14);
+  66:board/gtm900b/init.c **** 	writew(reg, ASIC_CONF_REG);
+  67:board/gtm900b/init.c **** 
+  68:board/gtm900b/init.c **** 	/*
+  69:board/gtm900b/init.c **** 	 * Configure Calypso GPIO and multifunction pins the same way
+  70:board/gtm900b/init.c **** 	 * how Huawei's official firmware configures them.
+  71:board/gtm900b/init.c **** 	 */
+  72:board/gtm900b/init.c **** 	writew(0x03F5, IO_CONF_REG);
+  73:board/gtm900b/init.c **** 	writew(0xDC58, IO_CNTL_REG);
+  74:board/gtm900b/init.c **** 	writew(0x0007, ARMIO_LATCH_OUT);
+  75:board/gtm900b/init.c **** 
+  76:board/gtm900b/init.c **** 	/* Set LPG output permanently on (power LED) */
+  77:board/gtm900b/init.c **** 	writew(1, LPG_PM_REG);
+  78:board/gtm900b/init.c **** 	writew((1 << 7), LPG_LCR_REG);
+  79:board/gtm900b/init.c **** 
+  80:board/gtm900b/init.c **** 	/* configure ADD(22), needed for second half of flash on MG01GSMT */
+  81:board/gtm900b/init.c **** 	reg = readw(ARM_CONF_REG);
+  82:board/gtm900b/init.c **** 	reg |= (1 << 3);
+  83:board/gtm900b/init.c **** 	writew(reg, ARM_CONF_REG);
+  84:board/gtm900b/init.c **** }
+  85:board/gtm900b/init.c **** 
+  86:board/gtm900b/init.c **** /*
+  87:board/gtm900b/init.c ****  * There exist two firmware-incompatible versions of GTM900-B hardware:
+  88:board/gtm900b/init.c ****  * MG01GSMT and MGCxGSMT.  They have different flash chip types (8 MiB
+  89:board/gtm900b/init.c ****  * vs. 4 MiB) with correspondingly different TIFFS configurations
+  90:board/gtm900b/init.c ****  * (and we need TIFFS in order to read factory RF calibration values),
+  91:board/gtm900b/init.c ****  * and they have different (incompatible) RFFE control signals.
+  92:board/gtm900b/init.c ****  *
+  93:board/gtm900b/init.c ****  * We are going to check the flash chip type and use it to decide which
+  94:board/gtm900b/init.c ****  * hw variant we are running on.
+  95:board/gtm900b/init.c ****  */
+  96:board/gtm900b/init.c **** static void board_flash_init(void)
+  97:board/gtm900b/init.c **** {
+  98:board/gtm900b/init.c **** 	uint16_t manufacturer_id, device_id[3];
+  99:board/gtm900b/init.c **** 
+ 100:board/gtm900b/init.c **** 	/* Use an address above the Calypso boot ROM
+ 101:board/gtm900b/init.c **** 	 * so we don't need to unmap it to access the flash. */
+ 102:board/gtm900b/init.c **** 	flash_get_id((void *)0x40000, &manufacturer_id, device_id);
+ 103:board/gtm900b/init.c **** 
+ 104:board/gtm900b/init.c **** 	switch (manufacturer_id) {
+ 105:board/gtm900b/init.c **** 	case CFI_MANUF_SPANSION:
+ 106:board/gtm900b/init.c **** 		/* is it S71PL064J? */
+ 107:board/gtm900b/init.c **** 		if (device_id[0] == 0x227E && device_id[1] == 0x2202 &&
+ 108:board/gtm900b/init.c **** 		    device_id[2] == 0x2201) {
+ 109:board/gtm900b/init.c **** 			gtm900_hw_is_mg01gsmt = 1;
+ 110:board/gtm900b/init.c **** 			break;
+ 111:board/gtm900b/init.c **** 		}
+ 112:board/gtm900b/init.c **** 		/* is it S71PL032J? */
+ 113:board/gtm900b/init.c **** 		if (device_id[0] == 0x227E && device_id[1] == 0x220A &&
+ 114:board/gtm900b/init.c **** 		    device_id[2] == 0x2201) {
+ 115:board/gtm900b/init.c **** 			gtm900_hw_is_mg01gsmt = 0;
+ 116:board/gtm900b/init.c **** 			break;
+ 117:board/gtm900b/init.c **** 		}
+ 118:board/gtm900b/init.c **** 		goto bad;
+ 119:board/gtm900b/init.c **** 	case CFI_MANUF_SAMSUNG:
+ 120:board/gtm900b/init.c **** 		/* is it K5A3281CTM? */
+ 121:board/gtm900b/init.c **** 		if (device_id[0] == 0x22A0) {
+ 122:board/gtm900b/init.c **** 			gtm900_hw_is_mg01gsmt = 0;
+ 123:board/gtm900b/init.c **** 			break;
+ 124:board/gtm900b/init.c **** 		}
+ 125:board/gtm900b/init.c **** 		/* is it K5L3316CAM? */
+ 126:board/gtm900b/init.c **** 		if (device_id[0] == 0x257E && device_id[1] == 0x2503 &&
+ 127:board/gtm900b/init.c **** 		    device_id[2] == 0x2501) {
+ 128:board/gtm900b/init.c **** 			gtm900_hw_is_mg01gsmt = 0;
+ 129:board/gtm900b/init.c **** 			break;
+ 130:board/gtm900b/init.c **** 		}
+ 131:board/gtm900b/init.c **** 		/* FALL THRU */
+ 132:board/gtm900b/init.c **** 	default:
+ 133:board/gtm900b/init.c **** 	bad:
+ 134:board/gtm900b/init.c **** 		printf("Unknown module detected, "
+ 135:board/gtm900b/init.c **** 		       "flash ID 0x%04x 0x%04x 0x%04x 0x%04x\n"
+ 136:board/gtm900b/init.c **** 		       "Please contact mailing list!\n\n", manufacturer_id,
+ 137:board/gtm900b/init.c **** 		       device_id[0], device_id[1], device_id[2]);
+ 138:board/gtm900b/init.c **** 		return;
+ 139:board/gtm900b/init.c **** 	}
+ 140:board/gtm900b/init.c **** 
+ 141:board/gtm900b/init.c **** 	/* Initialize TIFFS reader */
+ 142:board/gtm900b/init.c **** 	if (gtm900_hw_is_mg01gsmt)
+ 143:board/gtm900b/init.c **** 		tiffs_init(0x700000, 0x10000, 15);
+ 144:board/gtm900b/init.c **** 	else
+ 145:board/gtm900b/init.c **** 		tiffs_init(0x380000, 0x10000, 7);
+ 146:board/gtm900b/init.c **** }
+ 147:board/gtm900b/init.c **** 
+ 148:board/gtm900b/init.c **** void board_init(int with_irq)
+ 149:board/gtm900b/init.c **** {
+  18              		.loc 1 149 0
+  19              		.cfi_startproc
+  20              		@ args = 0, pretend = 0, frame = 8
+  21              		@ frame_needed = 0, uses_anonymous_args = 0
+  22              	.LVL0:
+  23 0000 30402DE9 		stmfd	sp!, {r4, r5, lr}
+  24              	.LCFI0:
+  25              		.cfi_def_cfa_offset 12
+ 150:board/gtm900b/init.c **** 	/*
+ 151:board/gtm900b/init.c **** 	 * Configure the memory interface.
+ 152:board/gtm900b/init.c **** 	 * Huawei's official fw sets WS=4 for RAM, but not for flash -
+ 153:board/gtm900b/init.c **** 	 * but let's be consistent and use WS=4 for both.  Please refer
+ 154:board/gtm900b/init.c **** 	 * to this technical article for the underlying theory:
+ 155:board/gtm900b/init.c **** https://www.freecalypso.org/hg/freecalypso-docs/file/tip/MEMIF-wait-states
+ 156:board/gtm900b/init.c **** 	 */
+ 157:board/gtm900b/init.c **** 	calypso_mem_cfg(CALYPSO_nCS0, 4, CALYPSO_MEM_16bit, 1);
+  26              		.loc 1 157 0
+  27 0004 0120A0E3 		mov	r2, #1
+ 149:board/gtm900b/init.c **** {
+  28              		.loc 1 149 0
+  29 0008 14D04DE2 		sub	sp, sp, #20
+  30              	.LCFI1:
+  31              		.cfi_def_cfa_offset 32
+ 149:board/gtm900b/init.c **** {
+  32              		.loc 1 149 0
+  33 000c 0040A0E1 		mov	r4, r0
+  34              		.cfi_offset 14, -4
+  35              		.cfi_offset 5, -8
+  36              		.cfi_offset 4, -12
+  37              		.loc 1 157 0
+  38 0010 0230A0E1 		mov	r3, r2
+  39 0014 0000A0E3 		mov	r0, #0
+  40              	.LVL1:
+  41 0018 0410A0E3 		mov	r1, #4
+  42 001c FEFFFFEB 		bl	calypso_mem_cfg
+ 158:board/gtm900b/init.c **** 	calypso_mem_cfg(CALYPSO_nCS1, 4, CALYPSO_MEM_16bit, 1);
+  43              		.loc 1 158 0
+  44 0020 0120A0E3 		mov	r2, #1
+  45 0024 0230A0E1 		mov	r3, r2
+  46 0028 0200A0E3 		mov	r0, #2
+  47 002c 0410A0E3 		mov	r1, #4
+  48 0030 FEFFFFEB 		bl	calypso_mem_cfg
+ 159:board/gtm900b/init.c **** 	/*
+ 160:board/gtm900b/init.c **** 	 * The remaining 3 chip selects are unused on this hw,
+ 161:board/gtm900b/init.c **** 	 * thus their settings are dummies.
+ 162:board/gtm900b/init.c **** 	 */
+ 163:board/gtm900b/init.c **** 	calypso_mem_cfg(CALYPSO_nCS2, 5, CALYPSO_MEM_16bit, 1);
+  49              		.loc 1 163 0
+  50 0034 0120A0E3 		mov	r2, #1
+  51 0038 0230A0E1 		mov	r3, r2
+  52 003c 0400A0E3 		mov	r0, #4
+  53 0040 0510A0E3 		mov	r1, #5
+  54 0044 FEFFFFEB 		bl	calypso_mem_cfg
+ 164:board/gtm900b/init.c **** 	calypso_mem_cfg(CALYPSO_nCS3, 5, CALYPSO_MEM_16bit, 1);
+  55              		.loc 1 164 0
+  56 0048 0120A0E3 		mov	r2, #1
+  57 004c 0230A0E1 		mov	r3, r2
+  58 0050 0600A0E3 		mov	r0, #6
+  59 0054 0510A0E3 		mov	r1, #5
+  60 0058 FEFFFFEB 		bl	calypso_mem_cfg
+ 165:board/gtm900b/init.c **** 	calypso_mem_cfg(CALYPSO_CS4, 0, CALYPSO_MEM_8bit, 1);
+  61              		.loc 1 165 0
+  62 005c 0010A0E3 		mov	r1, #0
+  63 0060 0120A0E1 		mov	r2, r1
+  64 0064 0A00A0E3 		mov	r0, #10
+  65 0068 0130A0E3 		mov	r3, #1
+  66 006c FEFFFFEB 		bl	calypso_mem_cfg
+ 166:board/gtm900b/init.c **** 	calypso_mem_cfg(CALYPSO_nCS6, 0, CALYPSO_MEM_32bit, 1);
+  67              		.loc 1 166 0
+  68 0070 0C00A0E3 		mov	r0, #12
+  69 0074 0010A0E3 		mov	r1, #0
+  70 0078 0220A0E3 		mov	r2, #2
+  71 007c 0130A0E3 		mov	r3, #1
+  72 0080 FEFFFFEB 		bl	calypso_mem_cfg
+ 167:board/gtm900b/init.c **** 	calypso_mem_cfg(CALYPSO_nCS7, 0, CALYPSO_MEM_32bit, 0);
+  73              		.loc 1 167 0
+  74 0084 0010A0E3 		mov	r1, #0
+  75 0088 0130A0E1 		mov	r3, r1
+  76 008c 0800A0E3 		mov	r0, #8
+  77 0090 0220A0E3 		mov	r2, #2
+  78 0094 FEFFFFEB 		bl	calypso_mem_cfg
+ 168:board/gtm900b/init.c **** 
+ 169:board/gtm900b/init.c **** 	/* Set VTCXO_DIV2 = 1, configure PLL for 104 MHz and give ARM half of that */
+ 170:board/gtm900b/init.c **** 	calypso_clock_set(2, CALYPSO_PLL13_104_MHZ, ARM_MCLK_DIV_2);
+  79              		.loc 1 170 0
+  80 0098 0200A0E3 		mov	r0, #2
+  81 009c 0020A0E1 		mov	r2, r0
+  82 00a0 021BA0E3 		mov	r1, #2048
+  83 00a4 FEFFFFEB 		bl	calypso_clock_set
+ 171:board/gtm900b/init.c **** 
+ 172:board/gtm900b/init.c **** 	/* Configure the RHEA bridge with some sane default values */
+ 173:board/gtm900b/init.c **** 	calypso_rhea_cfg(0, 0, 0xff, 0, 1, 0, 0);
+  84              		.loc 1 173 0
+  85 00a8 0000A0E3 		mov	r0, #0
+  86 00ac 0010A0E1 		mov	r1, r0
+  87 00b0 0030A0E1 		mov	r3, r0
+  88 00b4 0150A0E3 		mov	r5, #1
+  89 00b8 FF20A0E3 		mov	r2, #255
+  90 00bc 04008DE5 		str	r0, [sp, #4]
+  91 00c0 08008DE5 		str	r0, [sp, #8]
+  92 00c4 00508DE5 		str	r5, [sp, #0]
+  93 00c8 FEFFFFEB 		bl	calypso_rhea_cfg
+  94              	.LBB8:
+  95              	.LBB9:
+  61:board/gtm900b/init.c **** 	reg = readw(ASIC_CONF_REG);
+  96              		.loc 1 61 0
+  97 00cc D0319FE5 		ldr	r3, .L16
+  98 00d0 B72F53E1 		ldrh	r2, [r3, #-247]
+  99              	.LVL2:
+  65:board/gtm900b/init.c **** 	reg |= (1 << 13) | (1 << 14);
+ 100              		.loc 1 65 0
+ 101 00d4 062A82E3 		orr	r2, r2, #24576
+ 102              	.LVL3:
+ 103 00d8 402082E3 		orr	r2, r2, #64
+ 104              	.LVL4:
+  66:board/gtm900b/init.c **** 	writew(reg, ASIC_CONF_REG);
+ 105              		.loc 1 66 0
+ 106 00dc B72F43E1 		strh	r2, [r3, #-247]	@ movhi
+  72:board/gtm900b/init.c **** 	writew(0x03F5, IO_CONF_REG);
+ 107              		.loc 1 72 0
+ 108 00e0 C0219FE5 		ldr	r2, .L16+4
+ 109              	.LVL5:
+  73:board/gtm900b/init.c **** 	writew(0xDC58, IO_CNTL_REG);
+ 110              		.loc 1 73 0
+ 111 00e4 C0119FE5 		ldr	r1, .L16+8
+  72:board/gtm900b/init.c **** 	writew(0x03F5, IO_CONF_REG);
+ 112              		.loc 1 72 0
+ 113 00e8 B52F43E1 		strh	r2, [r3, #-245]	@ movhi
+  73:board/gtm900b/init.c **** 	writew(0xDC58, IO_CNTL_REG);
+ 114              		.loc 1 73 0
+ 115 00ec BC219FE5 		ldr	r2, .L16+12
+ 116 00f0 BB1F42E1 		strh	r1, [r2, #-251]	@ movhi
+  74:board/gtm900b/init.c **** 	writew(0x0007, ARMIO_LATCH_OUT);
+ 117              		.loc 1 74 0
+ 118 00f4 0710A0E3 		mov	r1, #7	@ movhi
+ 119 00f8 BD1F42E1 		strh	r1, [r2, #-253]	@ movhi
+  77:board/gtm900b/init.c **** 	writew(1, LPG_PM_REG);
+ 120              		.loc 1 77 0
+ 121 00fc 032A82E2 		add	r2, r2, #12288
+  78:board/gtm900b/init.c **** 	writew((1 << 7), LPG_LCR_REG);
+ 122              		.loc 1 78 0
+ 123 0100 8010A0E3 		mov	r1, #128	@ movhi
+  77:board/gtm900b/init.c **** 	writew(1, LPG_PM_REG);
+ 124              		.loc 1 77 0
+ 125 0104 BE5F42E1 		strh	r5, [r2, #-254]	@ movhi
+  78:board/gtm900b/init.c **** 	writew((1 << 7), LPG_LCR_REG);
+ 126              		.loc 1 78 0
+ 127 0108 BF1F42E1 		strh	r1, [r2, #-255]	@ movhi
+  81:board/gtm900b/init.c **** 	reg = readw(ARM_CONF_REG);
+ 128              		.loc 1 81 0
+ 129 010c B92F53E1 		ldrh	r2, [r3, #-249]
+ 130              	.LVL6:
+  82:board/gtm900b/init.c **** 	reg |= (1 << 3);
+ 131              		.loc 1 82 0
+ 132 0110 082082E3 		orr	r2, r2, #8
+ 133              	.LVL7:
+  83:board/gtm900b/init.c **** 	writew(reg, ARM_CONF_REG);
+ 134              		.loc 1 83 0
+ 135 0114 B92F43E1 		strh	r2, [r3, #-249]	@ movhi
+ 136              	.LBE9:
+ 137              	.LBE8:
+ 174:board/gtm900b/init.c **** 
+ 175:board/gtm900b/init.c **** 	/* Initialize board-specific GPIO */
+ 176:board/gtm900b/init.c **** 	board_io_init();
+ 177:board/gtm900b/init.c **** 
+ 178:board/gtm900b/init.c **** 	/* Enable bootrom mapping to route exception vectors to RAM */
+ 179:board/gtm900b/init.c **** 	calypso_bootrom(with_irq);
+ 138              		.loc 1 179 0
+ 139 0118 0400A0E1 		mov	r0, r4
+ 140 011c FEFFFFEB 		bl	calypso_bootrom
+ 141              	.LVL8:
+ 180:board/gtm900b/init.c **** 	calypso_exceptions_install();
+ 142              		.loc 1 180 0
+ 143 0120 FEFFFFEB 		bl	calypso_exceptions_install
+ 181:board/gtm900b/init.c **** 
+ 182:board/gtm900b/init.c **** 	/* Initialize interrupt controller */
+ 183:board/gtm900b/init.c **** 	if (with_irq)
+ 144              		.loc 1 183 0
+ 145 0124 000054E3 		cmp	r4, #0
+ 184:board/gtm900b/init.c **** 		irq_init();
+ 146              		.loc 1 184 0
+ 147 0128 FEFFFF1B 		blne	irq_init
+ 148              	.L2:
+ 185:board/gtm900b/init.c **** 
+ 186:board/gtm900b/init.c **** 	sercomm_bind_uart(UART_IRDA);
+ 149              		.loc 1 186 0
+ 150 012c 0000A0E3 		mov	r0, #0
+ 151 0130 FEFFFFEB 		bl	sercomm_bind_uart
+ 187:board/gtm900b/init.c **** 	cons_bind_uart(UART_MODEM);
+ 188:board/gtm900b/init.c **** 
+ 189:board/gtm900b/init.c **** 	/* initialize IRDA UART to be used for sercomm */
+ 190:board/gtm900b/init.c **** 	uart_init(UART_IRDA, with_irq);
+ 152              		.loc 1 190 0
+ 153 0134 FF4004E2 		and	r4, r4, #255
+ 154              	.LVL9:
+ 187:board/gtm900b/init.c **** 	cons_bind_uart(UART_MODEM);
+ 155              		.loc 1 187 0
+ 156 0138 0100A0E3 		mov	r0, #1
+ 157 013c FEFFFFEB 		bl	cons_bind_uart
+ 158              		.loc 1 190 0
+ 159 0140 0000A0E3 		mov	r0, #0
+ 160 0144 0410A0E1 		mov	r1, r4
+ 161 0148 FEFFFFEB 		bl	uart_init
+ 191:board/gtm900b/init.c **** 	uart_baudrate(UART_IRDA, UART_115200);
+ 162              		.loc 1 191 0
+ 163 014c 0210A0E3 		mov	r1, #2
+ 164 0150 0000A0E3 		mov	r0, #0
+ 165 0154 FEFFFFEB 		bl	uart_baudrate
+ 192:board/gtm900b/init.c **** 
+ 193:board/gtm900b/init.c **** 	/* Initialize MODEM UART to be used for old-school console code. */
+ 194:board/gtm900b/init.c **** 	uart_init(UART_MODEM, with_irq);
+ 166              		.loc 1 194 0
+ 167 0158 0100A0E3 		mov	r0, #1
+ 168 015c 0410A0E1 		mov	r1, r4
+ 169 0160 FEFFFFEB 		bl	uart_init
+ 195:board/gtm900b/init.c **** 	uart_baudrate(UART_MODEM, UART_115200);
+ 170              		.loc 1 195 0
+ 171 0164 0210A0E3 		mov	r1, #2
+ 172 0168 0100A0E3 		mov	r0, #1
+ 173 016c FEFFFFEB 		bl	uart_baudrate
+ 196:board/gtm900b/init.c **** 
+ 197:board/gtm900b/init.c **** 	/* Initialize hardware timers */
+ 198:board/gtm900b/init.c **** 	hwtimer_init();
+ 174              		.loc 1 198 0
+ 175 0170 FEFFFFEB 		bl	hwtimer_init
+ 199:board/gtm900b/init.c **** 
+ 200:board/gtm900b/init.c **** 	/* Initialize DMA controller */
+ 201:board/gtm900b/init.c **** 	dma_init();
+ 176              		.loc 1 201 0
+ 177 0174 FEFFFFEB 		bl	dma_init
+ 202:board/gtm900b/init.c **** 
+ 203:board/gtm900b/init.c **** 	/* Initialize real time clock */
+ 204:board/gtm900b/init.c **** 	rtc_init();
+ 178              		.loc 1 204 0
+ 179 0178 FEFFFFEB 		bl	rtc_init
+ 205:board/gtm900b/init.c **** 
+ 206:board/gtm900b/init.c **** 	/* Initialize system timers (uses hwtimer 2) */
+ 207:board/gtm900b/init.c **** 	timer_init();
+ 180              		.loc 1 207 0
+ 181 017c FEFFFFEB 		bl	timer_init
+ 208:board/gtm900b/init.c **** 
+ 209:board/gtm900b/init.c **** 	/* Initialize keypad driver */
+ 210:board/gtm900b/init.c **** 	keypad_init(keymap, with_irq);
+ 182              		.loc 1 210 0
+ 183 0180 2C019FE5 		ldr	r0, .L16+16
+ 184 0184 0410A0E1 		mov	r1, r4
+ 185 0188 FEFFFFEB 		bl	keypad_init
+ 211:board/gtm900b/init.c **** 
+ 212:board/gtm900b/init.c **** 	/* Initialize ABB driver (uses SPI) */
+ 213:board/gtm900b/init.c **** 	twl3025_init();
+ 186              		.loc 1 213 0
+ 187 018c FEFFFFEB 		bl	twl3025_init
+ 188              	.LBB10:
+ 189              	.LBB11:
+ 102:board/gtm900b/init.c **** 	flash_get_id((void *)0x40000, &manufacturer_id, device_id);
+ 190              		.loc 1 102 0
+ 191 0190 12108DE2 		add	r1, sp, #18
+ 192 0194 0107A0E3 		mov	r0, #262144
+ 193 0198 0C208DE2 		add	r2, sp, #12
+ 194 019c FEFFFFEB 		bl	flash_get_id
+ 195              	.LVL10:
+ 104:board/gtm900b/init.c **** 	switch (manufacturer_id) {
+ 196              		.loc 1 104 0
+ 197 01a0 B211DDE1 		ldrh	r1, [sp, #18]
+ 198 01a4 010051E3 		cmp	r1, #1
+ 199 01a8 0200000A 		beq	.L4
+ 200 01ac EC0051E3 		cmp	r1, #236
+ 201 01b0 2800001A 		bne	.L3
+ 202 01b4 140000EA 		b	.L15
+ 203              	.L4:
+ 107:board/gtm900b/init.c **** 		if (device_id[0] == 0x227E && device_id[1] == 0x2202 &&
+ 204              		.loc 1 107 0
+ 205 01b8 BC20DDE1 		ldrh	r2, [sp, #12]
+ 206 01bc F4309FE5 		ldr	r3, .L16+20
+ 207 01c0 030052E1 		cmp	r2, r3
+ 208 01c4 2300001A 		bne	.L3
+ 209 01c8 BE30DDE1 		ldrh	r3, [sp, #14]
+ 210 01cc E8209FE5 		ldr	r2, .L16+24
+ 211 01d0 020053E1 		cmp	r3, r2
+ 212 01d4 0600001A 		bne	.L6
+ 213 01d8 E0309FE5 		ldr	r3, .L16+28
+ 214 01dc B021DDE1 		ldrh	r2, [sp, #16]
+ 215 01e0 030052E1 		cmp	r2, r3
+ 109:board/gtm900b/init.c **** 			gtm900_hw_is_mg01gsmt = 1;
+ 216              		.loc 1 109 0
+ 217 01e4 D8309F05 		ldreq	r3, .L16+32
+ 218 01e8 00108305 		streq	r1, [r3, #0]
+ 107:board/gtm900b/init.c **** 		if (device_id[0] == 0x227E && device_id[1] == 0x2202 &&
+ 219              		.loc 1 107 0
+ 220 01ec 1900001A 		bne	.L3
+ 221 01f0 1F0000EA 		b	.L7
+ 222              	.L6:
+ 113:board/gtm900b/init.c **** 		if (device_id[0] == 0x227E && device_id[1] == 0x220A &&
+ 223              		.loc 1 113 0
+ 224 01f4 CC209FE5 		ldr	r2, .L16+36
+ 225 01f8 020053E1 		cmp	r3, r2
+ 226 01fc B021DD01 		ldreqh	r2, [sp, #16]
+ 227 0200 B8309F05 		ldreq	r3, .L16+28
+ 228 0204 1300001A 		bne	.L3
+ 229 0208 0C0000EA 		b	.L14
+ 230              	.L15:
+ 121:board/gtm900b/init.c **** 		if (device_id[0] == 0x22A0) {
+ 231              		.loc 1 121 0
+ 232 020c BC30DDE1 		ldrh	r3, [sp, #12]
+ 233 0210 B4209FE5 		ldr	r2, .L16+40
+ 234 0214 020053E1 		cmp	r3, r2
+ 235 0218 0A00000A 		beq	.L11
+ 236              	.L8:
+ 126:board/gtm900b/init.c **** 		if (device_id[0] == 0x257E && device_id[1] == 0x2503 &&
+ 237              		.loc 1 126 0
+ 238 021c AC209FE5 		ldr	r2, .L16+44
+ 239 0220 020053E1 		cmp	r3, r2
+ 240 0224 0B00001A 		bne	.L3
+ 241 0228 BE20DDE1 		ldrh	r2, [sp, #14]
+ 242 022c A0309FE5 		ldr	r3, .L16+48
+ 243 0230 030052E1 		cmp	r2, r3
+ 244 0234 0700001A 		bne	.L3
+ 245 0238 B021DDE1 		ldrh	r2, [sp, #16]
+ 246 023c 023043E2 		sub	r3, r3, #2
+ 247              	.L14:
+ 248 0240 030052E1 		cmp	r2, r3
+ 249 0244 0300001A 		bne	.L3
+ 250              	.L11:
+ 128:board/gtm900b/init.c **** 			gtm900_hw_is_mg01gsmt = 0;
+ 251              		.loc 1 128 0
+ 252 0248 74309FE5 		ldr	r3, .L16+32
+ 253 024c 0020A0E3 		mov	r2, #0
+ 254 0250 002083E5 		str	r2, [r3, #0]
+ 255 0254 060000EA 		b	.L7
+ 256              	.L3:
+ 134:board/gtm900b/init.c **** 		printf("Unknown module detected, "
+ 257              		.loc 1 134 0
+ 258 0258 B001DDE1 		ldrh	r0, [sp, #16]
+ 259 025c BC20DDE1 		ldrh	r2, [sp, #12]
+ 260 0260 00008DE5 		str	r0, [sp, #0]
+ 261 0264 BE30DDE1 		ldrh	r3, [sp, #14]
+ 262 0268 68009FE5 		ldr	r0, .L16+52
+ 263 026c FEFFFFEB 		bl	printf
+ 264 0270 090000EA 		b	.L1
+ 265              	.L7:
+ 142:board/gtm900b/init.c **** 	if (gtm900_hw_is_mg01gsmt)
+ 266              		.loc 1 142 0
+ 267 0274 48309FE5 		ldr	r3, .L16+32
+ 268 0278 003093E5 		ldr	r3, [r3, #0]
+ 269 027c 000053E3 		cmp	r3, #0
+ 143:board/gtm900b/init.c **** 		tiffs_init(0x700000, 0x10000, 15);
+ 270              		.loc 1 143 0
+ 271 0280 0706A013 		movne	r0, #7340032
+ 272 0284 0118A013 		movne	r1, #65536
+ 273 0288 0F20A013 		movne	r2, #15
+ 145:board/gtm900b/init.c **** 		tiffs_init(0x380000, 0x10000, 7);
+ 274              		.loc 1 145 0
+ 275 028c 0E07A003 		moveq	r0, #3670016
+ 276 0290 0118A003 		moveq	r1, #65536
+ 277 0294 0720A003 		moveq	r2, #7
+ 278 0298 FEFFFFEB 		bl	tiffs_init
+ 279              	.L1:
+ 280              	.LBE11:
+ 281              	.LBE10:
+ 214:board/gtm900b/init.c **** 
+ 215:board/gtm900b/init.c **** 	/* Initialize board flash */
+ 216:board/gtm900b/init.c **** 	board_flash_init();
+ 217:board/gtm900b/init.c **** }
+ 282              		.loc 1 217 0
+ 283 029c 14D08DE2 		add	sp, sp, #20
+ 284 02a0 3080BDE8 		ldmfd	sp!, {r4, r5, pc}
+ 285              	.L17:
+ 286              		.align	2
+ 287              	.L16:
+ 288 02a4 FFF0FEFF 		.word	-69377
+ 289 02a8 F5030000 		.word	1013
+ 290 02ac 58DCFFFF 		.word	-9128
+ 291 02b0 FF48FEFF 		.word	-112385
+ 292 02b4 00000000 		.word	.LANCHOR0
+ 293 02b8 7E220000 		.word	8830
+ 294 02bc 02220000 		.word	8706
+ 295 02c0 01220000 		.word	8705
+ 296 02c4 00000000 		.word	gtm900_hw_is_mg01gsmt
+ 297 02c8 0A220000 		.word	8714
+ 298 02cc A0220000 		.word	8864
+ 299 02d0 7E250000 		.word	9598
+ 300 02d4 03250000 		.word	9475
+ 301 02d8 00000000 		.word	.LC0
+ 302              		.cfi_endproc
+ 303              	.LFE42:
+ 305              		.comm	gtm900_hw_is_mg01gsmt,4,4
+ 306              		.section	.rodata
+ 307              		.align	2
+ 308              		.set	.LANCHOR0,. + 0
+ 311              	keymap:
+ 312 0000 00       		.byte	0
+ 313 0001 00       		.byte	0
+ 314 0002 00       		.byte	0
+ 315 0003 00       		.byte	0
+ 316 0004 00       		.byte	0
+ 317 0005 00       		.byte	0
+ 318 0006 00       		.byte	0
+ 319 0007 00       		.byte	0
+ 320 0008 00       		.byte	0
+ 321 0009 00       		.byte	0
+ 322 000a 00       		.byte	0
+ 323 000b 00       		.byte	0
+ 324 000c 00       		.byte	0
+ 325 000d 00       		.byte	0
+ 326 000e 00       		.byte	0
+ 327 000f 00       		.byte	0
+ 328 0010 00       		.byte	0
+ 329 0011 00       		.byte	0
+ 330 0012 00       		.byte	0
+ 331 0013 00       		.byte	0
+ 332 0014 1F       		.byte	31
+ 333 0015 00       		.byte	0
+ 334 0016 00       		.byte	0
+ 335 0017 00       		.byte	0
+ 336              		.section	.rodata.str1.1,"aMS",%progbits,1
+ 337              	.LC0:
+ 338 0000 556E6B6E 		.ascii	"Unknown module detected, flash ID 0x%04x 0x%04x 0x%"
+ 338      6F776E20 
+ 338      6D6F6475 
+ 338      6C652064 
+ 338      65746563 
+ 339 0033 30347820 		.ascii	"04x 0x%04x\012Please contact mailing list!\012\012\000"
+ 339      30782530 
+ 339      34780A50 
+ 339      6C656173 
+ 339      6520636F 
+ 340              		.text
+ 341              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 init.c
+     /tmp/ccl9PCU3.s:12     .text.board_init:0000000000000000 $a
+     /tmp/ccl9PCU3.s:15     .text.board_init:0000000000000000 board_init
+     /tmp/ccl9PCU3.s:288    .text.board_init:00000000000002a4 $d
+                            *COM*:0000000000000004 gtm900_hw_is_mg01gsmt
+     /tmp/ccl9PCU3.s:307    .rodata:0000000000000000 $d
+     /tmp/ccl9PCU3.s:311    .rodata:0000000000000000 keymap
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+calypso_mem_cfg
+calypso_clock_set
+calypso_rhea_cfg
+calypso_bootrom
+calypso_exceptions_install
+irq_init
+sercomm_bind_uart
+cons_bind_uart
+uart_init
+uart_baudrate
+hwtimer_init
+dma_init
+rtc_init
+timer_init
+keypad_init
+twl3025_init
+flash_get_id
+printf
+tiffs_init

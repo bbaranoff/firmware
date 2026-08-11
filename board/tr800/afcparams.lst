@@ -1,0 +1,22 @@
+   1              		.file	"afcparams.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.global	afc_slope
+  12              		.global	afc_initial_dac_value
+  13              		.data
+  14              		.align	1
+  17              	afc_slope:
+  18 0000 6601     		.short	358
+  21              	afc_initial_dac_value:
+  22 0002 44FD     		.short	-700
+  23              		.text
+  24              	.Letext0:
+  25              		.file 1 "board/tr800/afcparams.c"
+  26              		.file 2 "/root/gnuarm/install/lib/gcc/arm-elf/4.5.2/../../../../arm-elf/sys-include/stdint.h"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 afcparams.c
+     /tmp/cczxa3EJ.s:17     .data:0000000000000000 afc_slope
+     /tmp/cczxa3EJ.s:21     .data:0000000000000002 afc_initial_dac_value
+     /tmp/cczxa3EJ.s:14     .data:0000000000000000 $d
+
+NO UNDEFINED SYMBOLS

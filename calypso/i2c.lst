@@ -1,0 +1,259 @@
+   1              		.file	"i2c.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.i2c_write,"ax",%progbits
+  12              		.align	2
+  13              		.global	i2c_write
+  15              	i2c_write:
+  16              	.LFB0:
+  17              		.file 1 "calypso/i2c.c"
+   1:calypso/i2c.c **** /* Driver for I2C Master Controller inside TI Calypso */
+   2:calypso/i2c.c **** 
+   3:calypso/i2c.c **** /* (C) 2010 by Harald Welte <laforge@gnumonks.org>
+   4:calypso/i2c.c ****  *
+   5:calypso/i2c.c ****  * All Rights Reserved
+   6:calypso/i2c.c ****  *
+   7:calypso/i2c.c ****  * This program is free software; you can redistribute it and/or modify
+   8:calypso/i2c.c ****  * it under the terms of the GNU General Public License as published by
+   9:calypso/i2c.c ****  * the Free Software Foundation; either version 2 of the License, or
+  10:calypso/i2c.c ****  * (at your option) any later version.
+  11:calypso/i2c.c ****  *
+  12:calypso/i2c.c ****  * This program is distributed in the hope that it will be useful,
+  13:calypso/i2c.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  14:calypso/i2c.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  15:calypso/i2c.c ****  * GNU General Public License for more details.
+  16:calypso/i2c.c ****  *
+  17:calypso/i2c.c ****  */
+  18:calypso/i2c.c **** 
+  19:calypso/i2c.c **** #include <stdint.h>
+  20:calypso/i2c.c **** #include <stdio.h>
+  21:calypso/i2c.c **** 
+  22:calypso/i2c.c **** #include <debug.h>
+  23:calypso/i2c.c **** #include <memory.h>
+  24:calypso/i2c.c **** #include <i2c.h>
+  25:calypso/i2c.c **** 
+  26:calypso/i2c.c **** #define BASE_ADDR_I2C	0xfffe2800
+  27:calypso/i2c.c **** #define I2C_REG(x)	(BASE_ADDR_I2C+(x))
+  28:calypso/i2c.c **** 
+  29:calypso/i2c.c **** enum i2c_reg {
+  30:calypso/i2c.c **** 	DEVICE_REG	= 0,
+  31:calypso/i2c.c **** 	ADDRESS_REG,
+  32:calypso/i2c.c **** 	DATA_WR_REG,	
+  33:calypso/i2c.c **** 	DATA_RD_REG,
+  34:calypso/i2c.c **** 	CMD_REG,
+  35:calypso/i2c.c **** 	CONF_FIFO_REG,
+  36:calypso/i2c.c **** 	CONF_CLK_REG,
+  37:calypso/i2c.c **** 	CONF_CLK_FUNC_REF,
+  38:calypso/i2c.c **** 	STATUS_FIFO_REG,
+  39:calypso/i2c.c **** 	STATUS_ACTIVITY_REG,
+  40:calypso/i2c.c **** };
+  41:calypso/i2c.c **** 
+  42:calypso/i2c.c **** #define I2C_CMD_SOFT_RESET	(1 << 0)
+  43:calypso/i2c.c **** #define I2C_CMD_EN_CLK		(1 << 1)
+  44:calypso/i2c.c **** #define I2C_CMD_START		(1 << 2)
+  45:calypso/i2c.c **** #define I2C_CMD_RW_READ		(1 << 3)
+  46:calypso/i2c.c **** #define I2C_CMD_COMP_READ	(1 << 4)
+  47:calypso/i2c.c **** #define I2C_CMD_IRQ_ENABLE	(1 << 5)
+  48:calypso/i2c.c **** 
+  49:calypso/i2c.c **** #define I2C_STATUS_ERROR_DATA	(1 << 0)
+  50:calypso/i2c.c **** #define I2C_STATUS_ERROR_DEV	(1 << 1)
+  51:calypso/i2c.c **** #define I2C_STATUS_IDLE		(1 << 2) // 1: not idle, 0: idle
+  52:calypso/i2c.c **** #define I2C_STATUS_INTERRUPT	(1 << 3)
+  53:calypso/i2c.c **** 
+  54:calypso/i2c.c **** int i2c_write(uint8_t chip, uint32_t addr, int alen, const uint8_t *buffer, int len)
+  55:calypso/i2c.c **** {
+  18              		.loc 1 55 0
+  19              		.cfi_startproc
+  20              		@ args = 4, pretend = 0, frame = 0
+  21              		@ frame_needed = 0, uses_anonymous_args = 0
+  22              		@ link register save eliminated.
+  23              	.LVL0:
+  56:calypso/i2c.c **** 	uint8_t cmd;
+  57:calypso/i2c.c **** 
+  58:calypso/i2c.c **** 	/* Calypso I2C controller doesn't support fancy addressing */
+  59:calypso/i2c.c **** 	if (alen > 1)
+  24              		.loc 1 59 0
+  25 0000 010052E3 		cmp	r2, #1
+  55:calypso/i2c.c **** {
+  26              		.loc 1 55 0
+  27 0004 00C09DE5 		ldr	ip, [sp, #0]
+  60:calypso/i2c.c **** 		return -1;
+  28              		.loc 1 60 0
+  29 0008 0000E0C3 		mvngt	r0, #0
+  30              	.LVL1:
+  59:calypso/i2c.c **** 	if (alen > 1)
+  31              		.loc 1 59 0
+  32 000c 1EFF2FC1 		bxgt	lr
+  61:calypso/i2c.c **** 
+  62:calypso/i2c.c **** 	/* FIXME: implement writes longer than fifo size */
+  63:calypso/i2c.c **** 	if (len > 16)
+  33              		.loc 1 63 0
+  34 0010 10005CE3 		cmp	ip, #16
+  35 0014 140000CA 		bgt	.L7
+  64:calypso/i2c.c **** 		return -1;
+  65:calypso/i2c.c **** 
+  66:calypso/i2c.c **** 	printd("i2c_write(chip=0x%02u, addr=0x%02u): ", chip, addr);
+  67:calypso/i2c.c **** 
+  68:calypso/i2c.c **** 	writeb(chip & 0x7f, I2C_REG(DEVICE_REG));
+  36              		.loc 1 68 0
+  37 0018 54209FE5 		ldr	r2, .L9
+  38              	.LVL2:
+  69:calypso/i2c.c **** 	writeb(addr & 0xff, I2C_REG(ADDRESS_REG));
+  39              		.loc 1 69 0
+  40 001c FF1001E2 		and	r1, r1, #255
+  41              	.LVL3:
+  68:calypso/i2c.c **** 	writeb(chip & 0x7f, I2C_REG(DEVICE_REG));
+  42              		.loc 1 68 0
+  43 0020 7F0000E2 		and	r0, r0, #127
+  44 0024 FF0042E5 		strb	r0, [r2, #-255]
+  45              		.loc 1 69 0
+  46 0028 FE1042E5 		strb	r1, [r2, #-254]
+  70:calypso/i2c.c **** 	
+  71:calypso/i2c.c **** 	/* we have to tell the controller how many bits we'll put into the fifo ?!? */
+  72:calypso/i2c.c **** 	writeb(len-1, I2C_REG(CONF_FIFO_REG));
+  47              		.loc 1 72 0
+  48 002c 01104CE2 		sub	r1, ip, #1
+  49 0030 FF1001E2 		and	r1, r1, #255
+  50 0034 FA1042E5 		strb	r1, [r2, #-250]
+  73:calypso/i2c.c **** 
+  74:calypso/i2c.c **** 	/* fill the FIFO */
+  75:calypso/i2c.c **** 	while (len--) {
+  51              		.loc 1 75 0
+  52 0038 010000EA 		b	.L3
+  53              	.LVL4:
+  54              	.L4:
+  55              	.LBB2:
+  76:calypso/i2c.c **** 		uint8_t byte = *buffer++;
+  56              		.loc 1 76 0
+  57 003c 0110D3E4 		ldrb	r1, [r3], #1	@ zero_extendqisi2
+  58              	.LVL5:
+  77:calypso/i2c.c **** 		writeb(byte, I2C_REG(DATA_WR_REG));
+  59              		.loc 1 77 0
+  60 0040 FD1042E5 		strb	r1, [r2, #-253]
+  61              	.LVL6:
+  62              	.L3:
+  63              	.LBE2:
+  75:calypso/i2c.c **** 	while (len--) {
+  64              		.loc 1 75 0 discriminator 1
+  65 0044 01C05CE2 		subs	ip, ip, #1
+  66              	.LVL7:
+  67 0048 FBFFFF2A 		bcs	.L4
+  78:calypso/i2c.c **** 		printd("%02X ", byte);
+  79:calypso/i2c.c **** 	}
+  80:calypso/i2c.c **** 	dputchar('\n');
+  81:calypso/i2c.c **** 
+  82:calypso/i2c.c **** 	/* start the transfer */
+  83:calypso/i2c.c **** 	cmd = readb(I2C_REG(CMD_REG));
+  68              		.loc 1 83 0
+  69 004c 20309FE5 		ldr	r3, .L9
+  70              	.LVL8:
+  71 0050 FB2053E5 		ldrb	r2, [r3, #-251]	@ zero_extendqisi2
+  72              	.LVL9:
+  84:calypso/i2c.c **** 	cmd |= I2C_CMD_START;
+  73              		.loc 1 84 0
+  74 0054 042082E3 		orr	r2, r2, #4
+  75              	.LVL10:
+  85:calypso/i2c.c **** 	writeb(cmd, I2C_REG(CMD_REG));
+  76              		.loc 1 85 0
+  77 0058 FB2043E5 		strb	r2, [r3, #-251]
+  78              	.L5:
+  79              	.LBB3:
+  86:calypso/i2c.c **** 
+  87:calypso/i2c.c **** 	/* wait until transfer completes */
+  88:calypso/i2c.c **** 	while (1) {
+  89:calypso/i2c.c **** 		uint8_t reg = readb(I2C_REG(STATUS_ACTIVITY_REG));
+  80              		.loc 1 89 0
+  81 005c F60053E5 		ldrb	r0, [r3, #-246]	@ zero_extendqisi2
+  90:calypso/i2c.c **** 		printd("I2C Status: 0x%02x\n", reg & 0xf);
+  91:calypso/i2c.c **** 		if (!(reg & I2C_STATUS_IDLE)) // 0: idle 1: not idle
+  82              		.loc 1 91 0
+  83 0060 040010E2 		ands	r0, r0, #4
+  84 0064 FCFFFF1A 		bne	.L5
+  85 0068 1EFF2FE1 		bx	lr
+  86              	.LVL11:
+  87              	.L7:
+  88              	.LBE3:
+  64:calypso/i2c.c **** 		return -1;
+  89              		.loc 1 64 0
+  90 006c 0000E0E3 		mvn	r0, #0
+  92:calypso/i2c.c **** 			break;
+  93:calypso/i2c.c **** 	}
+  94:calypso/i2c.c **** 	dputs("I2C transfer completed\n");
+  95:calypso/i2c.c **** 
+  96:calypso/i2c.c **** 	return 0;
+  97:calypso/i2c.c **** }
+  91              		.loc 1 97 0
+  92 0070 1EFF2FE1 		bx	lr
+  93              	.L10:
+  94              		.align	2
+  95              	.L9:
+  96 0074 FF28FEFF 		.word	-120577
+  97              		.cfi_endproc
+  98              	.LFE0:
+ 100              		.section	.text.i2c_init,"ax",%progbits
+ 101              		.align	2
+ 102              		.global	i2c_init
+ 104              	i2c_init:
+ 105              	.LFB1:
+  98:calypso/i2c.c **** 
+  99:calypso/i2c.c **** void i2c_init(int speed, int slaveadd)
+ 100:calypso/i2c.c **** {
+ 106              		.loc 1 100 0
+ 107              		.cfi_startproc
+ 108              		@ args = 0, pretend = 0, frame = 0
+ 109              		@ frame_needed = 0, uses_anonymous_args = 0
+ 110              		@ link register save eliminated.
+ 111              	.LVL12:
+ 101:calypso/i2c.c **** 	/* scl_out = clk_func_ref / 3,
+ 102:calypso/i2c.c **** 	   clk_func_ref = master_clock_freq / (divisor_2 + 1)
+ 103:calypso/i2c.c **** 	   master_clock_freq = ext_clock_freq / divisor_1 */
+ 104:calypso/i2c.c **** 	/* clk_func_ref = scl_out * 3,
+ 105:calypso/i2c.c **** 	   divisor_2 = (master_clock_freq / clk_func_ref) - 1
+ 106:calypso/i2c.c **** 	   divisor_1 = ext_clock_freq / master_clock_freq */
+ 107:calypso/i2c.c **** 	/* for a target freq of 200kHz:
+ 108:calypso/i2c.c **** 		ext_clock_freq = 13MHz
+ 109:calypso/i2c.c **** 		clk_func_ref = 3 * 300kHZ = 600kHz
+ 110:calypso/i2c.c **** 		divisor_1 = 1 => master_clock_freq = ext_clock_freq = 13MHz
+ 111:calypso/i2c.c **** 		divisor_2 = 21 => clk_func_ref = 13MHz / (21+2) = 590.91 kHz
+ 112:calypso/i2c.c **** 		scl_out = clk_func_ref / 3 = 509.91 kHz / 3 = 196.97kHz */
+ 113:calypso/i2c.c **** 	writeb(I2C_CMD_SOFT_RESET, I2C_REG(CMD_REG));
+ 112              		.loc 1 113 0
+ 113 0000 20309FE5 		ldr	r3, .L12
+ 114 0004 0120A0E3 		mov	r2, #1
+ 115 0008 FB2043E5 		strb	r2, [r3, #-251]
+ 114:calypso/i2c.c **** 
+ 115:calypso/i2c.c **** 	writeb(0x00, I2C_REG(CONF_CLK_REG));
+ 116              		.loc 1 115 0
+ 117 000c 0020A0E3 		mov	r2, #0
+ 118 0010 F92043E5 		strb	r2, [r3, #-249]
+ 116:calypso/i2c.c **** 	writeb(21, I2C_REG(CONF_CLK_FUNC_REF));
+ 119              		.loc 1 116 0
+ 120 0014 152082E2 		add	r2, r2, #21
+ 121 0018 F82043E5 		strb	r2, [r3, #-248]
+ 117:calypso/i2c.c **** 
+ 118:calypso/i2c.c **** 	writeb(I2C_CMD_EN_CLK, I2C_REG(CMD_REG));
+ 122              		.loc 1 118 0
+ 123 001c 0220A0E3 		mov	r2, #2
+ 124 0020 FB2043E5 		strb	r2, [r3, #-251]
+ 119:calypso/i2c.c **** }
+ 125              		.loc 1 119 0
+ 126 0024 1EFF2FE1 		bx	lr
+ 127              	.L13:
+ 128              		.align	2
+ 129              	.L12:
+ 130 0028 FF28FEFF 		.word	-120577
+ 131              		.cfi_endproc
+ 132              	.LFE1:
+ 134              		.text
+ 135              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 i2c.c
+     /tmp/ccFAikIS.s:12     .text.i2c_write:0000000000000000 $a
+     /tmp/ccFAikIS.s:15     .text.i2c_write:0000000000000000 i2c_write
+     /tmp/ccFAikIS.s:96     .text.i2c_write:0000000000000074 $d
+     /tmp/ccFAikIS.s:101    .text.i2c_init:0000000000000000 $a
+     /tmp/ccFAikIS.s:104    .text.i2c_init:0000000000000000 i2c_init
+     /tmp/ccFAikIS.s:130    .text.i2c_init:0000000000000028 $d
+                     .debug_frame:0000000000000010 $d
+
+NO UNDEFINED SYMBOLS

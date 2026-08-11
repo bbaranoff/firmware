@@ -1,0 +1,1686 @@
+   1              		.file	"main.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.fb_clear,"ax",%progbits
+  12              		.align	2
+  14              	fb_clear:
+  15              	.LFB66:
+  16              		.file 1 "include/fb/framebuffer.h"
+   1:include/fb/framebuffer.h **** #ifndef _FB_FRAMEBUFFER_H
+   2:include/fb/framebuffer.h **** #define _FB_FRAMEBUFFER_H
+   3:include/fb/framebuffer.h **** 
+   4:include/fb/framebuffer.h **** #include <fb/font.h>
+   5:include/fb/framebuffer.h **** #include <stdint.h>
+   6:include/fb/framebuffer.h **** 
+   7:include/fb/framebuffer.h **** /* color is encoded as <special><red><green><blue> */
+   8:include/fb/framebuffer.h **** /* if a color is "special", then the RGB components most likely
+   9:include/fb/framebuffer.h ****    don't make sense. Use "special" colours when you have to
+  10:include/fb/framebuffer.h ****    mask out bits with transparency or you have to encode
+  11:include/fb/framebuffer.h ****    colours in a fixed color palette ... */
+  12:include/fb/framebuffer.h **** 
+  13:include/fb/framebuffer.h **** #define FB_COLOR_WHITE		0x00ffffffU
+  14:include/fb/framebuffer.h **** #define FB_COLOR_BLACK		0x00000000U
+  15:include/fb/framebuffer.h **** #define FB_COLOR_TRANSP		0x01ffffffU
+  16:include/fb/framebuffer.h **** 
+  17:include/fb/framebuffer.h **** #define FB_COLOR_RGB(r,g,b) ((((r) & 0xff)<<16)|(((g)&0xff)<<8)|((b)&0xff))
+  18:include/fb/framebuffer.h **** #define FB_COLOR_RED		FB_COLOR_RGB(0xff,0x00,0x00)
+  19:include/fb/framebuffer.h **** #define FB_COLOR_GREEN		FB_COLOR_RGB(0x00,0xff,0x00)
+  20:include/fb/framebuffer.h **** #define FB_COLOR_BLUE		FB_COLOR_RGB(0x00,0x00,0xff)
+  21:include/fb/framebuffer.h **** 
+  22:include/fb/framebuffer.h **** /* encode */
+  23:include/fb/framebuffer.h **** 
+  24:include/fb/framebuffer.h **** /* decode */
+  25:include/fb/framebuffer.h **** #define FB_COLOR_IS_SPECIAL(v)     (!!((v) & 0xff000000U))
+  26:include/fb/framebuffer.h **** #define FB_COLOR_TO_R(v)		(((v)>>16) & 0xff)
+  27:include/fb/framebuffer.h **** #define FB_COLOR_TO_G(v)		(((v)>> 8) & 0xff)
+  28:include/fb/framebuffer.h **** #define FB_COLOR_TO_B(v)		( (v)      & 0xff)
+  29:include/fb/framebuffer.h **** 
+  30:include/fb/framebuffer.h **** struct framebuffer {
+  31:include/fb/framebuffer.h **** 	char name[8];				// keep it short!
+  32:include/fb/framebuffer.h **** 	void (*init)();				// (re)initialize
+  33:include/fb/framebuffer.h **** 	void (*clear)();			// clear display
+  34:include/fb/framebuffer.h **** 	void (*set_p)(uint16_t x,uint16_t y);	// set pixel to fg color
+  35:include/fb/framebuffer.h **** 	void (*boxto)(uint16_t x,uint16_t y);	// draw box to xy
+  36:include/fb/framebuffer.h **** 	void (*lineto)(uint16_t x,uint16_t y);	// draw line to xy
+  37:include/fb/framebuffer.h **** 	int (*putstr)(char *c,int maxwidth);	// put text in current font to fb
+  38:include/fb/framebuffer.h **** 	void (*flush)();			// flush changes
+  39:include/fb/framebuffer.h **** 
+  40:include/fb/framebuffer.h **** 	uint16_t width,height;			// width/height of fb
+  41:include/fb/framebuffer.h **** 	uint16_t cursor_x,cursor_y;		// current cursor
+  42:include/fb/framebuffer.h **** 	uint32_t fg_color,bg_color;		// current fg/bg color
+  43:include/fb/framebuffer.h **** 	enum fb_font_id font;			// current font
+  44:include/fb/framebuffer.h **** };
+  45:include/fb/framebuffer.h **** 
+  46:include/fb/framebuffer.h **** /* there is a single framebuffer, the specific driver defines
+  47:include/fb/framebuffer.h ****    the "framebuffer" symbol */
+  48:include/fb/framebuffer.h **** extern struct framebuffer *framebuffer;
+  49:include/fb/framebuffer.h **** 
+  50:include/fb/framebuffer.h **** static inline void
+  51:include/fb/framebuffer.h **** fb_init(){
+  52:include/fb/framebuffer.h **** 	framebuffer->init();
+  53:include/fb/framebuffer.h **** }
+  54:include/fb/framebuffer.h **** 
+  55:include/fb/framebuffer.h **** static inline void
+  56:include/fb/framebuffer.h **** fb_clear(){
+  17              		.loc 1 56 0
+  18              		.cfi_startproc
+  19              		@ args = 0, pretend = 0, frame = 0
+  20              		@ frame_needed = 0, uses_anonymous_args = 0
+  57:include/fb/framebuffer.h **** 	framebuffer->clear();
+  21              		.loc 1 57 0
+  22 0000 10309FE5 		ldr	r3, .L2
+  56:include/fb/framebuffer.h **** fb_clear(){
+  23              		.loc 1 56 0
+  24 0004 04E02DE5 		str	lr, [sp, #-4]!
+  25              	.LCFI0:
+  26              		.cfi_def_cfa_offset 4
+  27              		.loc 1 57 0
+  28 0008 003093E5 		ldr	r3, [r3, #0]
+  29              		.cfi_offset 14, -4
+  30 000c 0FE0A0E1 		mov	lr, pc
+  31 0010 0CF093E5 		ldr	pc, [r3, #12]
+  58:include/fb/framebuffer.h **** }
+  32              		.loc 1 58 0
+  33 0014 04F09DE4 		ldr	pc, [sp], #4
+  34              	.L3:
+  35              		.align	2
+  36              	.L2:
+  37 0018 00000000 		.word	framebuffer
+  38              		.cfi_endproc
+  39              	.LFE66:
+  41              		.section	.text.fb_putstr,"ax",%progbits
+  42              		.align	2
+  44              	fb_putstr:
+  45              	.LFB70:
+  59:include/fb/framebuffer.h **** 
+  60:include/fb/framebuffer.h **** static inline void
+  61:include/fb/framebuffer.h **** fb_boxto(uint16_t x,uint16_t y){
+  62:include/fb/framebuffer.h **** 	framebuffer->boxto(x,y);
+  63:include/fb/framebuffer.h **** }
+  64:include/fb/framebuffer.h **** 
+  65:include/fb/framebuffer.h **** static inline void
+  66:include/fb/framebuffer.h **** fb_lineto(uint16_t x,uint16_t y){
+  67:include/fb/framebuffer.h **** 	framebuffer->lineto(x,y);
+  68:include/fb/framebuffer.h **** }
+  69:include/fb/framebuffer.h **** 
+  70:include/fb/framebuffer.h **** static inline void
+  71:include/fb/framebuffer.h **** fb_set_p(uint16_t x,uint16_t y){
+  72:include/fb/framebuffer.h **** 	framebuffer->set_p(x,y);
+  73:include/fb/framebuffer.h **** }
+  74:include/fb/framebuffer.h **** 
+  75:include/fb/framebuffer.h **** static inline int
+  76:include/fb/framebuffer.h **** fb_putstr(char *str,int maxwidth){
+  46              		.loc 1 76 0
+  47              		.cfi_startproc
+  48              		@ args = 0, pretend = 0, frame = 0
+  49              		@ frame_needed = 0, uses_anonymous_args = 0
+  50              	.LVL0:
+  77:include/fb/framebuffer.h **** 	return framebuffer->putstr(str,maxwidth);
+  51              		.loc 1 77 0
+  52 0000 10309FE5 		ldr	r3, .L5
+  76:include/fb/framebuffer.h **** fb_putstr(char *str,int maxwidth){
+  53              		.loc 1 76 0
+  54 0004 04E02DE5 		str	lr, [sp, #-4]!
+  55              	.LCFI1:
+  56              		.cfi_def_cfa_offset 4
+  57              		.loc 1 77 0
+  58 0008 003093E5 		ldr	r3, [r3, #0]
+  59              		.cfi_offset 14, -4
+  60 000c 0FE0A0E1 		mov	lr, pc
+  61 0010 1CF093E5 		ldr	pc, [r3, #28]
+  62              	.LVL1:
+  78:include/fb/framebuffer.h **** }
+  63              		.loc 1 78 0
+  64 0014 04F09DE4 		ldr	pc, [sp], #4
+  65              	.L6:
+  66              		.align	2
+  67              	.L5:
+  68 0018 00000000 		.word	framebuffer
+  69              		.cfi_endproc
+  70              	.LFE70:
+  72              		.section	.text.fb_flush,"ax",%progbits
+  73              		.align	2
+  75              	fb_flush:
+  76              	.LFB71:
+  79:include/fb/framebuffer.h **** 
+  80:include/fb/framebuffer.h **** static inline void
+  81:include/fb/framebuffer.h **** fb_flush(){
+  77              		.loc 1 81 0
+  78              		.cfi_startproc
+  79              		@ args = 0, pretend = 0, frame = 0
+  80              		@ frame_needed = 0, uses_anonymous_args = 0
+  82:include/fb/framebuffer.h **** 	framebuffer->flush();
+  81              		.loc 1 82 0
+  82 0000 10309FE5 		ldr	r3, .L8
+  81:include/fb/framebuffer.h **** fb_flush(){
+  83              		.loc 1 81 0
+  84 0004 04E02DE5 		str	lr, [sp, #-4]!
+  85              	.LCFI2:
+  86              		.cfi_def_cfa_offset 4
+  87              		.loc 1 82 0
+  88 0008 003093E5 		ldr	r3, [r3, #0]
+  89              		.cfi_offset 14, -4
+  90 000c 0FE0A0E1 		mov	lr, pc
+  91 0010 20F093E5 		ldr	pc, [r3, #32]
+  83:include/fb/framebuffer.h **** }
+  92              		.loc 1 83 0
+  93 0014 04F09DE4 		ldr	pc, [sp], #4
+  94              	.L9:
+  95              		.align	2
+  96              	.L8:
+  97 0018 00000000 		.word	framebuffer
+  98              		.cfi_endproc
+  99              	.LFE71:
+ 101              		.section	.text.fb_gotoxy,"ax",%progbits
+ 102              		.align	2
+ 104              	fb_gotoxy:
+ 105              	.LFB72:
+  84:include/fb/framebuffer.h **** 
+  85:include/fb/framebuffer.h **** static inline void
+  86:include/fb/framebuffer.h **** fb_gotoxy(uint16_t x,uint16_t y){
+ 106              		.loc 1 86 0
+ 107              		.cfi_startproc
+ 108              		@ args = 0, pretend = 0, frame = 0
+ 109              		@ frame_needed = 0, uses_anonymous_args = 0
+ 110              		@ link register save eliminated.
+ 111              	.LVL2:
+  87:include/fb/framebuffer.h **** 	framebuffer->cursor_x = x;
+ 112              		.loc 1 87 0
+ 113 0000 0C309FE5 		ldr	r3, .L11
+ 114 0004 003093E5 		ldr	r3, [r3, #0]
+ 115 0008 B802C3E1 		strh	r0, [r3, #40]	@ movhi
+  88:include/fb/framebuffer.h **** 	framebuffer->cursor_y = y;
+ 116              		.loc 1 88 0
+ 117 000c BA12C3E1 		strh	r1, [r3, #42]	@ movhi
+  89:include/fb/framebuffer.h **** }
+ 118              		.loc 1 89 0
+ 119 0010 1EFF2FE1 		bx	lr
+ 120              	.L12:
+ 121              		.align	2
+ 122              	.L11:
+ 123 0014 00000000 		.word	framebuffer
+ 124              		.cfi_endproc
+ 125              	.LFE72:
+ 127              		.section	.text.refresh_display,"ax",%progbits
+ 128              		.align	2
+ 130              	refresh_display:
+ 131              	.LFB81:
+ 132              		.file 2 "apps/menu/main.c"
+   1:apps/menu/main.c **** /* Menu for Calypso Phone to load applicatios from flash */
+   2:apps/menu/main.c **** 
+   3:apps/menu/main.c **** /* (C) 2013 by Andreas Eversberg <jolly@eversberg.eu>
+   4:apps/menu/main.c ****  *
+   5:apps/menu/main.c ****  * All Rights Reserved
+   6:apps/menu/main.c ****  *
+   7:apps/menu/main.c ****  * This program is free software; you can redistribute it and/or modify
+   8:apps/menu/main.c ****  * it under the terms of the GNU General Public License as published by
+   9:apps/menu/main.c ****  * the Free Software Foundation; either version 2 of the License, or
+  10:apps/menu/main.c ****  * (at your option) any later version.
+  11:apps/menu/main.c ****  *
+  12:apps/menu/main.c ****  * This program is distributed in the hope that it will be useful,
+  13:apps/menu/main.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  14:apps/menu/main.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  15:apps/menu/main.c ****  * GNU General Public License for more details.
+  16:apps/menu/main.c ****  *
+  17:apps/menu/main.c ****  */
+  18:apps/menu/main.c **** 
+  19:apps/menu/main.c **** #include <stdint.h>
+  20:apps/menu/main.c **** #include <stdio.h>
+  21:apps/menu/main.c **** #include <string.h>
+  22:apps/menu/main.c **** #include <errno.h>
+  23:apps/menu/main.c **** 
+  24:apps/menu/main.c **** #include <debug.h>
+  25:apps/menu/main.c **** #include <memory.h>
+  26:apps/menu/main.c **** #include <delay.h>
+  27:apps/menu/main.c **** #include <byteorder.h>
+  28:apps/menu/main.c **** #include <rffe.h>
+  29:apps/menu/main.c **** #include <keypad.h>
+  30:apps/menu/main.c **** #include <board.h>
+  31:apps/menu/main.c **** #include <abb/twl3025.h>
+  32:apps/menu/main.c **** #include <rf/trf6151.h>
+  33:apps/menu/main.c **** #include <calypso/clock.h>
+  34:apps/menu/main.c **** #include <calypso/tpu.h>
+  35:apps/menu/main.c **** #include <calypso/tsp.h>
+  36:apps/menu/main.c **** #include <calypso/dsp.h>
+  37:apps/menu/main.c **** #include <calypso/irq.h>
+  38:apps/menu/main.c **** #include <calypso/misc.h>
+  39:apps/menu/main.c **** #include <calypso/timer.h>
+  40:apps/menu/main.c **** #include <comm/sercomm.h>
+  41:apps/menu/main.c **** #include <comm/timer.h>
+  42:apps/menu/main.c **** #include <uart.h>
+  43:apps/menu/main.c **** #include <fb/framebuffer.h>
+  44:apps/menu/main.c **** #include <battery/battery.h>
+  45:apps/menu/main.c **** #include <asm/system.h>
+  46:apps/menu/main.c **** 
+  47:apps/menu/main.c **** #define RAM 0x00820000
+  48:apps/menu/main.c **** #define MAGIC 0x0083ff00
+  49:apps/menu/main.c **** 
+  50:apps/menu/main.c **** static enum key_codes key_code = KEY_INV;
+  51:apps/menu/main.c **** static volatile enum key_states key_state;
+  52:apps/menu/main.c **** 
+  53:apps/menu/main.c **** static int cursor = 0, scroll_apps = 0;
+  54:apps/menu/main.c **** 
+  55:apps/menu/main.c **** static struct apps {
+  56:apps/menu/main.c **** 	char name[16];
+  57:apps/menu/main.c **** 	void *start;
+  58:apps/menu/main.c **** 	int len;
+  59:apps/menu/main.c **** } apps[32];
+  60:apps/menu/main.c **** 
+  61:apps/menu/main.c **** static void locate_apps(void)
+  62:apps/menu/main.c **** {
+  63:apps/menu/main.c **** 	int i, j, k;
+  64:apps/menu/main.c **** 	char *p;
+  65:apps/menu/main.c **** 
+  66:apps/menu/main.c **** 	memset(apps, 0, sizeof(apps));
+  67:apps/menu/main.c **** 
+  68:apps/menu/main.c **** 	for (j = 0, i = 0x010000; i < 0x200000; i += 0x10000) {
+  69:apps/menu/main.c **** 		p = (char *)i;
+  70:apps/menu/main.c **** 		/* check for highram header: "highram:" */
+  71:apps/menu/main.c **** 		if (!!memcmp(p, "highram:", 8))
+  72:apps/menu/main.c **** 			continue;
+  73:apps/menu/main.c **** 		p += 8;
+  74:apps/menu/main.c **** 		/* check for app name after header: "highram:<name>\n" */
+  75:apps/menu/main.c **** 		printf("found highram image at flash mem address 0x%p\n",
+  76:apps/menu/main.c **** 			(char *)i);
+  77:apps/menu/main.c **** 		for (k = 0; k < (int)sizeof(apps[j].name) - 1; k++) {
+  78:apps/menu/main.c **** 			if (p[k] == '\n')
+  79:apps/menu/main.c **** 				break;
+  80:apps/menu/main.c **** 		}
+  81:apps/menu/main.c **** 		if (k == sizeof(apps[j].name) - 3) {
+  82:apps/menu/main.c **** 			printf("skipping: corrupt highram header, no '\\n' "
+  83:apps/menu/main.c **** 				"after image name or name more larger than %d "
+  84:apps/menu/main.c **** 				"digits\n", (int)sizeof(apps[j].name) - 3);
+  85:apps/menu/main.c **** 				continue;
+  86:apps/menu/main.c **** 		}
+  87:apps/menu/main.c **** 		if (j < 9)
+  88:apps/menu/main.c **** 			apps[j].name[0] = '1' + j;
+  89:apps/menu/main.c **** 		else if (j == 9)
+  90:apps/menu/main.c **** 			apps[j].name[0] = '0';
+  91:apps/menu/main.c **** 		else
+  92:apps/menu/main.c **** 			apps[j].name[0] = ' ';
+  93:apps/menu/main.c **** 		apps[j].name[1] = ' ';
+  94:apps/menu/main.c **** 		memcpy(apps[j].name + 2, p, k);
+  95:apps/menu/main.c **** 		apps[j].len = 0x20000;
+  96:apps/menu/main.c **** 		p += k + 1;
+  97:apps/menu/main.c **** 		/* p points to highram image after header */
+  98:apps/menu/main.c **** 		apps[j].start = p;
+  99:apps/menu/main.c **** 		j++;
+ 100:apps/menu/main.c **** 	}
+ 101:apps/menu/main.c **** }
+ 102:apps/menu/main.c **** 
+ 103:apps/menu/main.c **** static void wait_key_release(void)
+ 104:apps/menu/main.c **** {
+ 105:apps/menu/main.c **** 	/* wait for key release */
+ 106:apps/menu/main.c **** 	while (key_state == PRESSED) {
+ 107:apps/menu/main.c **** 		delay_ms(10);
+ 108:apps/menu/main.c **** 		keypad_poll();
+ 109:apps/menu/main.c **** 	}
+ 110:apps/menu/main.c **** }
+ 111:apps/menu/main.c **** 
+ 112:apps/menu/main.c **** static void load_app(void)
+ 113:apps/menu/main.c **** {
+ 114:apps/menu/main.c **** 	static int i;
+ 115:apps/menu/main.c **** 	static void (*f) (void) = (void (*)(void))RAM;
+ 116:apps/menu/main.c **** 
+ 117:apps/menu/main.c **** 	wait_key_release();
+ 118:apps/menu/main.c **** 
+ 119:apps/menu/main.c **** 	local_irq_disable();
+ 120:apps/menu/main.c **** 
+ 121:apps/menu/main.c **** 	for (i = 0; i < apps[cursor].len; i++)
+ 122:apps/menu/main.c **** 		((unsigned char *)RAM)[i] = ((unsigned char *)apps[cursor].start)[i];
+ 123:apps/menu/main.c **** 	f();
+ 124:apps/menu/main.c **** }
+ 125:apps/menu/main.c **** 
+ 126:apps/menu/main.c **** /* UI */
+ 127:apps/menu/main.c **** 
+ 128:apps/menu/main.c **** static void refresh_display(void)
+ 129:apps/menu/main.c **** {
+ 133              		.loc 2 129 0
+ 134              		.cfi_startproc
+ 135              		@ args = 0, pretend = 0, frame = 0
+ 136              		@ frame_needed = 0, uses_anonymous_args = 0
+ 137 0000 F04F2DE9 		stmfd	sp!, {r4, r5, r6, r7, r8, r9, sl, fp, lr}
+ 138              	.LCFI3:
+ 139              		.cfi_def_cfa_offset 36
+ 140              	.LBB44:
+ 141              	.LBB46:
+  90:include/fb/framebuffer.h **** 
+  91:include/fb/framebuffer.h **** static inline void
+  92:include/fb/framebuffer.h **** fb_setfg(uint32_t color){
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+  94:include/fb/framebuffer.h **** }
+  95:include/fb/framebuffer.h **** 
+  96:include/fb/framebuffer.h **** static inline void
+  97:include/fb/framebuffer.h **** fb_setbg(uint32_t color){
+  98:include/fb/framebuffer.h **** 	framebuffer->bg_color = color;
+ 142              		.loc 1 98 0
+ 143 0004 28619FE5 		ldr	r6, .L18
+ 144              		.cfi_offset 14, -4
+ 145              		.cfi_offset 11, -8
+ 146              		.cfi_offset 10, -12
+ 147              		.cfi_offset 9, -16
+ 148              		.cfi_offset 8, -20
+ 149              		.cfi_offset 7, -24
+ 150              		.cfi_offset 6, -28
+ 151              		.cfi_offset 5, -32
+ 152              		.cfi_offset 4, -36
+ 153              	.LBE46:
+ 154              	.LBE44:
+ 130:apps/menu/main.c **** #if 0
+ 131:apps/menu/main.c **** 	char text[16];
+ 132:apps/menu/main.c **** 	int bat = battery_info.battery_percent;
+ 133:apps/menu/main.c **** #endif
+ 134:apps/menu/main.c **** 	int i;
+ 135:apps/menu/main.c **** 
+ 136:apps/menu/main.c **** 	fb_clear();
+ 155              		.loc 2 136 0
+ 156 0008 FEFFFFEB 		bl	fb_clear
+ 157              	.LVL3:
+ 158              	.LBB49:
+ 159              	.LBB47:
+ 160              		.loc 1 98 0
+ 161 000c 003096E5 		ldr	r3, [r6, #0]
+ 162              	.LBE47:
+ 163              	.LBE49:
+ 164              	.LBB50:
+ 165              	.LBB51:
+  99:include/fb/framebuffer.h **** }
+ 100:include/fb/framebuffer.h **** 
+ 101:include/fb/framebuffer.h **** static inline void
+ 102:include/fb/framebuffer.h **** fb_setfont(enum fb_font_id fid){
+ 103:include/fb/framebuffer.h **** 	framebuffer->font = fid;
+ 166              		.loc 1 103 0
+ 167 0010 0040A0E3 		mov	r4, #0
+ 168              	.LBE51:
+ 169              	.LBE50:
+ 170              	.LBB53:
+ 171              	.LBB45:
+  98:include/fb/framebuffer.h **** 	framebuffer->bg_color = color;
+ 172              		.loc 1 98 0
+ 173 0014 FF84E0E3 		mvn	r8, #-16777216
+ 174              	.LBE45:
+ 175              	.LBE53:
+ 176              	.LBB54:
+ 177              	.LBB55:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 178              		.loc 1 93 0
+ 179 0018 FFB0A0E3 		mov	fp, #255
+ 180              	.LBE55:
+ 181              	.LBE54:
+ 182              	.LBB57:
+ 183              	.LBB48:
+  98:include/fb/framebuffer.h **** 	framebuffer->bg_color = color;
+ 184              		.loc 1 98 0
+ 185 001c 308083E5 		str	r8, [r3, #48]
+ 186              	.LVL4:
+ 187              	.LBE48:
+ 188              	.LBE57:
+ 189              	.LBB58:
+ 190              	.LBB56:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 191              		.loc 1 93 0
+ 192 0020 2CB083E5 		str	fp, [r3, #44]
+ 193              	.LVL5:
+ 194              	.LBE56:
+ 195              	.LBE58:
+ 196              	.LBB59:
+ 197              	.LBB52:
+ 198              		.loc 1 103 0
+ 199 0024 344083E5 		str	r4, [r3, #52]
+ 200              	.LBE52:
+ 201              	.LBE59:
+ 137:apps/menu/main.c **** 
+ 138:apps/menu/main.c **** 	/* header */
+ 139:apps/menu/main.c **** 	fb_setbg(FB_COLOR_WHITE);
+ 140:apps/menu/main.c **** 	if (1) {
+ 141:apps/menu/main.c **** 		fb_setfg(FB_COLOR_BLUE);
+ 142:apps/menu/main.c **** 		fb_setfont(FB_FONT_HELVR08);
+ 143:apps/menu/main.c **** 		fb_gotoxy(0, 7);
+ 202              		.loc 2 143 0
+ 203 0028 0400A0E1 		mov	r0, r4
+ 204 002c 0710A0E3 		mov	r1, #7
+ 205 0030 FEFFFFEB 		bl	fb_gotoxy
+ 144:apps/menu/main.c **** 		fb_putstr("Osmocom Menu", -1);
+ 206              		.loc 2 144 0
+ 207 0034 0010E0E3 		mvn	r1, #0
+ 208 0038 F8009FE5 		ldr	r0, .L18+4
+ 209 003c FEFFFFEB 		bl	fb_putstr
+ 210              	.LVL6:
+ 211              	.LBB60:
+ 212              	.LBB61:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 213              		.loc 1 93 0
+ 214 0040 003096E5 		ldr	r3, [r6, #0]
+ 215 0044 F0209FE5 		ldr	r2, .L18+8
+ 216 0048 2C2083E5 		str	r2, [r3, #44]
+ 217              	.LVL7:
+ 218              	.LBE61:
+ 219              	.LBE60:
+ 220              	.LBB62:
+ 221              	.LBB63:
+ 222              		.loc 1 103 0
+ 223 004c 0320A0E3 		mov	r2, #3
+ 224 0050 342083E5 		str	r2, [r3, #52]
+ 225              	.LBE63:
+ 226              	.LBE62:
+ 145:apps/menu/main.c **** 		fb_setfg(FB_COLOR_RGB(0xc0, 0xc0, 0x00));
+ 146:apps/menu/main.c **** 		fb_setfont(FB_FONT_SYMBOLS);
+ 147:apps/menu/main.c **** #if 0
+ 148:apps/menu/main.c **** 		fb_gotoxy(framebuffer->width - 15, 8);
+ 149:apps/menu/main.c **** 		if (bat >= 100 && (battery_info.flags & BATTERY_CHG_ENABLED)
+ 150:apps/menu/main.c **** 		 && !(battery_info.flags & BATTERY_CHARGING))
+ 151:apps/menu/main.c **** 			fb_putstr("@HHBC", framebuffer->width);
+ 152:apps/menu/main.c **** 		else {
+ 153:apps/menu/main.c **** 			sprintf(text, "@%c%c%cC", (bat >= 30) ? 'B':'A',
+ 154:apps/menu/main.c **** 				(bat >= 60) ? 'B':'A', (bat >= 90) ? 'B':'A');
+ 155:apps/menu/main.c **** 			fb_putstr(text, framebuffer->width);
+ 156:apps/menu/main.c **** 		}
+ 157:apps/menu/main.c **** #endif
+ 158:apps/menu/main.c **** 		fb_gotoxy(0, 8);
+ 227              		.loc 2 158 0
+ 228 0054 0400A0E1 		mov	r0, r4
+ 229 0058 0810A0E3 		mov	r1, #8
+ 230 005c FEFFFFEB 		bl	fb_gotoxy
+ 159:apps/menu/main.c **** 		fb_putstr("GGEGG", framebuffer->width);
+ 231              		.loc 2 159 0
+ 232 0060 003096E5 		ldr	r3, [r6, #0]
+ 233 0064 D4009FE5 		ldr	r0, .L18+12
+ 234 0068 B412D3E1 		ldrh	r1, [r3, #36]
+ 235 006c FEFFFFEB 		bl	fb_putstr
+ 236              	.LVL8:
+ 237              	.LBB64:
+ 238              	.LBB65:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 239              		.loc 1 93 0
+ 240 0070 003096E5 		ldr	r3, [r6, #0]
+ 241 0074 FF2CA0E3 		mov	r2, #65280
+ 242 0078 2C2083E5 		str	r2, [r3, #44]
+ 243              	.LBE65:
+ 244              	.LBE64:
+ 160:apps/menu/main.c **** 		fb_setfg(FB_COLOR_GREEN);
+ 161:apps/menu/main.c **** 		fb_gotoxy(0, 10);
+ 245              		.loc 2 161 0
+ 246 007c 0400A0E1 		mov	r0, r4
+ 247 0080 0A10A0E3 		mov	r1, #10
+ 248 0084 FEFFFFEB 		bl	fb_gotoxy
+ 162:apps/menu/main.c **** 		fb_boxto(framebuffer->width - 1, 10);
+ 249              		.loc 2 162 0
+ 250 0088 003096E5 		ldr	r3, [r6, #0]
+ 251              	.LVL9:
+ 252 008c B402D3E1 		ldrh	r0, [r3, #36]
+ 253 0090 010040E2 		sub	r0, r0, #1
+ 254 0094 0008A0E1 		mov	r0, r0, asl #16
+ 255              	.LBB66:
+ 256              	.LBB67:
+  62:include/fb/framebuffer.h **** 	framebuffer->boxto(x,y);
+ 257              		.loc 1 62 0
+ 258 0098 2008A0E1 		mov	r0, r0, lsr #16
+ 259 009c 0A10A0E3 		mov	r1, #10
+ 260 00a0 0FE0A0E1 		mov	lr, pc
+ 261 00a4 14F093E5 		ldr	pc, [r3, #20]
+ 262              	.LVL10:
+ 263              	.LBE67:
+ 264              	.LBE66:
+ 265              	.LBB68:
+ 266              	.LBB69:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 267              		.loc 1 93 0
+ 268 00a8 003096E5 		ldr	r3, [r6, #0]
+ 269              	.LBE69:
+ 270              	.LBE68:
+ 271              	.LBB71:
+ 272              	.LBB73:
+ 273              		.loc 1 103 0
+ 274 00ac 0220A0E3 		mov	r2, #2
+ 275              	.LBE73:
+ 276              	.LBE71:
+ 277              	.LBB75:
+ 278              	.LBB70:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 279              		.loc 1 93 0
+ 280 00b0 2C4083E5 		str	r4, [r3, #44]
+ 281              	.LVL11:
+ 282              	.LBE70:
+ 283              	.LBE75:
+ 284              	.LBB76:
+ 285              	.LBB72:
+ 286              		.loc 1 103 0
+ 287 00b4 342083E5 		str	r2, [r3, #52]
+ 288              	.LVL12:
+ 289              	.LBE72:
+ 290              	.LBE76:
+ 163:apps/menu/main.c **** 	}
+ 164:apps/menu/main.c **** 	fb_setfg(FB_COLOR_BLACK);
+ 165:apps/menu/main.c **** 	fb_setfont(FB_FONT_C64);
+ 166:apps/menu/main.c **** 
+ 167:apps/menu/main.c **** 
+ 168:apps/menu/main.c **** 	for (i = 0; i < 5; i++) {
+ 169:apps/menu/main.c **** 		if (!apps[scroll_apps + i].name)
+ 170:apps/menu/main.c **** 			break;
+ 171:apps/menu/main.c **** 		if (scroll_apps + i == cursor) {
+ 291              		.loc 2 171 0
+ 292 00b8 84509FE5 		ldr	r5, .L18+16
+ 293              	.LBB77:
+ 294              	.LBB74:
+ 295              		.loc 1 103 0
+ 296 00bc 1470A0E3 		mov	r7, #20
+ 297              	.LBE74:
+ 298              	.LBE77:
+ 172:apps/menu/main.c **** 			fb_setfg(FB_COLOR_WHITE);
+ 173:apps/menu/main.c **** 			fb_setbg(FB_COLOR_BLUE);
+ 174:apps/menu/main.c **** 		}
+ 175:apps/menu/main.c **** 		fb_gotoxy(0, 20 + i * 10);
+ 299              		.loc 2 175 0
+ 300 00c0 0490A0E1 		mov	r9, r4
+ 301              	.LVL13:
+ 302              	.L16:
+ 171:apps/menu/main.c **** 		if (scroll_apps + i == cursor) {
+ 303              		.loc 2 171 0
+ 304 00c4 00A095E5 		ldr	sl, [r5, #0]
+ 305 00c8 043095E5 		ldr	r3, [r5, #4]
+ 306 00cc 0AA084E0 		add	sl, r4, sl
+ 307 00d0 03005AE1 		cmp	sl, r3
+ 308              	.LVL14:
+ 309              	.LBB78:
+ 310              	.LBB79:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 311              		.loc 1 93 0
+ 312 00d4 00309605 		ldreq	r3, [r6, #0]
+ 313              	.LBE79:
+ 314              	.LBE78:
+ 315              		.loc 2 175 0
+ 316 00d8 0710A0E1 		mov	r1, r7
+ 317              	.LBB81:
+ 318              	.LBB80:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 319              		.loc 1 93 0
+ 320 00dc 2C808305 		streq	r8, [r3, #44]
+ 321              	.LVL15:
+ 322              	.LBE80:
+ 323              	.LBE81:
+ 324              	.LBB82:
+ 325              	.LBB83:
+  98:include/fb/framebuffer.h **** 	framebuffer->bg_color = color;
+ 326              		.loc 1 98 0
+ 327 00e0 30B08305 		streq	fp, [r3, #48]
+ 328              	.LBE83:
+ 329              	.LBE82:
+ 330              		.loc 2 175 0
+ 331 00e4 0000A0E3 		mov	r0, #0
+ 332 00e8 FEFFFFEB 		bl	fb_gotoxy
+ 176:apps/menu/main.c **** 		fb_putstr(apps[scroll_apps + i].name,
+ 177:apps/menu/main.c **** 			framebuffer->width);
+ 333              		.loc 2 177 0
+ 334 00ec 003096E5 		ldr	r3, [r6, #0]
+ 176:apps/menu/main.c **** 		fb_putstr(apps[scroll_apps + i].name,
+ 335              		.loc 2 176 0
+ 336 00f0 50209FE5 		ldr	r2, .L18+20
+ 337 00f4 1810A0E3 		mov	r1, #24
+ 338 00f8 912A20E0 		mla	r0, r1, sl, r2
+ 339 00fc B412D3E1 		ldrh	r1, [r3, #36]
+ 340 0100 FEFFFFEB 		bl	fb_putstr
+ 178:apps/menu/main.c **** 		if (scroll_apps + i == cursor) {
+ 341              		.loc 2 178 0
+ 342 0104 0C0095E8 		ldmia	r5, {r2, r3}	@ phole ldm
+ 343 0108 022084E0 		add	r2, r4, r2
+ 344 010c 030052E1 		cmp	r2, r3
+ 345              	.LVL16:
+ 346              	.LBB84:
+ 347              	.LBB85:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 348              		.loc 1 93 0
+ 349 0110 00309605 		ldreq	r3, [r6, #0]
+ 350              	.LBE85:
+ 351              	.LBE84:
+ 168:apps/menu/main.c **** 	for (i = 0; i < 5; i++) {
+ 352              		.loc 2 168 0
+ 353 0114 014084E2 		add	r4, r4, #1
+ 354              	.LBB87:
+ 355              	.LBB86:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 356              		.loc 1 93 0
+ 357 0118 2C908305 		streq	r9, [r3, #44]
+ 358              	.LVL17:
+ 359              	.LBE86:
+ 360              	.LBE87:
+ 361              	.LBB88:
+ 362              	.LBB89:
+  98:include/fb/framebuffer.h **** 	framebuffer->bg_color = color;
+ 363              		.loc 1 98 0
+ 364 011c 30808305 		streq	r8, [r3, #48]
+ 365              	.LBE89:
+ 366              	.LBE88:
+ 168:apps/menu/main.c **** 	for (i = 0; i < 5; i++) {
+ 367              		.loc 2 168 0
+ 368 0120 050054E3 		cmp	r4, #5
+ 369 0124 0A7087E2 		add	r7, r7, #10
+ 370 0128 E5FFFF1A 		bne	.L16
+ 179:apps/menu/main.c **** 			fb_setfg(FB_COLOR_BLACK);
+ 180:apps/menu/main.c **** 			fb_setbg(FB_COLOR_WHITE);
+ 181:apps/menu/main.c **** 		}
+ 182:apps/menu/main.c **** 	}
+ 183:apps/menu/main.c **** 	if (i == 0) {
+ 184:apps/menu/main.c **** 		fb_gotoxy(0, 50);
+ 185:apps/menu/main.c **** 		fb_putstr("No apps!", -1);
+ 186:apps/menu/main.c **** 	}
+ 187:apps/menu/main.c **** 
+ 188:apps/menu/main.c **** 	fb_flush();
+ 189:apps/menu/main.c **** }
+ 371              		.loc 2 189 0
+ 372 012c F04FBDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, r9, sl, fp, lr}
+ 188:apps/menu/main.c **** 	fb_flush();
+ 373              		.loc 2 188 0
+ 374 0130 FEFFFFEA 		b	fb_flush
+ 375              	.L19:
+ 376              		.align	2
+ 377              	.L18:
+ 378 0134 00000000 		.word	framebuffer
+ 379 0138 00000000 		.word	.LC0
+ 380 013c 00C0C000 		.word	12632064
+ 381 0140 0D000000 		.word	.LC1
+ 382 0144 00000000 		.word	.LANCHOR0
+ 383 0148 08000000 		.word	.LANCHOR0+8
+ 384              		.cfi_endproc
+ 385              	.LFE81:
+ 387              		.section	.text.key_handler,"ax",%progbits
+ 388              		.align	2
+ 390              	key_handler:
+ 391              	.LFB83:
+ 190:apps/menu/main.c **** 
+ 191:apps/menu/main.c **** static void handle_key_code()
+ 192:apps/menu/main.c **** {
+ 193:apps/menu/main.c **** 	if (key_code == KEY_INV)
+ 194:apps/menu/main.c **** 		return;
+ 195:apps/menu/main.c **** 
+ 196:apps/menu/main.c **** 	switch (key_code) {
+ 197:apps/menu/main.c **** 	case KEY_1:
+ 198:apps/menu/main.c **** 	case KEY_2:
+ 199:apps/menu/main.c **** 	case KEY_3:
+ 200:apps/menu/main.c **** 	case KEY_4:
+ 201:apps/menu/main.c **** 	case KEY_5:
+ 202:apps/menu/main.c **** 	case KEY_6:
+ 203:apps/menu/main.c **** 	case KEY_7:
+ 204:apps/menu/main.c **** 	case KEY_8:
+ 205:apps/menu/main.c **** 	case KEY_9:
+ 206:apps/menu/main.c **** 		if (apps[key_code - KEY_1].len) {
+ 207:apps/menu/main.c **** 			cursor = key_code - KEY_1;
+ 208:apps/menu/main.c **** 			load_app();
+ 209:apps/menu/main.c **** 		}
+ 210:apps/menu/main.c **** 		break;
+ 211:apps/menu/main.c **** 	case KEY_0:
+ 212:apps/menu/main.c **** 		if (apps[9].len) {
+ 213:apps/menu/main.c **** 			cursor = 9;
+ 214:apps/menu/main.c **** 			load_app();
+ 215:apps/menu/main.c **** 		}
+ 216:apps/menu/main.c **** 		break;
+ 217:apps/menu/main.c **** 	case KEY_UP:
+ 218:apps/menu/main.c **** 		if (cursor == 0)
+ 219:apps/menu/main.c **** 			return;
+ 220:apps/menu/main.c **** 		cursor--;
+ 221:apps/menu/main.c **** 		if (cursor < scroll_apps)
+ 222:apps/menu/main.c **** 			scroll_apps = cursor;
+ 223:apps/menu/main.c **** 		refresh_display();
+ 224:apps/menu/main.c **** 		break;
+ 225:apps/menu/main.c **** 	case KEY_DOWN:
+ 226:apps/menu/main.c **** 		if (!apps[cursor + 1].name[0])
+ 227:apps/menu/main.c **** 			return;
+ 228:apps/menu/main.c **** 		cursor++;
+ 229:apps/menu/main.c **** 		if (cursor >= scroll_apps + 5)
+ 230:apps/menu/main.c **** 			scroll_apps = cursor - 4;
+ 231:apps/menu/main.c **** 		refresh_display();
+ 232:apps/menu/main.c **** 		break;
+ 233:apps/menu/main.c **** 	case KEY_OK:
+ 234:apps/menu/main.c **** 		if (apps[cursor].len)
+ 235:apps/menu/main.c **** 			load_app();
+ 236:apps/menu/main.c **** 		break;
+ 237:apps/menu/main.c **** 	case KEY_POWER:
+ 238:apps/menu/main.c **** 		wait_key_release();
+ 239:apps/menu/main.c **** 		twl3025_power_off();
+ 240:apps/menu/main.c **** 		break;
+ 241:apps/menu/main.c **** 	default:
+ 242:apps/menu/main.c **** 		break;
+ 243:apps/menu/main.c **** 	}
+ 244:apps/menu/main.c **** 
+ 245:apps/menu/main.c **** 	key_code = KEY_INV;
+ 246:apps/menu/main.c **** }
+ 247:apps/menu/main.c **** 
+ 248:apps/menu/main.c **** /* Main Program */
+ 249:apps/menu/main.c **** const char *hr = "======================================================================\n";
+ 250:apps/menu/main.c **** 
+ 251:apps/menu/main.c **** static void key_handler(enum key_codes code, enum key_states state)
+ 252:apps/menu/main.c **** {
+ 392              		.loc 2 252 0
+ 393              		.cfi_startproc
+ 394              		@ args = 0, pretend = 0, frame = 0
+ 395              		@ frame_needed = 0, uses_anonymous_args = 0
+ 396              		@ link register save eliminated.
+ 397              	.LVL18:
+ 253:apps/menu/main.c **** 	key_state = state;
+ 398              		.loc 2 253 0
+ 399 0000 10309FE5 		ldr	r3, .L22
+ 254:apps/menu/main.c **** 
+ 255:apps/menu/main.c **** 	if (state != PRESSED)
+ 400              		.loc 2 255 0
+ 401 0004 000051E3 		cmp	r1, #0
+ 253:apps/menu/main.c **** 	key_state = state;
+ 402              		.loc 2 253 0
+ 403 0008 081383E5 		str	r1, [r3, #776]
+ 256:apps/menu/main.c **** 		return;
+ 257:apps/menu/main.c **** 
+ 258:apps/menu/main.c **** 	key_code = code;
+ 404              		.loc 2 258 0
+ 405 000c 08309F05 		ldreq	r3, .L22+4
+ 406 0010 00008305 		streq	r0, [r3, #0]
+ 407 0014 1EFF2FE1 		bx	lr
+ 408              	.L23:
+ 409              		.align	2
+ 410              	.L22:
+ 411 0018 00000000 		.word	.LANCHOR0
+ 412 001c 00000000 		.word	.LANCHOR1
+ 413              		.cfi_endproc
+ 414              	.LFE83:
+ 416              		.section	.text.wait_key_release,"ax",%progbits
+ 417              		.align	2
+ 419              	wait_key_release:
+ 420              	.LFB79:
+ 104:apps/menu/main.c **** {
+ 421              		.loc 2 104 0
+ 422              		.cfi_startproc
+ 423              		@ args = 0, pretend = 0, frame = 0
+ 424              		@ frame_needed = 0, uses_anonymous_args = 0
+ 425 0000 10402DE9 		stmfd	sp!, {r4, lr}
+ 426              	.LCFI4:
+ 427              		.cfi_def_cfa_offset 8
+ 106:apps/menu/main.c **** 	while (key_state == PRESSED) {
+ 428              		.loc 2 106 0
+ 429 0004 1C409FE5 		ldr	r4, .L27
+ 430              		.cfi_offset 14, -4
+ 431              		.cfi_offset 4, -8
+ 432 0008 020000EA 		b	.L25
+ 433              	.L26:
+ 107:apps/menu/main.c **** 		delay_ms(10);
+ 434              		.loc 2 107 0
+ 435 000c 0A00A0E3 		mov	r0, #10
+ 436 0010 FEFFFFEB 		bl	delay_ms
+ 108:apps/menu/main.c **** 		keypad_poll();
+ 437              		.loc 2 108 0
+ 438 0014 FEFFFFEB 		bl	keypad_poll
+ 439              	.L25:
+ 106:apps/menu/main.c **** 	while (key_state == PRESSED) {
+ 440              		.loc 2 106 0 discriminator 1
+ 441 0018 083394E5 		ldr	r3, [r4, #776]
+ 442 001c 000053E3 		cmp	r3, #0
+ 443 0020 F9FFFF0A 		beq	.L26
+ 110:apps/menu/main.c **** }
+ 444              		.loc 2 110 0
+ 445 0024 1080BDE8 		ldmfd	sp!, {r4, pc}
+ 446              	.L28:
+ 447              		.align	2
+ 448              	.L27:
+ 449 0028 00000000 		.word	.LANCHOR0
+ 450              		.cfi_endproc
+ 451              	.LFE79:
+ 453              		.section	.text.load_app,"ax",%progbits
+ 454              		.align	2
+ 456              	load_app:
+ 457              	.LFB80:
+ 113:apps/menu/main.c **** {
+ 458              		.loc 2 113 0
+ 459              		.cfi_startproc
+ 460              		@ args = 0, pretend = 0, frame = 0
+ 461              		@ frame_needed = 0, uses_anonymous_args = 0
+ 462 0000 04E02DE5 		str	lr, [sp, #-4]!
+ 463              	.LCFI5:
+ 464              		.cfi_def_cfa_offset 4
+ 117:apps/menu/main.c **** 	wait_key_release();
+ 465              		.loc 2 117 0
+ 466              		.cfi_offset 14, -4
+ 467 0004 FEFFFFEB 		bl	wait_key_release
+ 468              	.LBB90:
+ 119:apps/menu/main.c **** 	local_irq_disable();
+ 469              		.loc 2 119 0
+ 470              	@ 119 "apps/menu/main.c" 1
+ 471 0008 00300FE1 		mrs	r3, cpsr		@ local_irq_disable
+ 472 000c 803083E3 		orr	r3, r3, #128
+ 473 0010 03F021E1 		msr	cpsr_c, r3
+ 474              	@ 0 "" 2
+ 475              	.LBE90:
+ 121:apps/menu/main.c **** 	for (i = 0; i < apps[cursor].len; i++)
+ 476              		.loc 2 121 0
+ 477 0014 4C209FE5 		ldr	r2, .L32
+ 478 0018 040092E5 		ldr	r0, [r2, #4]
+ 479 001c 0030A0E3 		mov	r3, #0
+ 480 0020 18C0A0E3 		mov	ip, #24
+ 481 0024 0C3382E5 		str	r3, [r2, #780]
+ 482 0028 8218A0E3 		mov	r1, #8519680
+ 483 002c 9C2022E0 		mla	r2, ip, r0, r2
+ 484 0030 030000EA 		b	.L30
+ 485              	.L31:
+ 122:apps/menu/main.c **** 		((unsigned char *)RAM)[i] = ((unsigned char *)apps[cursor].start)[i];
+ 486              		.loc 2 122 0 discriminator 2
+ 487 0034 180092E5 		ldr	r0, [r2, #24]
+ 488 0038 0300D0E7 		ldrb	r0, [r0, r3]	@ zero_extendqisi2
+ 489 003c 0100C1E4 		strb	r0, [r1], #1
+ 490 0040 013083E2 		add	r3, r3, #1
+ 491              	.L30:
+ 121:apps/menu/main.c **** 	for (i = 0; i < apps[cursor].len; i++)
+ 492              		.loc 2 121 0 discriminator 1
+ 493 0044 1C0092E5 		ldr	r0, [r2, #28]
+ 494 0048 000053E1 		cmp	r3, r0
+ 495 004c F8FFFFBA 		blt	.L31
+ 121:apps/menu/main.c **** 	for (i = 0; i < apps[cursor].len; i++)
+ 496              		.loc 2 121 0 is_stmt 0
+ 497 0050 10209FE5 		ldr	r2, .L32
+ 498 0054 0C3382E5 		str	r3, [r2, #780]
+ 123:apps/menu/main.c **** 	f();
+ 499              		.loc 2 123 0 is_stmt 1
+ 500 0058 8238A0E3 		mov	r3, #8519680
+ 501 005c 0FE0A0E1 		mov	lr, pc
+ 502 0060 13FF2FE1 		bx	r3
+ 124:apps/menu/main.c **** }
+ 503              		.loc 2 124 0
+ 504 0064 04F09DE4 		ldr	pc, [sp], #4
+ 505              	.L33:
+ 506              		.align	2
+ 507              	.L32:
+ 508 0068 00000000 		.word	.LANCHOR0
+ 509              		.cfi_endproc
+ 510              	.LFE80:
+ 512              		.section	.text.main,"ax",%progbits
+ 513              		.align	2
+ 514              		.global	main
+ 516              	main:
+ 517              	.LFB84:
+ 259:apps/menu/main.c **** }
+ 260:apps/menu/main.c **** 
+ 261:apps/menu/main.c **** extern void putchar_asm(uint32_t c);
+ 262:apps/menu/main.c **** 
+ 263:apps/menu/main.c **** static const uint8_t phone_ack[] = { 0x1b, 0xf6, 0x02, 0x00, 0x41, 0x03, 0x42 };
+ 264:apps/menu/main.c **** 
+ 265:apps/menu/main.c **** int main(void)
+ 266:apps/menu/main.c **** {
+ 518              		.loc 2 266 0
+ 519              		.cfi_startproc
+ 520              		@ args = 0, pretend = 0, frame = 0
+ 521              		@ frame_needed = 0, uses_anonymous_args = 0
+ 522              	.LVL19:
+ 523 0000 F04F2DE9 		stmfd	sp!, {r4, r5, r6, r7, r8, r9, sl, fp, lr}
+ 524              	.LCFI6:
+ 525              		.cfi_def_cfa_offset 36
+ 267:apps/menu/main.c **** 	int i;
+ 268:apps/menu/main.c **** 
+ 269:apps/menu/main.c **** 	/* Simulate a compal loader saying "ACK" */
+ 270:apps/menu/main.c **** 	for (i = 0; i < (int)sizeof(phone_ack); i++) {
+ 271:apps/menu/main.c **** 		putchar_asm(phone_ack[i]);
+ 272:apps/menu/main.c **** 	}
+ 273:apps/menu/main.c **** 
+ 274:apps/menu/main.c **** 	board_init(0);
+ 275:apps/menu/main.c **** 
+ 276:apps/menu/main.c **** 	puts("\n\nOsmocomBB Menu (revision " GIT_REVISION ")\n");
+ 277:apps/menu/main.c **** 	puts(hr);
+ 278:apps/menu/main.c **** 
+ 279:apps/menu/main.c **** 	fb_clear();
+ 280:apps/menu/main.c **** 
+ 281:apps/menu/main.c **** 	fb_setfg(FB_COLOR_BLACK);
+ 282:apps/menu/main.c **** 	fb_setbg(FB_COLOR_WHITE);
+ 283:apps/menu/main.c **** 	fb_setfont(FB_FONT_HELVB14);
+ 284:apps/menu/main.c **** 
+ 285:apps/menu/main.c **** 	fb_gotoxy(2,20);
+ 286:apps/menu/main.c **** 	fb_putstr("menu",framebuffer->width-4);
+ 287:apps/menu/main.c **** 
+ 288:apps/menu/main.c **** 	fb_setfg(FB_COLOR_RED);
+ 289:apps/menu/main.c **** 	fb_setbg(FB_COLOR_BLUE);
+ 290:apps/menu/main.c **** 
+ 291:apps/menu/main.c **** 	fb_gotoxy(2,25);
+ 292:apps/menu/main.c **** 	fb_boxto(framebuffer->width-3,38);
+ 293:apps/menu/main.c **** 
+ 294:apps/menu/main.c **** 	fb_setfg(FB_COLOR_WHITE);
+ 295:apps/menu/main.c **** 	fb_setfont(FB_FONT_HELVR08);
+ 296:apps/menu/main.c **** 	fb_gotoxy(8,33);
+ 297:apps/menu/main.c **** 	fb_putstr("osmocom-bb",framebuffer->width-4);
+ 298:apps/menu/main.c **** 
+ 299:apps/menu/main.c **** 	fb_flush();
+ 300:apps/menu/main.c **** 
+ 301:apps/menu/main.c **** 	/* Dump device identification */
+ 302:apps/menu/main.c **** 	dump_dev_id();
+ 303:apps/menu/main.c **** 	puts(hr);
+ 304:apps/menu/main.c **** 
+ 305:apps/menu/main.c **** 	/* Dump clock config before PLL set */
+ 306:apps/menu/main.c **** 	calypso_clk_dump();
+ 307:apps/menu/main.c **** 	puts(hr);
+ 308:apps/menu/main.c **** 
+ 309:apps/menu/main.c **** 	keypad_set_handler(&key_handler);
+ 310:apps/menu/main.c **** 
+ 311:apps/menu/main.c **** 	/* Dump clock config after PLL set */
+ 312:apps/menu/main.c **** 	calypso_clk_dump();
+ 313:apps/menu/main.c **** 	puts(hr);
+ 314:apps/menu/main.c **** 
+ 315:apps/menu/main.c **** //	display_unset_attr(DISP_ATTR_INVERT);
+ 316:apps/menu/main.c **** 
+ 317:apps/menu/main.c **** 	locate_apps();
+ 318:apps/menu/main.c **** 
+ 319:apps/menu/main.c **** 	while (1) {
+ 320:apps/menu/main.c **** 		for (i = 0; i < 50; i++) {
+ 526              		.loc 2 320 0
+ 527 0004 64439FE5 		ldr	r4, .L64
+ 528              		.cfi_offset 14, -4
+ 529              		.cfi_offset 11, -8
+ 530              		.cfi_offset 10, -12
+ 531              		.cfi_offset 9, -16
+ 532              		.cfi_offset 8, -20
+ 533              		.cfi_offset 7, -24
+ 534              		.cfi_offset 6, -28
+ 535              		.cfi_offset 5, -32
+ 536              		.cfi_offset 4, -36
+ 265:apps/menu/main.c **** int main(void)
+ 537              		.loc 2 265 0
+ 538 0008 075084E2 		add	r5, r4, #7
+ 539              	.LVL20:
+ 540              	.L35:
+ 271:apps/menu/main.c **** 		putchar_asm(phone_ack[i]);
+ 541              		.loc 2 271 0 discriminator 2
+ 542 000c 0100F4E5 		ldrb	r0, [r4, #1]!	@ zero_extendqisi2
+ 543 0010 FEFFFFEB 		bl	putchar_asm
+ 270:apps/menu/main.c **** 	for (i = 0; i < (int)sizeof(phone_ack); i++) {
+ 544              		.loc 2 270 0 discriminator 2
+ 545 0014 050054E1 		cmp	r4, r5
+ 546 0018 FBFFFF1A 		bne	.L35
+ 277:apps/menu/main.c **** 	puts(hr);
+ 547              		.loc 2 277 0
+ 548 001c 50639FE5 		ldr	r6, .L64+4
+ 274:apps/menu/main.c **** 	board_init(0);
+ 549              		.loc 2 274 0
+ 550 0020 0000A0E3 		mov	r0, #0
+ 551              	.LBB111:
+ 552              	.LBB113:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 553              		.loc 1 93 0
+ 554 0024 4C539FE5 		ldr	r5, .L64+8
+ 555              	.LBE113:
+ 556              	.LBE111:
+ 274:apps/menu/main.c **** 	board_init(0);
+ 557              		.loc 2 274 0
+ 558 0028 FEFFFFEB 		bl	board_init
+ 276:apps/menu/main.c **** 	puts("\n\nOsmocomBB Menu (revision " GIT_REVISION ")\n");
+ 559              		.loc 2 276 0
+ 560 002c 48039FE5 		ldr	r0, .L64+12
+ 561 0030 FEFFFFEB 		bl	puts
+ 277:apps/menu/main.c **** 	puts(hr);
+ 562              		.loc 2 277 0
+ 563 0034 040096E5 		ldr	r0, [r6, #4]
+ 564 0038 FEFFFFEB 		bl	puts
+ 279:apps/menu/main.c **** 	fb_clear();
+ 565              		.loc 2 279 0
+ 566 003c FEFFFFEB 		bl	fb_clear
+ 567              	.LVL21:
+ 568              	.LBB116:
+ 569              	.LBB114:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 570              		.loc 1 93 0
+ 571 0040 003095E5 		ldr	r3, [r5, #0]
+ 572              	.LBE114:
+ 573              	.LBE116:
+ 574              	.LBB117:
+ 575              	.LBB118:
+ 576              		.loc 1 103 0
+ 577 0044 0120A0E3 		mov	r2, #1
+ 578              	.LBE118:
+ 579              	.LBE117:
+ 580              	.LBB120:
+ 581              	.LBB112:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 582              		.loc 1 93 0
+ 583 0048 0040A0E3 		mov	r4, #0
+ 584              	.LBE112:
+ 585              	.LBE120:
+ 586              	.LBB121:
+ 587              	.LBB122:
+  98:include/fb/framebuffer.h **** 	framebuffer->bg_color = color;
+ 588              		.loc 1 98 0
+ 589 004c FF74E0E3 		mvn	r7, #-16777216
+ 590              	.LBE122:
+ 591              	.LBE121:
+ 592              	.LBB124:
+ 593              	.LBB119:
+ 594              		.loc 1 103 0
+ 595 0050 342083E5 		str	r2, [r3, #52]
+ 596              	.LBE119:
+ 597              	.LBE124:
+ 598              	.LBB125:
+ 599              	.LBB123:
+  98:include/fb/framebuffer.h **** 	framebuffer->bg_color = color;
+ 600              		.loc 1 98 0
+ 601 0054 307083E5 		str	r7, [r3, #48]
+ 602              	.LBE123:
+ 603              	.LBE125:
+ 604              	.LBB126:
+ 605              	.LBB115:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 606              		.loc 1 93 0
+ 607 0058 2C4083E5 		str	r4, [r3, #44]
+ 608              	.LVL22:
+ 609              	.LBE115:
+ 610              	.LBE126:
+ 285:apps/menu/main.c **** 	fb_gotoxy(2,20);
+ 611              		.loc 2 285 0
+ 612 005c 0200A0E3 		mov	r0, #2
+ 613 0060 1410A0E3 		mov	r1, #20
+ 614 0064 FEFFFFEB 		bl	fb_gotoxy
+ 286:apps/menu/main.c **** 	fb_putstr("menu",framebuffer->width-4);
+ 615              		.loc 2 286 0
+ 616 0068 003095E5 		ldr	r3, [r5, #0]
+ 617 006c B412D3E1 		ldrh	r1, [r3, #36]
+ 618 0070 08039FE5 		ldr	r0, .L64+16
+ 619 0074 041041E2 		sub	r1, r1, #4
+ 620 0078 FEFFFFEB 		bl	fb_putstr
+ 621              	.LVL23:
+ 622              	.LBB127:
+ 623              	.LBB128:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 624              		.loc 1 93 0
+ 625 007c 003095E5 		ldr	r3, [r5, #0]
+ 626 0080 FF28A0E3 		mov	r2, #16711680
+ 627 0084 2C2083E5 		str	r2, [r3, #44]
+ 628              	.LVL24:
+ 629              	.LBE128:
+ 630              	.LBE127:
+ 631              	.LBB129:
+ 632              	.LBB130:
+  98:include/fb/framebuffer.h **** 	framebuffer->bg_color = color;
+ 633              		.loc 1 98 0
+ 634 0088 FF20A0E3 		mov	r2, #255
+ 635 008c 302083E5 		str	r2, [r3, #48]
+ 636              	.LBE130:
+ 637              	.LBE129:
+ 291:apps/menu/main.c **** 	fb_gotoxy(2,25);
+ 638              		.loc 2 291 0
+ 639 0090 0200A0E3 		mov	r0, #2
+ 640 0094 1910A0E3 		mov	r1, #25
+ 641 0098 FEFFFFEB 		bl	fb_gotoxy
+ 292:apps/menu/main.c **** 	fb_boxto(framebuffer->width-3,38);
+ 642              		.loc 2 292 0
+ 643 009c 003095E5 		ldr	r3, [r5, #0]
+ 644              	.LVL25:
+ 645 00a0 B402D3E1 		ldrh	r0, [r3, #36]
+ 646 00a4 030040E2 		sub	r0, r0, #3
+ 647 00a8 0008A0E1 		mov	r0, r0, asl #16
+ 648              	.LBB131:
+ 649              	.LBB132:
+  62:include/fb/framebuffer.h **** 	framebuffer->boxto(x,y);
+ 650              		.loc 1 62 0
+ 651 00ac 2008A0E1 		mov	r0, r0, lsr #16
+ 652 00b0 2610A0E3 		mov	r1, #38
+ 653 00b4 0FE0A0E1 		mov	lr, pc
+ 654 00b8 14F093E5 		ldr	pc, [r3, #20]
+ 655              	.LVL26:
+ 656              	.LBE132:
+ 657              	.LBE131:
+ 658              	.LBB133:
+ 659              	.LBB134:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 660              		.loc 1 93 0
+ 661 00bc 003095E5 		ldr	r3, [r5, #0]
+ 662              	.LBE134:
+ 663              	.LBE133:
+ 296:apps/menu/main.c **** 	fb_gotoxy(8,33);
+ 664              		.loc 2 296 0
+ 665 00c0 0800A0E3 		mov	r0, #8
+ 666              	.LBB136:
+ 667              	.LBB135:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 668              		.loc 1 93 0
+ 669 00c4 2C7083E5 		str	r7, [r3, #44]
+ 670              	.LVL27:
+ 671              	.LBE135:
+ 672              	.LBE136:
+ 673              	.LBB137:
+ 674              	.LBB138:
+ 675              		.loc 1 103 0
+ 676 00c8 344083E5 		str	r4, [r3, #52]
+ 677              	.LBE138:
+ 678              	.LBE137:
+ 296:apps/menu/main.c **** 	fb_gotoxy(8,33);
+ 679              		.loc 2 296 0
+ 680 00cc 2110A0E3 		mov	r1, #33
+ 681 00d0 FEFFFFEB 		bl	fb_gotoxy
+ 297:apps/menu/main.c **** 	fb_putstr("osmocom-bb",framebuffer->width-4);
+ 682              		.loc 2 297 0
+ 683 00d4 003095E5 		ldr	r3, [r5, #0]
+ 684 00d8 B412D3E1 		ldrh	r1, [r3, #36]
+ 685 00dc A0029FE5 		ldr	r0, .L64+20
+ 686 00e0 041041E2 		sub	r1, r1, #4
+ 687 00e4 FEFFFFEB 		bl	fb_putstr
+ 299:apps/menu/main.c **** 	fb_flush();
+ 688              		.loc 2 299 0
+ 689 00e8 FEFFFFEB 		bl	fb_flush
+ 302:apps/menu/main.c **** 	dump_dev_id();
+ 690              		.loc 2 302 0
+ 691 00ec FEFFFFEB 		bl	dump_dev_id
+ 303:apps/menu/main.c **** 	puts(hr);
+ 692              		.loc 2 303 0
+ 693 00f0 040096E5 		ldr	r0, [r6, #4]
+ 694 00f4 FEFFFFEB 		bl	puts
+ 306:apps/menu/main.c **** 	calypso_clk_dump();
+ 695              		.loc 2 306 0
+ 696 00f8 FEFFFFEB 		bl	calypso_clk_dump
+ 307:apps/menu/main.c **** 	puts(hr);
+ 697              		.loc 2 307 0
+ 698 00fc 040096E5 		ldr	r0, [r6, #4]
+ 699 0100 FEFFFFEB 		bl	puts
+ 309:apps/menu/main.c **** 	keypad_set_handler(&key_handler);
+ 700              		.loc 2 309 0
+ 701 0104 7C029FE5 		ldr	r0, .L64+24
+ 702 0108 FEFFFFEB 		bl	keypad_set_handler
+ 312:apps/menu/main.c **** 	calypso_clk_dump();
+ 703              		.loc 2 312 0
+ 704 010c FEFFFFEB 		bl	calypso_clk_dump
+ 313:apps/menu/main.c **** 	puts(hr);
+ 705              		.loc 2 313 0
+ 706 0110 040096E5 		ldr	r0, [r6, #4]
+ 707 0114 FEFFFFEB 		bl	puts
+ 708              	.LBB139:
+ 709              	.LBB140:
+  66:apps/menu/main.c **** 	memset(apps, 0, sizeof(apps));
+ 710              		.loc 2 66 0
+ 711 0118 6C029FE5 		ldr	r0, .L64+28
+ 712 011c 0410A0E1 		mov	r1, r4
+ 713 0120 032CA0E3 		mov	r2, #768
+ 714 0124 FEFFFFEB 		bl	memset
+ 715              	.LVL28:
+  93:apps/menu/main.c **** 		apps[j].name[1] = ' ';
+ 716              		.loc 2 93 0
+ 717 0128 60729FE5 		ldr	r7, .L64+32
+  68:apps/menu/main.c **** 	for (j = 0, i = 0x010000; i < 0x200000; i += 0x10000) {
+ 718              		.loc 2 68 0
+ 719 012c 0158A0E3 		mov	r5, #65536
+  93:apps/menu/main.c **** 		apps[j].name[1] = ' ';
+ 720              		.loc 2 93 0
+ 721 0130 1880A0E3 		mov	r8, #24
+ 722 0134 20B0A0E3 		mov	fp, #32
+ 723              	.LVL29:
+ 724              	.L43:
+  71:apps/menu/main.c **** 		if (!!memcmp(p, "highram:", 8))
+ 725              		.loc 2 71 0
+ 726 0138 0500A0E1 		mov	r0, r5
+ 727 013c 50129FE5 		ldr	r1, .L64+36
+ 728 0140 0820A0E3 		mov	r2, #8
+ 729 0144 FEFFFFEB 		bl	memcmp
+ 730 0148 006050E2 		subs	r6, r0, #0
+ 731 014c 2B00001A 		bne	.L36
+  75:apps/menu/main.c **** 		printf("found highram image at flash mem address 0x%p\n",
+ 732              		.loc 2 75 0
+ 733 0150 40029FE5 		ldr	r0, .L64+40
+ 734 0154 0510A0E1 		mov	r1, r5
+ 735 0158 FEFFFFEB 		bl	printf
+ 265:apps/menu/main.c **** int main(void)
+ 736              		.loc 2 265 0
+ 737 015c 089085E2 		add	r9, r5, #8
+ 738              	.LVL30:
+  75:apps/menu/main.c **** 		printf("found highram image at flash mem address 0x%p\n",
+ 739              		.loc 2 75 0
+ 740 0160 073085E2 		add	r3, r5, #7
+ 741              	.LVL31:
+ 742              	.L38:
+  78:apps/menu/main.c **** 			if (p[k] == '\n')
+ 743              		.loc 2 78 0
+ 744 0164 0120F3E5 		ldrb	r2, [r3, #1]!	@ zero_extendqisi2
+ 745 0168 0A0052E3 		cmp	r2, #10
+ 746 016c 0300000A 		beq	.L37
+  77:apps/menu/main.c **** 		for (k = 0; k < (int)sizeof(apps[j].name) - 1; k++) {
+ 747              		.loc 2 77 0
+ 748 0170 016086E2 		add	r6, r6, #1
+ 749              	.LVL32:
+ 750 0174 0F0056E3 		cmp	r6, #15
+ 751 0178 F9FFFF1A 		bne	.L38
+ 752 017c 050000EA 		b	.L39
+ 753              	.LVL33:
+ 754              	.L37:
+  81:apps/menu/main.c **** 		if (k == sizeof(apps[j].name) - 3) {
+ 755              		.loc 2 81 0
+ 756 0180 0D0056E3 		cmp	r6, #13
+ 757 0184 0300001A 		bne	.L39
+  82:apps/menu/main.c **** 			printf("skipping: corrupt highram header, no '\\n' "
+ 758              		.loc 2 82 0
+ 759 0188 0610A0E1 		mov	r1, r6
+ 760 018c 08029FE5 		ldr	r0, .L64+44
+ 761 0190 FEFFFFEB 		bl	printf
+ 762 0194 190000EA 		b	.L36
+ 763              	.L39:
+  87:apps/menu/main.c **** 		if (j < 9)
+ 764              		.loc 2 87 0
+ 765 0198 080054E3 		cmp	r4, #8
+  88:apps/menu/main.c **** 			apps[j].name[0] = '1' + j;
+ 766              		.loc 2 88 0
+ 767 019c 987423D0 		mlale	r3, r8, r4, r7
+ 768 01a0 312084D2 		addle	r2, r4, #49
+  87:apps/menu/main.c **** 		if (j < 9)
+ 769              		.loc 2 87 0
+ 770 01a4 050000DA 		ble	.L62
+  89:apps/menu/main.c **** 		else if (j == 9)
+ 771              		.loc 2 89 0
+ 772 01a8 090054E3 		cmp	r4, #9
+  90:apps/menu/main.c **** 			apps[j].name[0] = '0';
+ 773              		.loc 2 90 0
+ 774 01ac 3020A003 		moveq	r2, #48
+ 775 01b0 E020C705 		streqb	r2, [r7, #224]
+  89:apps/menu/main.c **** 		else if (j == 9)
+ 776              		.loc 2 89 0
+ 777 01b4 0200000A 		beq	.L41
+  92:apps/menu/main.c **** 			apps[j].name[0] = ' ';
+ 778              		.loc 2 92 0
+ 779 01b8 987423E0 		mla	r3, r8, r4, r7
+ 780 01bc 0B20A0E1 		mov	r2, fp
+ 781              	.L62:
+ 782 01c0 0820C3E5 		strb	r2, [r3, #8]
+ 783              	.L41:
+  93:apps/menu/main.c **** 		apps[j].name[1] = ' ';
+ 784              		.loc 2 93 0
+ 785 01c4 980400E0 		mul	r0, r8, r4
+  94:apps/menu/main.c **** 		memcpy(apps[j].name + 2, p, k);
+ 786              		.loc 2 94 0
+ 787 01c8 BC219FE5 		ldr	r2, .L64+28
+  93:apps/menu/main.c **** 		apps[j].name[1] = ' ';
+ 788              		.loc 2 93 0
+ 789 01cc 00A087E0 		add	sl, r7, r0
+  94:apps/menu/main.c **** 		memcpy(apps[j].name + 2, p, k);
+ 790              		.loc 2 94 0
+ 791 01d0 000082E0 		add	r0, r2, r0
+ 792 01d4 0910A0E1 		mov	r1, r9
+ 793 01d8 0620A0E1 		mov	r2, r6
+  93:apps/menu/main.c **** 		apps[j].name[1] = ' ';
+ 794              		.loc 2 93 0
+ 795 01dc 09B0CAE5 		strb	fp, [sl, #9]
+  94:apps/menu/main.c **** 		memcpy(apps[j].name + 2, p, k);
+ 796              		.loc 2 94 0
+ 797 01e0 020080E2 		add	r0, r0, #2
+  96:apps/menu/main.c **** 		p += k + 1;
+ 798              		.loc 2 96 0
+ 799 01e4 016086E2 		add	r6, r6, #1
+  94:apps/menu/main.c **** 		memcpy(apps[j].name + 2, p, k);
+ 800              		.loc 2 94 0
+ 801 01e8 FEFFFFEB 		bl	memcpy
+  96:apps/menu/main.c **** 		p += k + 1;
+ 802              		.loc 2 96 0
+ 803 01ec 069089E0 		add	r9, r9, r6
+ 804              	.LVL34:
+  95:apps/menu/main.c **** 		apps[j].len = 0x20000;
+ 805              		.loc 2 95 0
+ 806 01f0 0238A0E3 		mov	r3, #131072
+ 807 01f4 1C308AE5 		str	r3, [sl, #28]
+  98:apps/menu/main.c **** 		apps[j].start = p;
+ 808              		.loc 2 98 0
+ 809 01f8 18908AE5 		str	r9, [sl, #24]
+  99:apps/menu/main.c **** 		j++;
+ 810              		.loc 2 99 0
+ 811 01fc 014084E2 		add	r4, r4, #1
+ 812              	.LVL35:
+ 813              	.L36:
+  68:apps/menu/main.c **** 	for (j = 0, i = 0x010000; i < 0x200000; i += 0x10000) {
+ 814              		.loc 2 68 0
+ 815 0200 015885E2 		add	r5, r5, #65536
+ 816              	.LVL36:
+ 817 0204 020655E3 		cmp	r5, #2097152
+ 818 0208 CAFFFF1A 		bne	.L43
+  68:apps/menu/main.c **** 	for (j = 0, i = 0x010000; i < 0x200000; i += 0x10000) {
+ 819              		.loc 2 68 0 is_stmt 0 discriminator 1
+ 820 020c 025645E2 		sub	r5, r5, #2097152
+ 821              	.LVL37:
+ 822              	.LBE140:
+ 823              	.LBE139:
+ 824              	.LBB141:
+ 825              	.LBB142:
+ 193:apps/menu/main.c **** 	if (key_code == KEY_INV)
+ 826              		.loc 2 193 0 is_stmt 1 discriminator 1
+ 827 0210 5C719FE5 		ldr	r7, .L64+4
+ 245:apps/menu/main.c **** 	key_code = KEY_INV;
+ 828              		.loc 2 245 0 discriminator 1
+ 829 0214 FFA0A0E3 		mov	sl, #255
+ 234:apps/menu/main.c **** 		if (apps[cursor].len)
+ 830              		.loc 2 234 0 discriminator 1
+ 831 0218 70419FE5 		ldr	r4, .L64+32
+ 832              	.LVL38:
+ 833 021c 1860A0E3 		mov	r6, #24
+ 213:apps/menu/main.c **** 			cursor = 9;
+ 834              		.loc 2 213 0 discriminator 1
+ 835 0220 0980A0E3 		mov	r8, #9
+ 836 0224 4C0000EA 		b	.L61
+ 837              	.LVL39:
+ 838              	.L56:
+ 839              	.LBE142:
+ 840              	.LBE141:
+ 321:apps/menu/main.c **** 			keypad_poll();
+ 841              		.loc 2 321 0 discriminator 2
+ 842 0228 FEFFFFEB 		bl	keypad_poll
+ 322:apps/menu/main.c **** 			delay_ms(10);
+ 843              		.loc 2 322 0 discriminator 2
+ 844 022c 0A00A0E3 		mov	r0, #10
+ 845 0230 FEFFFFEB 		bl	delay_ms
+ 323:apps/menu/main.c **** 			osmo_timers_update();
+ 846              		.loc 2 323 0 discriminator 2
+ 847 0234 FEFFFFEB 		bl	osmo_timers_update
+ 848              	.LBB144:
+ 849              	.LBB143:
+ 193:apps/menu/main.c **** 	if (key_code == KEY_INV)
+ 850              		.loc 2 193 0 discriminator 2
+ 851 0238 003097E5 		ldr	r3, [r7, #0]
+ 852 023c FF0053E3 		cmp	r3, #255
+ 853 0240 4400000A 		beq	.L45
+ 196:apps/menu/main.c **** 	switch (key_code) {
+ 854              		.loc 2 196 0
+ 855 0244 140053E3 		cmp	r3, #20
+ 856 0248 03F19F97 		ldrls	pc, [pc, r3, asl #2]
+ 857 024c 400000EA 		b	.L46
+ 858              	.L53:
+ 859 0250 C0020000 		.word	.L47
+ 860 0254 A4020000 		.word	.L48
+ 861 0258 A4020000 		.word	.L48
+ 862 025c A4020000 		.word	.L48
+ 863 0260 A4020000 		.word	.L48
+ 864 0264 A4020000 		.word	.L48
+ 865 0268 A4020000 		.word	.L48
+ 866 026c A4020000 		.word	.L48
+ 867 0270 A4020000 		.word	.L48
+ 868 0274 A4020000 		.word	.L48
+ 869 0278 54030000 		.word	.L46
+ 870 027c 54030000 		.word	.L46
+ 871 0280 54030000 		.word	.L46
+ 872 0284 54030000 		.word	.L46
+ 873 0288 54030000 		.word	.L46
+ 874 028c D8020000 		.word	.L49
+ 875 0290 FC020000 		.word	.L50
+ 876 0294 54030000 		.word	.L46
+ 877 0298 54030000 		.word	.L46
+ 878 029c 34030000 		.word	.L51
+ 879 02a0 4C030000 		.word	.L52
+ 880              	.L48:
+ 206:apps/menu/main.c **** 		if (apps[key_code - KEY_1].len) {
+ 881              		.loc 2 206 0
+ 882 02a4 013043E2 		sub	r3, r3, #1
+ 883 02a8 964322E0 		mla	r2, r6, r3, r4
+ 884 02ac 1C2092E5 		ldr	r2, [r2, #28]
+ 885 02b0 000052E3 		cmp	r2, #0
+ 207:apps/menu/main.c **** 			cursor = key_code - KEY_1;
+ 886              		.loc 2 207 0
+ 887 02b4 04308415 		strne	r3, [r4, #4]
+ 206:apps/menu/main.c **** 		if (apps[key_code - KEY_1].len) {
+ 888              		.loc 2 206 0
+ 889 02b8 2500000A 		beq	.L46
+ 890 02bc 030000EA 		b	.L63
+ 891              	.L47:
+ 212:apps/menu/main.c **** 		if (apps[9].len) {
+ 892              		.loc 2 212 0
+ 893 02c0 F43094E5 		ldr	r3, [r4, #244]
+ 894 02c4 000053E3 		cmp	r3, #0
+ 895 02c8 2100000A 		beq	.L46
+ 213:apps/menu/main.c **** 			cursor = 9;
+ 896              		.loc 2 213 0
+ 897 02cc 048084E5 		str	r8, [r4, #4]
+ 898              	.L63:
+ 214:apps/menu/main.c **** 			load_app();
+ 899              		.loc 2 214 0
+ 900 02d0 FEFFFFEB 		bl	load_app
+ 901 02d4 1E0000EA 		b	.L46
+ 902              	.L49:
+ 218:apps/menu/main.c **** 		if (cursor == 0)
+ 903              		.loc 2 218 0
+ 904 02d8 043094E5 		ldr	r3, [r4, #4]
+ 905 02dc 000053E3 		cmp	r3, #0
+ 906 02e0 1C00000A 		beq	.L45
+ 221:apps/menu/main.c **** 		if (cursor < scroll_apps)
+ 907              		.loc 2 221 0
+ 908 02e4 002094E5 		ldr	r2, [r4, #0]
+ 220:apps/menu/main.c **** 		cursor--;
+ 909              		.loc 2 220 0
+ 910 02e8 013043E2 		sub	r3, r3, #1
+ 221:apps/menu/main.c **** 		if (cursor < scroll_apps)
+ 911              		.loc 2 221 0
+ 912 02ec 020053E1 		cmp	r3, r2
+ 220:apps/menu/main.c **** 		cursor--;
+ 913              		.loc 2 220 0
+ 914 02f0 043084E5 		str	r3, [r4, #4]
+ 222:apps/menu/main.c **** 			scroll_apps = cursor;
+ 915              		.loc 2 222 0
+ 916 02f4 003084B5 		strlt	r3, [r4, #0]
+ 917 02f8 0B0000EA 		b	.L55
+ 918              	.L50:
+ 226:apps/menu/main.c **** 		if (!apps[cursor + 1].name[0])
+ 919              		.loc 2 226 0
+ 920 02fc 042094E5 		ldr	r2, [r4, #4]
+ 921 0300 013082E2 		add	r3, r2, #1
+ 922 0304 964321E0 		mla	r1, r6, r3, r4
+ 923 0308 0810D1E5 		ldrb	r1, [r1, #8]	@ zero_extendqisi2
+ 924 030c 000051E3 		cmp	r1, #0
+ 925 0310 1000000A 		beq	.L45
+ 229:apps/menu/main.c **** 		if (cursor >= scroll_apps + 5)
+ 926              		.loc 2 229 0
+ 927 0314 001094E5 		ldr	r1, [r4, #0]
+ 928 0318 041081E2 		add	r1, r1, #4
+ 929 031c 030051E1 		cmp	r1, r3
+ 230:apps/menu/main.c **** 			scroll_apps = cursor - 4;
+ 930              		.loc 2 230 0
+ 931 0320 032042B2 		sublt	r2, r2, #3
+ 228:apps/menu/main.c **** 		cursor++;
+ 932              		.loc 2 228 0
+ 933 0324 043084E5 		str	r3, [r4, #4]
+ 230:apps/menu/main.c **** 			scroll_apps = cursor - 4;
+ 934              		.loc 2 230 0
+ 935 0328 002084B5 		strlt	r2, [r4, #0]
+ 936              	.L55:
+ 231:apps/menu/main.c **** 		refresh_display();
+ 937              		.loc 2 231 0
+ 938 032c FEFFFFEB 		bl	refresh_display
+ 939 0330 070000EA 		b	.L46
+ 940              	.L51:
+ 234:apps/menu/main.c **** 		if (apps[cursor].len)
+ 941              		.loc 2 234 0
+ 942 0334 043094E5 		ldr	r3, [r4, #4]
+ 943 0338 964323E0 		mla	r3, r6, r3, r4
+ 944 033c 1C3093E5 		ldr	r3, [r3, #28]
+ 945 0340 000053E3 		cmp	r3, #0
+ 946 0344 0200000A 		beq	.L46
+ 947 0348 E0FFFFEA 		b	.L63
+ 948              	.L52:
+ 238:apps/menu/main.c **** 		wait_key_release();
+ 949              		.loc 2 238 0
+ 950 034c FEFFFFEB 		bl	wait_key_release
+ 239:apps/menu/main.c **** 		twl3025_power_off();
+ 951              		.loc 2 239 0
+ 952 0350 FEFFFFEB 		bl	twl3025_power_off
+ 953              	.L46:
+ 245:apps/menu/main.c **** 	key_code = KEY_INV;
+ 954              		.loc 2 245 0
+ 955 0354 00A087E5 		str	sl, [r7, #0]
+ 956              	.L45:
+ 957              	.LBE143:
+ 958              	.LBE144:
+ 320:apps/menu/main.c **** 		for (i = 0; i < 50; i++) {
+ 959              		.loc 2 320 0 discriminator 2
+ 960 0358 015085E2 		add	r5, r5, #1
+ 961              	.L61:
+ 962              	.LVL40:
+ 320:apps/menu/main.c **** 		for (i = 0; i < 50; i++) {
+ 963              		.loc 2 320 0 is_stmt 0 discriminator 1
+ 964 035c 310055E3 		cmp	r5, #49
+ 965 0360 B0FFFFDA 		ble	.L56
+ 324:apps/menu/main.c **** 			handle_key_code();
+ 325:apps/menu/main.c **** 		}
+ 326:apps/menu/main.c **** 		refresh_display();
+ 966              		.loc 2 326 0 is_stmt 1
+ 967 0364 FEFFFFEB 		bl	refresh_display
+ 320:apps/menu/main.c **** 		for (i = 0; i < 50; i++) {
+ 968              		.loc 2 320 0
+ 969 0368 0050A0E3 		mov	r5, #0
+ 970              	.LVL41:
+ 971 036c ADFFFFEA 		b	.L56
+ 972              	.L65:
+ 973              		.align	2
+ 974              	.L64:
+ 975 0370 FFFFFFFF 		.word	.LANCHOR2-1
+ 976 0374 00000000 		.word	.LANCHOR1
+ 977 0378 00000000 		.word	framebuffer
+ 978 037c 13000000 		.word	.LC2
+ 979 0380 4C000000 		.word	.LC3
+ 980 0384 51000000 		.word	.LC4
+ 981 0388 00000000 		.word	key_handler
+ 982 038c 08000000 		.word	.LANCHOR0+8
+ 983 0390 00000000 		.word	.LANCHOR0
+ 984 0394 5C000000 		.word	.LC5
+ 985 0398 65000000 		.word	.LC6
+ 986 039c 94000000 		.word	.LC7
+ 987              		.cfi_endproc
+ 988              	.LFE84:
+ 990              		.global	hr
+ 991              		.section	.rodata
+ 992              		.align	2
+ 993              		.set	.LANCHOR2,. + 0
+ 996              	phone_ack:
+ 997 0000 1B       		.byte	27
+ 998 0001 F6       		.byte	-10
+ 999 0002 02       		.byte	2
+ 1000 0003 00       		.byte	0
+ 1001 0004 41       		.byte	65
+ 1002 0005 03       		.byte	3
+ 1003 0006 42       		.byte	66
+ 1004 0007 00       		.section	.rodata.str1.1,"aMS",%progbits,1
+ 1005              	.LC0:
+ 1006 0000 4F736D6F 		.ascii	"Osmocom Menu\000"
+ 1006      636F6D20 
+ 1006      4D656E75 
+ 1006      00
+ 1007              	.LC1:
+ 1008 000d 47474547 		.ascii	"GGEGG\000"
+ 1008      4700
+ 1009              	.LC2:
+ 1010 0013 0A0A4F73 		.ascii	"\012\012OsmocomBB Menu (revision 0.2.0-55-g6fef14bc"
+ 1010      6D6F636F 
+ 1010      6D424220 
+ 1010      4D656E75 
+ 1010      20287265 
+ 1011 0040 2D6D6F64 		.ascii	"-modified)\012\000"
+ 1011      69666965 
+ 1011      64290A00 
+ 1012              	.LC3:
+ 1013 004c 6D656E75 		.ascii	"menu\000"
+ 1013      00
+ 1014              	.LC4:
+ 1015 0051 6F736D6F 		.ascii	"osmocom-bb\000"
+ 1015      636F6D2D 
+ 1015      626200
+ 1016              	.LC5:
+ 1017 005c 68696768 		.ascii	"highram:\000"
+ 1017      72616D3A 
+ 1017      00
+ 1018              	.LC6:
+ 1019 0065 666F756E 		.ascii	"found highram image at flash mem address 0x%p\012\000"
+ 1019      64206869 
+ 1019      67687261 
+ 1019      6D20696D 
+ 1019      61676520 
+ 1020              	.LC7:
+ 1021 0094 736B6970 		.ascii	"skipping: corrupt highram header, no '\\n' after im"
+ 1021      70696E67 
+ 1021      3A20636F 
+ 1021      72727570 
+ 1021      74206869 
+ 1022 00c6 61676520 		.ascii	"age name or name more larger than %d digits\012\000"
+ 1022      6E616D65 
+ 1022      206F7220 
+ 1022      6E616D65 
+ 1022      206D6F72 
+ 1023              	.LC8:
+ 1024 00f3 3D3D3D3D 		.ascii	"==================================================="
+ 1024      3D3D3D3D 
+ 1024      3D3D3D3D 
+ 1024      3D3D3D3D 
+ 1024      3D3D3D3D 
+ 1025 0126 3D3D3D3D 		.ascii	"===================\012\000"
+ 1025      3D3D3D3D 
+ 1025      3D3D3D3D 
+ 1025      3D3D3D3D 
+ 1025      3D3D3D0A 
+ 1026              		.data
+ 1027              		.align	2
+ 1028              		.set	.LANCHOR1,. + 0
+ 1031              	key_code:
+ 1032 0000 FF000000 		.word	255
+ 1035              	hr:
+ 1036 0004 F3000000 		.word	.LC8
+ 1037              		.bss
+ 1038              		.align	2
+ 1039              		.set	.LANCHOR0,. + 0
+ 1042              	scroll_apps:
+ 1043 0000 00000000 		.space	4
+ 1046              	cursor:
+ 1047 0004 00000000 		.space	4
+ 1050              	apps:
+ 1051 0008 00000000 		.space	768
+ 1051      00000000 
+ 1051      00000000 
+ 1051      00000000 
+ 1051      00000000 
+ 1054              	key_state:
+ 1055 0308 00000000 		.space	4
+ 1058              	i.3161:
+ 1059 030c 00000000 		.space	4
+ 1060              		.text
+ 1061              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 main.c
+     /tmp/ccLcajE4.s:12     .text.fb_clear:0000000000000000 $a
+     /tmp/ccLcajE4.s:14     .text.fb_clear:0000000000000000 fb_clear
+     /tmp/ccLcajE4.s:37     .text.fb_clear:0000000000000018 $d
+     /tmp/ccLcajE4.s:42     .text.fb_putstr:0000000000000000 $a
+     /tmp/ccLcajE4.s:44     .text.fb_putstr:0000000000000000 fb_putstr
+     /tmp/ccLcajE4.s:68     .text.fb_putstr:0000000000000018 $d
+     /tmp/ccLcajE4.s:73     .text.fb_flush:0000000000000000 $a
+     /tmp/ccLcajE4.s:75     .text.fb_flush:0000000000000000 fb_flush
+     /tmp/ccLcajE4.s:97     .text.fb_flush:0000000000000018 $d
+     /tmp/ccLcajE4.s:102    .text.fb_gotoxy:0000000000000000 $a
+     /tmp/ccLcajE4.s:104    .text.fb_gotoxy:0000000000000000 fb_gotoxy
+     /tmp/ccLcajE4.s:123    .text.fb_gotoxy:0000000000000014 $d
+     /tmp/ccLcajE4.s:128    .text.refresh_display:0000000000000000 $a
+     /tmp/ccLcajE4.s:130    .text.refresh_display:0000000000000000 refresh_display
+     /tmp/ccLcajE4.s:378    .text.refresh_display:0000000000000134 $d
+     /tmp/ccLcajE4.s:388    .text.key_handler:0000000000000000 $a
+     /tmp/ccLcajE4.s:390    .text.key_handler:0000000000000000 key_handler
+     /tmp/ccLcajE4.s:411    .text.key_handler:0000000000000018 $d
+     /tmp/ccLcajE4.s:417    .text.wait_key_release:0000000000000000 $a
+     /tmp/ccLcajE4.s:419    .text.wait_key_release:0000000000000000 wait_key_release
+     /tmp/ccLcajE4.s:449    .text.wait_key_release:0000000000000028 $d
+     /tmp/ccLcajE4.s:454    .text.load_app:0000000000000000 $a
+     /tmp/ccLcajE4.s:456    .text.load_app:0000000000000000 load_app
+     /tmp/ccLcajE4.s:508    .text.load_app:0000000000000068 $d
+     /tmp/ccLcajE4.s:513    .text.main:0000000000000000 $a
+     /tmp/ccLcajE4.s:516    .text.main:0000000000000000 main
+     /tmp/ccLcajE4.s:859    .text.main:0000000000000250 $d
+     /tmp/ccLcajE4.s:882    .text.main:00000000000002a4 $a
+     /tmp/ccLcajE4.s:975    .text.main:0000000000000370 $d
+     /tmp/ccLcajE4.s:1035   .data:0000000000000004 hr
+     /tmp/ccLcajE4.s:992    .rodata:0000000000000000 $d
+     /tmp/ccLcajE4.s:996    .rodata:0000000000000000 phone_ack
+     /tmp/ccLcajE4.s:1027   .data:0000000000000000 $d
+     /tmp/ccLcajE4.s:1031   .data:0000000000000000 key_code
+     /tmp/ccLcajE4.s:1038   .bss:0000000000000000 $d
+     /tmp/ccLcajE4.s:1042   .bss:0000000000000000 scroll_apps
+     /tmp/ccLcajE4.s:1046   .bss:0000000000000004 cursor
+     /tmp/ccLcajE4.s:1050   .bss:0000000000000008 apps
+     /tmp/ccLcajE4.s:1054   .bss:0000000000000308 key_state
+     /tmp/ccLcajE4.s:1058   .bss:000000000000030c i.3161
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+framebuffer
+delay_ms
+keypad_poll
+putchar_asm
+board_init
+puts
+dump_dev_id
+calypso_clk_dump
+keypad_set_handler
+memset
+memcmp
+printf
+memcpy
+osmo_timers_update
+twl3025_power_off

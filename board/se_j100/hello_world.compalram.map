@@ -61,6 +61,8 @@ Discarded input sections
                 0x0000000000000000       0x14 abb/twl3025.o
  .text.twl3025_tsp_write
                 0x0000000000000000       0x10 abb/twl3025.o
+ .text.twl3025_power_off_now
+                0x0000000000000000       0x18 abb/twl3025.o
  .text.twl3025_downlink
                 0x0000000000000000       0x98 abb/twl3025.o
  .text.twl3025_uplink
@@ -77,8 +79,6 @@ Discarded input sections
  .text          0x0000000000000000        0x0 rf/trf6151.o
  .data          0x0000000000000000       0x1c rf/trf6151.o
  .bss           0x0000000000000000        0x4 rf/trf6151.o
- .text.tpu_enq_at
-                0x0000000000000000       0x34 rf/trf6151.o
  .text.tpu_enq_wait
                 0x0000000000000000       0x14 rf/trf6151.o
  .text.trf6151_reg_write
@@ -94,7 +94,7 @@ Discarded input sections
  .text.trf6151_set_mode
                 0x0000000000000000       0x34 rf/trf6151.o
  .text.trf6151_set_arfcn
-                0x0000000000000000      0x21c rf/trf6151.o
+                0x0000000000000000      0x220 rf/trf6151.o
  .text.trf6151_calib_dc_offs
                 0x0000000000000000       0x28 rf/trf6151.o
  .text.trf6151_get_gain_reg
@@ -106,9 +106,9 @@ Discarded input sections
  .text.trf6151_tx_test
                 0x0000000000000000       0x40 rf/trf6151.o
  .text.trf6151_rx_window
-                0x0000000000000000       0x54 rf/trf6151.o
+                0x0000000000000000       0x8c rf/trf6151.o
  .text.trf6151_tx_window
-                0x0000000000000000       0x44 rf/trf6151.o
+                0x0000000000000000        0x4 rf/trf6151.o
  .text.trf6151_compute_gain
                 0x0000000000000000       0x28 rf/trf6151.o
  .text.trf6151_iq_swapped
@@ -119,19 +119,22 @@ Discarded input sections
  .text          0x0000000000000000        0x0 flash/cfi_flash.o
  .data          0x0000000000000000        0x0 flash/cfi_flash.o
  .bss           0x0000000000000000        0x0 flash/cfi_flash.o
- .ramtext       0x0000000000000000      0x26c flash/cfi_flash.o
+ .ramtext       0x0000000000000000      0x2e0 flash/cfi_flash.o
  .rodata.str1.1
-                0x0000000000000000       0x37 flash/cfi_flash.o
+                0x0000000000000000       0x39 flash/cfi_flash.o
  .data          0x0000000000000000        0x0 board/common/calypso_uart.o
  .bss           0x0000000000000000        0x0 board/common/calypso_uart.o
  .text          0x0000000000000000       0x34 board/common/calypso_pwl.o
  .data          0x0000000000000000        0x0 board/common/calypso_pwl.o
  .bss           0x0000000000000000        0x0 board/common/calypso_pwl.o
+ .text          0x0000000000000000        0x0 board/common/tx_calchan.o
+ .data          0x0000000000000000      0x200 board/common/tx_calchan.o
+ .bss           0x0000000000000000        0x0 board/common/tx_calchan.o
  .text          0x0000000000000000        0x0 board/compal/rffe_dualband.o
  .data          0x0000000000000000        0x0 board/compal/rffe_dualband.o
  .bss           0x0000000000000000        0x0 board/compal/rffe_dualband.o
  .text.rffe_mode
-                0x0000000000000000       0x44 board/compal/rffe_dualband.o
+                0x0000000000000000       0x20 board/compal/rffe_dualband.o
  .text.rffe_get_rx_ports
                 0x0000000000000000        0x8 board/compal/rffe_dualband.o
  .text.rffe_get_tx_ports
@@ -149,13 +152,29 @@ Discarded input sections
  .text.rffe_rx_win_ctrl
                 0x0000000000000000        0x4 board/compal/rffe_dualband.o
  .rodata        0x0000000000000000        0x1 board/compal/rffe_dualband.o
- .text          0x0000000000000000        0x0 board/compal/rf_power.o
- .data          0x0000000000000000        0x0 board/compal/rf_power.o
- .bss           0x0000000000000000        0x0 board/compal/rf_power.o
- .rodata        0x0000000000000000       0x44 board/compal/rf_power.o
+ .text          0x0000000000000000        0x0 board/compal/rf_tables.o
+ .data          0x0000000000000000      0x204 board/compal/rf_tables.o
+ .bss           0x0000000000000000        0x0 board/compal/rf_tables.o
+ .text          0x0000000000000000        0x0 board/compal/readcal_common.o
+ .data          0x0000000000000000        0x0 board/compal/readcal_common.o
+ .bss           0x0000000000000000        0x0 board/compal/readcal_common.o
+ .text.apply_levels
+                0x0000000000000000       0x28 board/compal/readcal_common.o
+ .text.read_compal_factory_records
+                0x0000000000000000      0x1a8 board/compal/readcal_common.o
+ .rodata.str1.1
+                0x0000000000000000      0x1ca board/compal/readcal_common.o
  .text          0x0000000000000000        0x0 board/se_j100/init.o
  .data          0x0000000000000000        0x0 board/se_j100/init.o
  .bss           0x0000000000000000        0x0 board/se_j100/init.o
+ .text          0x0000000000000000        0x0 board/compal/readcal_small.o
+ .data          0x0000000000000000        0x0 board/compal/readcal_small.o
+ .bss           0x0000000000000000        0x0 board/compal/readcal_small.o
+ .text.read_factory_rf_calibration
+                0x0000000000000000        0x8 board/compal/readcal_small.o
+ .text          0x0000000000000000        0x0 board/se_j100/tx_ramps.o
+ .data          0x0000000000000000      0x804 board/se_j100/tx_ramps.o
+ .bss           0x0000000000000000        0x0 board/se_j100/tx_ramps.o
  .text          0x0000000000000000        0x0 battery/dummy.o
  .data          0x0000000000000000        0x0 battery/dummy.o
  .bss           0x0000000000000000        0x0 battery/dummy.o
@@ -194,7 +213,7 @@ Discarded input sections
  .data          0x0000000000000000       0x10 board/se_j100/hello_world.compalram.manifest.o
  .bss           0x0000000000000000        0x0 board/se_j100/hello_world.compalram.manifest.o
  .rodata.str1.1
-                0x0000000000000000       0x44 board/se_j100/hello_world.compalram.manifest.o
+                0x0000000000000000       0x3a board/se_j100/hello_world.compalram.manifest.o
  .text          0x0000000000000000        0x0 calypso/libcalypso.a(clock.o)
  .data          0x0000000000000000        0x0 calypso/libcalypso.a(clock.o)
  .bss           0x0000000000000000        0x0 calypso/libcalypso.a(clock.o)
@@ -402,9 +421,9 @@ Discarded input sections
  .text.gsm_band_parse
                 0x0000000000000000       0xf8 ../../shared/libosmocore/build-target/src/gsm/.libs/libosmogsm.a(gsm_utils.o)
  .text.gsm_arfcn2band
-                0x0000000000000000       0xd8 ../../shared/libosmocore/build-target/src/gsm/.libs/libosmogsm.a(gsm_utils.o)
+                0x0000000000000000       0xd4 ../../shared/libosmocore/build-target/src/gsm/.libs/libosmogsm.a(gsm_utils.o)
  .text.gsm_arfcn2freq10
-                0x0000000000000000      0x168 ../../shared/libosmocore/build-target/src/gsm/.libs/libosmogsm.a(gsm_utils.o)
+                0x0000000000000000      0x164 ../../shared/libosmocore/build-target/src/gsm/.libs/libosmogsm.a(gsm_utils.o)
  .text.gsm_fn2gsmtime
                 0x0000000000000000       0x5c ../../shared/libosmocore/build-target/src/gsm/.libs/libosmogsm.a(gsm_utils.o)
  .text.gsm_gsmtime2fn
@@ -428,11 +447,46 @@ IRAM             0x0000000000810000 0x0000000000030000 rw
 
 Linker script and memory map
 
+START GROUP
+LOAD apps/hello_world/main.o
+LOAD abb/twl3025.o
+LOAD rf/trf6151.o
+LOAD flash/cfi_flash.o
+LOAD board/common/calypso_uart.o
+LOAD board/common/calypso_pwl.o
+LOAD board/common/tx_calchan.o
+LOAD board/compal/rffe_dualband.o
+LOAD board/compal/rf_tables.o
+LOAD board/compal/readcal_common.o
+LOAD board/se_j100/init.o
+LOAD board/compal/readcal_small.o
+LOAD board/se_j100/tx_ramps.o
+LOAD battery/dummy.o
+LOAD fb/framebuffer.o
+LOAD fb/font.o
+LOAD fb/helvR08.o
+LOAD fb/helvB14.o
+LOAD fb/c64.o
+LOAD fb/symbols.o
+LOAD fb/fb_rgb332.o
+LOAD fb/fb_ssd1963.o
+LOAD board/compal/start.ram.o
+LOAD board/compal/exceptions_redirected.o
+LOAD board/compal/handlers.o
+LOAD board/se_j100/hello_world.compalram.manifest.o
+LOAD calypso/libcalypso.a
+LOAD layer1/liblayer1.a
+LOAD lib/libmini.a
+LOAD comm/libcomm.a
+LOAD tiffs/libtiffs.a
+LOAD ../../shared/libosmocore/build-target/src/.libs/libosmocore.a
+LOAD ../../shared/libosmocore/build-target/src/gsm/.libs/libosmogsm.a
+END GROUP
                 0x0000000000800000                . = 0x800000
 
-.compal.loader  0x0000000000800000      0x100
-                0x0000000000000100                . = 0x100
- *fill*         0x0000000000800000      0x100 00
+.compal.loader  0x0000000000800000       0x1c
+                0x000000000000001c                . = 0x1c
+ *fill*         0x0000000000800000       0x1c 00
 
 .compal.header  0x0000000000800100        0x4
                 0x0000000000000004                . = 0x4
@@ -456,7 +510,7 @@ Linker script and memory map
                 0x0000000000800170                PROVIDE (_exceptions, LOADADDR (.text.exceptions))
                 0x0000000000800038                . = ALIGN (0x4)
 
-.text           0x000000000080018c     0x4338
+.text           0x000000000080018c     0x4458
  *(.text*)
  .text.fb_putstr
                 0x000000000080018c       0x1c apps/hello_world/main.o
@@ -486,346 +540,349 @@ Linker script and memory map
  .text.twl3025_reg_read
                 0x0000000000800550       0x74 abb/twl3025.o
                 0x0000000000800550                twl3025_reg_read
+ .text.twl3025_get_pwon
+                0x00000000008005c4       0x58 abb/twl3025.o
+                0x00000000008005c4                twl3025_get_pwon
  .text.twl3025_power_off
-                0x00000000008005c4       0x30 abb/twl3025.o
-                0x00000000008005c4                twl3025_power_off
+                0x000000000080061c       0x30 abb/twl3025.o
+                0x000000000080061c                twl3025_power_off
  .text.twl3025_irq
-                0x00000000008005f4       0x48 abb/twl3025.o
+                0x000000000080064c       0x68 abb/twl3025.o
  .text.twl3025_clk13m
-                0x000000000080063c       0x38 abb/twl3025.o
-                0x000000000080063c                twl3025_clk13m
+                0x00000000008006b4       0x38 abb/twl3025.o
+                0x00000000008006b4                twl3025_clk13m
  .text.twl3025_unit_enable
-                0x0000000000800674       0x6c abb/twl3025.o
-                0x0000000000800674                twl3025_unit_enable
+                0x00000000008006ec       0x7c abb/twl3025.o
+                0x00000000008006ec                twl3025_unit_enable
  .text.twl3025_init
-                0x00000000008006e0       0x8c abb/twl3025.o
-                0x00000000008006e0                twl3025_init
- .text          0x000000000080076c       0xfc board/common/calypso_uart.o
-                0x0000000000800778                phex
-                0x00000000008007ac                puts_asm
-                0x00000000008007e8                putchar_asm
-                0x00000000008007f8                memdump_asm
+                0x0000000000800768       0x9c abb/twl3025.o
+                0x0000000000800768                twl3025_init
+ .text          0x0000000000800804       0xfc board/common/calypso_uart.o
+                0x0000000000800810                phex
+                0x0000000000800844                puts_asm
+                0x0000000000800880                putchar_asm
+                0x0000000000800890                memdump_asm
  .text.board_init
-                0x0000000000800868      0x1cc board/se_j100/init.o
-                0x0000000000800868                board_init
+                0x0000000000800900      0x1cc board/se_j100/init.o
+                0x0000000000800900                board_init
  .text.fb_font_get_char
-                0x0000000000800a34       0x58 fb/font.o
-                0x0000000000800a34                fb_font_get_char
+                0x0000000000800acc       0x58 fb/font.o
+                0x0000000000800acc                fb_font_get_char
  .text.fb_limit_fb_range
-                0x0000000000800a8c       0x38 fb/fb_rgb332.o
+                0x0000000000800b24       0x38 fb/fb_rgb332.o
  .text.fb_rgb332_update_damage
-                0x0000000000800ac4       0xf0 fb/fb_rgb332.o
+                0x0000000000800b5c       0xf0 fb/fb_rgb332.o
  .text.rgb_to_pixel
-                0x0000000000800bb4       0x20 fb/fb_rgb332.o
+                0x0000000000800c4c       0x20 fb/fb_rgb332.o
  .text.fb_rgb332_clear
-                0x0000000000800bd4       0x78 fb/fb_rgb332.o
-                0x0000000000800bd4                fb_rgb332_clear
+                0x0000000000800c6c       0x78 fb/fb_rgb332.o
+                0x0000000000800c6c                fb_rgb332_clear
  .text.fb_rgb332_boxto
-                0x0000000000800c4c      0x14c fb/fb_rgb332.o
-                0x0000000000800c4c                fb_rgb332_boxto
+                0x0000000000800ce4      0x14c fb/fb_rgb332.o
+                0x0000000000800ce4                fb_rgb332_boxto
  .text.fb_rgb332_lineto
-                0x0000000000800d98      0x128 fb/fb_rgb332.o
-                0x0000000000800d98                fb_rgb332_lineto
+                0x0000000000800e30      0x128 fb/fb_rgb332.o
+                0x0000000000800e30                fb_rgb332_lineto
  .text.fb_rgb332_putstr
-                0x0000000000800ec0      0x2a8 fb/fb_rgb332.o
-                0x0000000000800ec0                fb_rgb332_putstr
+                0x0000000000800f58      0x2a8 fb/fb_rgb332.o
+                0x0000000000800f58                fb_rgb332_putstr
  .text.fb_ssd1963_send_cmdlist
-                0x0000000000801168       0x4c fb/fb_ssd1963.o
+                0x0000000000801200       0x4c fb/fb_ssd1963.o
  .text.fb_ssd1963_flush
-                0x00000000008011b4      0x174 fb/fb_ssd1963.o
+                0x000000000080124c      0x174 fb/fb_ssd1963.o
  .text.fb_ssd1963_init
-                0x0000000000801328       0x48 fb/fb_ssd1963.o
- .text          0x0000000000801370       0x90 board/compal/handlers.o
-                0x0000000000801370                handle_abort
-                0x00000000008013b0                irq_entry
-                0x00000000008013d8                fiq_entry
+                0x00000000008013c0       0x48 fb/fb_ssd1963.o
+ .text          0x0000000000801408       0x90 board/compal/handlers.o
+                0x0000000000801408                handle_abort
+                0x0000000000801448                irq_entry
+                0x0000000000801470                fiq_entry
  .text.dump_reg16
-                0x0000000000801400       0x10 calypso/libcalypso.a(clock.o)
+                0x0000000000801498       0x10 calypso/libcalypso.a(clock.o)
  .text.calypso_clk_dump
-                0x0000000000801410       0x6c calypso/libcalypso.a(clock.o)
-                0x0000000000801410                calypso_clk_dump
+                0x00000000008014a8       0x6c calypso/libcalypso.a(clock.o)
+                0x00000000008014a8                calypso_clk_dump
  .text.calypso_pll_set
-                0x000000000080147c       0x34 calypso/libcalypso.a(clock.o)
-                0x000000000080147c                calypso_pll_set
+                0x0000000000801514       0x34 calypso/libcalypso.a(clock.o)
+                0x0000000000801514                calypso_pll_set
  .text.calypso_reset_set
-                0x00000000008014b0       0x28 calypso/libcalypso.a(clock.o)
-                0x00000000008014b0                calypso_reset_set
+                0x0000000000801548       0x28 calypso/libcalypso.a(clock.o)
+                0x0000000000801548                calypso_reset_set
  .text.calypso_clock_set
-                0x00000000008014d8       0x70 calypso/libcalypso.a(clock.o)
-                0x00000000008014d8                calypso_clock_set
+                0x0000000000801570       0x70 calypso/libcalypso.a(clock.o)
+                0x0000000000801570                calypso_clock_set
  .text.calypso_mem_cfg
-                0x0000000000801548       0x24 calypso/libcalypso.a(clock.o)
-                0x0000000000801548                calypso_mem_cfg
+                0x00000000008015e0       0x24 calypso/libcalypso.a(clock.o)
+                0x00000000008015e0                calypso_mem_cfg
  .text.calypso_bootrom
-                0x000000000080156c       0x20 calypso/libcalypso.a(clock.o)
-                0x000000000080156c                calypso_bootrom
+                0x0000000000801604       0x20 calypso/libcalypso.a(clock.o)
+                0x0000000000801604                calypso_bootrom
  .text.calypso_rhea_cfg
-                0x000000000080158c       0x4c calypso/libcalypso.a(clock.o)
-                0x000000000080158c                calypso_rhea_cfg
+                0x0000000000801624       0x4c calypso/libcalypso.a(clock.o)
+                0x0000000000801624                calypso_rhea_cfg
  .text.dma_init
-                0x00000000008015d8       0x10 calypso/libcalypso.a(dma.o)
-                0x00000000008015d8                dma_init
+                0x0000000000801670       0x10 calypso/libcalypso.a(dma.o)
+                0x0000000000801670                dma_init
  .text._irq_enable
-                0x00000000008015e8       0x40 calypso/libcalypso.a(irq.o)
+                0x0000000000801680       0x40 calypso/libcalypso.a(irq.o)
  .text.irq_enable
-                0x0000000000801628        0x8 calypso/libcalypso.a(irq.o)
-                0x0000000000801628                irq_enable
+                0x00000000008016c0        0x8 calypso/libcalypso.a(irq.o)
+                0x00000000008016c0                irq_enable
  .text.irq_disable
-                0x0000000000801630        0x8 calypso/libcalypso.a(irq.o)
-                0x0000000000801630                irq_disable
+                0x00000000008016c8        0x8 calypso/libcalypso.a(irq.o)
+                0x00000000008016c8                irq_disable
  .text.irq_config
-                0x0000000000801638       0x48 calypso/libcalypso.a(irq.o)
-                0x0000000000801638                irq_config
- .text.irq      0x0000000000801680       0x3c calypso/libcalypso.a(irq.o)
-                0x0000000000801680                irq
- .text.fiq      0x00000000008016bc       0x3c calypso/libcalypso.a(irq.o)
-                0x00000000008016bc                fiq
+                0x00000000008016d0       0x48 calypso/libcalypso.a(irq.o)
+                0x00000000008016d0                irq_config
+ .text.irq      0x0000000000801718       0x3c calypso/libcalypso.a(irq.o)
+                0x0000000000801718                irq
+ .text.fiq      0x0000000000801754       0x3c calypso/libcalypso.a(irq.o)
+                0x0000000000801754                fiq
  .text.irq_register_handler
-                0x00000000008016f8       0x14 calypso/libcalypso.a(irq.o)
-                0x00000000008016f8                irq_register_handler
+                0x0000000000801790       0x14 calypso/libcalypso.a(irq.o)
+                0x0000000000801790                irq_register_handler
  .text.calypso_exceptions_install
-                0x000000000080170c       0x34 calypso/libcalypso.a(irq.o)
-                0x000000000080170c                calypso_exceptions_install
+                0x00000000008017a4       0x34 calypso/libcalypso.a(irq.o)
+                0x00000000008017a4                calypso_exceptions_install
  .text.irq_init
-                0x0000000000801740       0x5c calypso/libcalypso.a(irq.o)
-                0x0000000000801740                irq_init
+                0x00000000008017d8       0x5c calypso/libcalypso.a(irq.o)
+                0x00000000008017d8                irq_init
  .text.rtc_irq_tick
-                0x000000000080179c       0x18 calypso/libcalypso.a(rtc.o)
+                0x0000000000801834       0x18 calypso/libcalypso.a(rtc.o)
  .text.rtc_init
-                0x00000000008017b4       0x54 calypso/libcalypso.a(rtc.o)
-                0x00000000008017b4                rtc_init
+                0x000000000080184c       0x54 calypso/libcalypso.a(rtc.o)
+                0x000000000080184c                rtc_init
  .text.spi_init
-                0x0000000000801808       0x1c calypso/libcalypso.a(spi.o)
-                0x0000000000801808                spi_init
+                0x00000000008018a0       0x1c calypso/libcalypso.a(spi.o)
+                0x00000000008018a0                spi_init
  .text.spi_xfer
-                0x0000000000801824      0x100 calypso/libcalypso.a(spi.o)
-                0x0000000000801824                spi_xfer
+                0x00000000008018bc      0x100 calypso/libcalypso.a(spi.o)
+                0x00000000008018bc                spi_xfer
  .text.keypad_irq
-                0x0000000000801924       0x18 calypso/libcalypso.a(keypad.o)
+                0x00000000008019bc       0x18 calypso/libcalypso.a(keypad.o)
  .text.emit_key
-                0x000000000080193c       0x58 calypso/libcalypso.a(keypad.o)
-                0x000000000080193c                emit_key
+                0x00000000008019d4       0x58 calypso/libcalypso.a(keypad.o)
+                0x00000000008019d4                emit_key
  .text.dispatch_buttons
-                0x0000000000801994       0xc4 calypso/libcalypso.a(keypad.o)
-                0x0000000000801994                dispatch_buttons
+                0x0000000000801a2c       0xc4 calypso/libcalypso.a(keypad.o)
+                0x0000000000801a2c                dispatch_buttons
  .text.keypad_init
-                0x0000000000801a58       0x6c calypso/libcalypso.a(keypad.o)
-                0x0000000000801a58                keypad_init
+                0x0000000000801af0       0x6c calypso/libcalypso.a(keypad.o)
+                0x0000000000801af0                keypad_init
  .text.keypad_set_handler
-                0x0000000000801ac4       0x10 calypso/libcalypso.a(keypad.o)
-                0x0000000000801ac4                keypad_set_handler
+                0x0000000000801b5c       0x10 calypso/libcalypso.a(keypad.o)
+                0x0000000000801b5c                keypad_set_handler
  .text.keypad_poll
-                0x0000000000801ad4      0x174 calypso/libcalypso.a(keypad.o)
-                0x0000000000801ad4                keypad_poll
+                0x0000000000801b6c      0x1f0 calypso/libcalypso.a(keypad.o)
+                0x0000000000801b6c                keypad_poll
  .text.dump_dev_id
-                0x0000000000801c48       0x8c calypso/libcalypso.a(misc.o)
-                0x0000000000801c48                dump_dev_id
+                0x0000000000801d5c       0x8c calypso/libcalypso.a(misc.o)
+                0x0000000000801d5c                dump_dev_id
  .text.wdog_irq
-                0x0000000000801cd4        0xc calypso/libcalypso.a(timer.o)
+                0x0000000000801de8        0xc calypso/libcalypso.a(timer.o)
  .text.hwtimer_enable
-                0x0000000000801ce0       0x68 calypso/libcalypso.a(timer.o)
-                0x0000000000801ce0                hwtimer_enable
+                0x0000000000801df4       0x68 calypso/libcalypso.a(timer.o)
+                0x0000000000801df4                hwtimer_enable
  .text.hwtimer_config
-                0x0000000000801d48       0x34 calypso/libcalypso.a(timer.o)
-                0x0000000000801d48                hwtimer_config
+                0x0000000000801e5c       0x34 calypso/libcalypso.a(timer.o)
+                0x0000000000801e5c                hwtimer_config
  .text.hwtimer_load
-                0x0000000000801d7c       0x28 calypso/libcalypso.a(timer.o)
-                0x0000000000801d7c                hwtimer_load
+                0x0000000000801e90       0x28 calypso/libcalypso.a(timer.o)
+                0x0000000000801e90                hwtimer_load
  .text.hwtimer_init
-                0x0000000000801da4       0x1c calypso/libcalypso.a(timer.o)
-                0x0000000000801da4                hwtimer_init
+                0x0000000000801eb8       0x1c calypso/libcalypso.a(timer.o)
+                0x0000000000801eb8                hwtimer_init
  .text.wdog_enable
-                0x0000000000801dc0       0x5c calypso/libcalypso.a(timer.o)
-                0x0000000000801dc0                wdog_enable
+                0x0000000000801ed4       0x5c calypso/libcalypso.a(timer.o)
+                0x0000000000801ed4                wdog_enable
  .text.bl_mode_pwl
-                0x0000000000801e1c       0x3c calypso/libcalypso.a(backlight.o)
-                0x0000000000801e1c                bl_mode_pwl
+                0x0000000000801f30       0x3c calypso/libcalypso.a(backlight.o)
+                0x0000000000801f30                bl_mode_pwl
  .text.bl_level
-                0x0000000000801e58       0x34 calypso/libcalypso.a(backlight.o)
-                0x0000000000801e58                bl_level
+                0x0000000000801f6c       0x34 calypso/libcalypso.a(backlight.o)
+                0x0000000000801f6c                bl_level
  .text.uart_set_lcr7bit
-                0x0000000000801e8c       0x2c calypso/libcalypso.a(uart.o)
+                0x0000000000801fa0       0x2c calypso/libcalypso.a(uart.o)
  .text.uart_set_lcr_bf
-                0x0000000000801eb8       0x38 calypso/libcalypso.a(uart.o)
+                0x0000000000801fcc       0x38 calypso/libcalypso.a(uart.o)
  .text.uart_set_mcr6bit
-                0x0000000000801ef0       0x2c calypso/libcalypso.a(uart.o)
+                0x0000000000802004       0x2c calypso/libcalypso.a(uart.o)
  .text.uart_reg_write
-                0x0000000000801f1c       0xa0 calypso/libcalypso.a(uart.o)
+                0x0000000000802030       0xa0 calypso/libcalypso.a(uart.o)
  .text.uart_reg_read
-                0x0000000000801fbc       0xa0 calypso/libcalypso.a(uart.o)
+                0x00000000008020d0       0xa0 calypso/libcalypso.a(uart.o)
  .text.uart_irq_handler_cons
-                0x000000000080205c       0x5c calypso/libcalypso.a(uart.o)
+                0x0000000000802170       0x5c calypso/libcalypso.a(uart.o)
  .text.uart_irq_enable
-                0x00000000008020b8       0x50 calypso/libcalypso.a(uart.o)
-                0x00000000008020b8                uart_irq_enable
+                0x00000000008021cc       0x50 calypso/libcalypso.a(uart.o)
+                0x00000000008021cc                uart_irq_enable
  .text.uart_init
-                0x0000000000802108      0x188 calypso/libcalypso.a(uart.o)
-                0x0000000000802108                uart_init
+                0x000000000080221c      0x188 calypso/libcalypso.a(uart.o)
+                0x000000000080221c                uart_init
  .text.uart_putchar_wait
-                0x0000000000802290       0x30 calypso/libcalypso.a(uart.o)
-                0x0000000000802290                uart_putchar_wait
+                0x00000000008023a4       0x30 calypso/libcalypso.a(uart.o)
+                0x00000000008023a4                uart_putchar_wait
  .text.uart_putchar_nb
-                0x00000000008022c0       0x30 calypso/libcalypso.a(uart.o)
-                0x00000000008022c0                uart_putchar_nb
+                0x00000000008023d4       0x30 calypso/libcalypso.a(uart.o)
+                0x00000000008023d4                uart_putchar_nb
  .text.uart_getchar_nb
-                0x00000000008022f0       0x88 calypso/libcalypso.a(uart.o)
-                0x00000000008022f0                uart_getchar_nb
+                0x0000000000802404       0x88 calypso/libcalypso.a(uart.o)
+                0x0000000000802404                uart_getchar_nb
  .text.uart_tx_busy
-                0x0000000000802378       0x20 calypso/libcalypso.a(uart.o)
-                0x0000000000802378                uart_tx_busy
+                0x000000000080248c       0x20 calypso/libcalypso.a(uart.o)
+                0x000000000080248c                uart_tx_busy
  .text.uart_irq_handler_sercomm
-                0x0000000000802398      0x124 calypso/libcalypso.a(uart.o)
+                0x00000000008024ac      0x124 calypso/libcalypso.a(uart.o)
  .text.uart_baudrate
-                0x00000000008024bc       0x68 calypso/libcalypso.a(uart.o)
-                0x00000000008024bc                uart_baudrate
+                0x00000000008025d0       0x68 calypso/libcalypso.a(uart.o)
+                0x00000000008025d0                uart_baudrate
  .text._uwire_wait
-                0x0000000000802524       0x1c calypso/libcalypso.a(uwire.o)
+                0x0000000000802638       0x1c calypso/libcalypso.a(uwire.o)
  .text.uwire_init
-                0x0000000000802540       0x2c calypso/libcalypso.a(uwire.o)
-                0x0000000000802540                uwire_init
+                0x0000000000802654       0x2c calypso/libcalypso.a(uwire.o)
+                0x0000000000802654                uwire_init
  .text.uwire_xfer
-                0x000000000080256c       0xf4 calypso/libcalypso.a(uwire.o)
-                0x000000000080256c                uwire_xfer
+                0x0000000000802680       0xf4 calypso/libcalypso.a(uwire.o)
+                0x0000000000802680                uwire_xfer
  .text.arm_enable_interrupts
-                0x0000000000802660       0x10 calypso/libcalypso.a(arm.o)
-                0x0000000000802660                arm_enable_interrupts
+                0x0000000000802774       0x10 calypso/libcalypso.a(arm.o)
+                0x0000000000802774                arm_enable_interrupts
  .text.skip_atoi
-                0x0000000000802670       0x44 lib/libmini.a(vsprintf.o)
- .text.number   0x00000000008026b4      0x254 lib/libmini.a(vsprintf.o)
+                0x0000000000802784       0x44 lib/libmini.a(vsprintf.o)
+ .text.number   0x00000000008027c8      0x254 lib/libmini.a(vsprintf.o)
  .text.vsnprintf
-                0x0000000000802908      0x518 lib/libmini.a(vsprintf.o)
-                0x0000000000802908                vsnprintf
+                0x0000000000802a1c      0x518 lib/libmini.a(vsprintf.o)
+                0x0000000000802a1c                vsnprintf
  .text.snprintf
-                0x0000000000802e20       0x24 lib/libmini.a(vsprintf.o)
-                0x0000000000802e20                snprintf
- .text.puts     0x0000000000802e44        0x4 lib/libmini.a(vsprintf.o)
-                0x0000000000802e44                puts
- .text.strnlen  0x0000000000802e48       0x28 lib/libmini.a(string.o)
-                0x0000000000802e48                strnlen
- .text.strlen   0x0000000000802e70       0x1c lib/libmini.a(string.o)
-                0x0000000000802e70                strlen
- .text.printf   0x0000000000802e8c       0x44 lib/libmini.a(printf.o)
-                0x0000000000802e8c                printf
+                0x0000000000802f34       0x24 lib/libmini.a(vsprintf.o)
+                0x0000000000802f34                snprintf
+ .text.puts     0x0000000000802f58        0x4 lib/libmini.a(vsprintf.o)
+                0x0000000000802f58                puts
+ .text.strnlen  0x0000000000802f5c       0x28 lib/libmini.a(string.o)
+                0x0000000000802f5c                strnlen
+ .text.strlen   0x0000000000802f84       0x1c lib/libmini.a(string.o)
+                0x0000000000802f84                strlen
+ .text.printf   0x0000000000802fa0       0x44 lib/libmini.a(printf.o)
+                0x0000000000802fa0                printf
  .text.cons_rb_pull
-                0x0000000000802ed0       0x6c lib/libmini.a(console.o)
+                0x0000000000802fe4       0x6c lib/libmini.a(console.o)
  .text.__cons_rb_append
-                0x0000000000802f3c       0x70 lib/libmini.a(console.o)
+                0x0000000000803050       0x70 lib/libmini.a(console.o)
  .text.cons_bind_uart
-                0x0000000000802fac       0x18 lib/libmini.a(console.o)
-                0x0000000000802fac                cons_bind_uart
+                0x00000000008030c0       0x18 lib/libmini.a(console.o)
+                0x00000000008030c0                cons_bind_uart
  .text.cons_get_uart
-                0x0000000000802fc4       0x18 lib/libmini.a(console.o)
-                0x0000000000802fc4                cons_get_uart
+                0x00000000008030d8       0x18 lib/libmini.a(console.o)
+                0x00000000008030d8                cons_get_uart
  .text.cons_init
-                0x0000000000802fdc       0x40 lib/libmini.a(console.o)
-                0x0000000000802fdc                cons_init
+                0x00000000008030f0       0x40 lib/libmini.a(console.o)
+                0x00000000008030f0                cons_init
  .text.cons_rb_flush
-                0x000000000080301c       0x58 lib/libmini.a(console.o)
-                0x000000000080301c                cons_rb_flush
+                0x0000000000803130       0x58 lib/libmini.a(console.o)
+                0x0000000000803130                cons_rb_flush
  .text.cons_rb_append
-                0x0000000000803074       0xe0 lib/libmini.a(console.o)
-                0x0000000000803074                cons_rb_append
+                0x0000000000803188       0xe0 lib/libmini.a(console.o)
+                0x0000000000803188                cons_rb_append
  .text.cons_puts
-                0x0000000000803154       0x74 lib/libmini.a(console.o)
-                0x0000000000803154                cons_puts
+                0x0000000000803268       0x74 lib/libmini.a(console.o)
+                0x0000000000803268                cons_puts
  .text.do_global_ctors
-                0x00000000008031c8       0x2c lib/libmini.a(ctors.o)
-                0x00000000008031c8                do_global_ctors
+                0x00000000008032dc       0x2c lib/libmini.a(ctors.o)
+                0x00000000008032dc                do_global_ctors
  .text.delay_ms
-                0x00000000008031f4       0x40 lib/libmini.a(delay.o)
-                0x00000000008031f4                delay_ms
- .text          0x0000000000803234      0x130 lib/libmini.a(div64.o)
-                0x0000000000803234                __do_div64
- .text          0x0000000000803364      0x3d4 lib/libmini.a(lib1funcs.o)
-                0x0000000000803364                __udivsi3
-                0x0000000000803364                __aeabi_uidiv
-                0x000000000080344c                __umodsi3
-                0x0000000000803508                __aeabi_idiv
-                0x0000000000803508                __divsi3
-                0x0000000000803620                __modsi3
-                0x00000000008036f4                __aeabi_uidivmod
-                0x000000000080370c                __aeabi_idivmod
-                0x0000000000803734                __div0
- .text          0x0000000000803738      0x29c lib/libmini.a(memcpy.o)
-                0x0000000000803738                memcpy
- *fill*         0x00000000008039d4        0xc 00
- .text          0x00000000008039e0       0xc0 lib/libmini.a(memset.o)
-                0x0000000000803a00                memset
+                0x0000000000803308       0x40 lib/libmini.a(delay.o)
+                0x0000000000803308                delay_ms
+ .text          0x0000000000803348      0x130 lib/libmini.a(div64.o)
+                0x0000000000803348                __do_div64
+ .text          0x0000000000803478      0x3d4 lib/libmini.a(lib1funcs.o)
+                0x0000000000803478                __udivsi3
+                0x0000000000803478                __aeabi_uidiv
+                0x0000000000803560                __umodsi3
+                0x000000000080361c                __aeabi_idiv
+                0x000000000080361c                __divsi3
+                0x0000000000803734                __modsi3
+                0x0000000000803808                __aeabi_uidivmod
+                0x0000000000803820                __aeabi_idivmod
+                0x0000000000803848                __div0
+ .text          0x000000000080384c      0x29c lib/libmini.a(memcpy.o)
+                0x000000000080384c                memcpy
+ *fill*         0x0000000000803ae8       0x18 00
+ .text          0x0000000000803b00       0xc0 lib/libmini.a(memset.o)
+                0x0000000000803b20                memset
  .text.sercomm_sendmsg
-                0x0000000000803aa0       0x8c comm/libcomm.a(sercomm.o)
-                0x0000000000803aa0                sercomm_sendmsg
+                0x0000000000803bc0       0x8c comm/libcomm.a(sercomm.o)
+                0x0000000000803bc0                sercomm_sendmsg
  .text.sercomm_alloc_msgb.clone.2
-                0x0000000000803b2c       0x38 comm/libcomm.a(sercomm.o)
+                0x0000000000803c4c       0x38 comm/libcomm.a(sercomm.o)
  .text.sercomm_bind_uart
-                0x0000000000803b64       0x10 comm/libcomm.a(sercomm.o)
-                0x0000000000803b64                sercomm_bind_uart
+                0x0000000000803c84       0x10 comm/libcomm.a(sercomm.o)
+                0x0000000000803c84                sercomm_bind_uart
  .text.sercomm_get_uart
-                0x0000000000803b74       0x10 comm/libcomm.a(sercomm.o)
-                0x0000000000803b74                sercomm_get_uart
+                0x0000000000803c94       0x10 comm/libcomm.a(sercomm.o)
+                0x0000000000803c94                sercomm_get_uart
  .text.sercomm_initialized
-                0x0000000000803b84       0x10 comm/libcomm.a(sercomm.o)
-                0x0000000000803b84                sercomm_initialized
+                0x0000000000803ca4       0x10 comm/libcomm.a(sercomm.o)
+                0x0000000000803ca4                sercomm_initialized
  .text.sercomm_tx_queue_depth
-                0x0000000000803b94       0x34 comm/libcomm.a(sercomm.o)
-                0x0000000000803b94                sercomm_tx_queue_depth
+                0x0000000000803cb4       0x34 comm/libcomm.a(sercomm.o)
+                0x0000000000803cb4                sercomm_tx_queue_depth
  .text.sercomm_drv_pull
-                0x0000000000803bc8      0x118 comm/libcomm.a(sercomm.o)
-                0x0000000000803bc8                sercomm_drv_pull
+                0x0000000000803ce8      0x118 comm/libcomm.a(sercomm.o)
+                0x0000000000803ce8                sercomm_drv_pull
  .text.sercomm_register_rx_cb
-                0x0000000000803ce0       0x34 comm/libcomm.a(sercomm.o)
-                0x0000000000803ce0                sercomm_register_rx_cb
+                0x0000000000803e00       0x34 comm/libcomm.a(sercomm.o)
+                0x0000000000803e00                sercomm_register_rx_cb
  .text.sercomm_init
-                0x0000000000803d14       0x50 comm/libcomm.a(sercomm.o)
-                0x0000000000803d14                sercomm_init
+                0x0000000000803e34       0x50 comm/libcomm.a(sercomm.o)
+                0x0000000000803e34                sercomm_init
  .text.sercomm_drv_rx_char
-                0x0000000000803d64      0x1a8 comm/libcomm.a(sercomm.o)
-                0x0000000000803d64                sercomm_drv_rx_char
+                0x0000000000803e84      0x1a8 comm/libcomm.a(sercomm.o)
+                0x0000000000803e84                sercomm_drv_rx_char
  .text.raw_puts
-                0x0000000000803f0c       0x38 comm/libcomm.a(sercomm_cons.o)
+                0x000000000080402c       0x38 comm/libcomm.a(sercomm_cons.o)
  .text.sercomm_puts
-                0x0000000000803f44      0x178 comm/libcomm.a(sercomm_cons.o)
-                0x0000000000803f44                sercomm_puts
+                0x0000000000804064      0x178 comm/libcomm.a(sercomm_cons.o)
+                0x0000000000804064                sercomm_puts
  .text.sercomm_putchar
-                0x00000000008040bc       0x28 comm/libcomm.a(sercomm_cons.o)
-                0x00000000008040bc                sercomm_putchar
+                0x00000000008041dc       0x28 comm/libcomm.a(sercomm_cons.o)
+                0x00000000008041dc                sercomm_putchar
  .text.timer_irq
-                0x00000000008040e4       0x18 comm/libcomm.a(timer.o)
+                0x0000000000804204       0x18 comm/libcomm.a(timer.o)
  .text.osmo_timer_add
-                0x00000000008040fc       0x54 comm/libcomm.a(timer.o)
-                0x00000000008040fc                osmo_timer_add
+                0x000000000080421c       0x54 comm/libcomm.a(timer.o)
+                0x000000000080421c                osmo_timer_add
  .text.osmo_timer_schedule
-                0x0000000000804150       0x34 comm/libcomm.a(timer.o)
-                0x0000000000804150                osmo_timer_schedule
+                0x0000000000804270       0x34 comm/libcomm.a(timer.o)
+                0x0000000000804270                osmo_timer_schedule
  .text.osmo_timer_del
-                0x0000000000804184       0x48 comm/libcomm.a(timer.o)
-                0x0000000000804184                osmo_timer_del
+                0x00000000008042a4       0x48 comm/libcomm.a(timer.o)
+                0x00000000008042a4                osmo_timer_del
  .text.osmo_timers_update
-                0x00000000008041cc       0xdc comm/libcomm.a(timer.o)
-                0x00000000008041cc                osmo_timers_update
+                0x00000000008042ec       0xdc comm/libcomm.a(timer.o)
+                0x00000000008042ec                osmo_timers_update
  .text.timer_init
-                0x00000000008042a8       0x6c comm/libcomm.a(timer.o)
-                0x00000000008042a8                timer_init
+                0x00000000008043c8       0x6c comm/libcomm.a(timer.o)
+                0x00000000008043c8                timer_init
  .text.msgb_alloc
-                0x0000000000804314       0x5c ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
-                0x0000000000804314                msgb_alloc
+                0x0000000000804434       0x5c ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
+                0x0000000000804434                msgb_alloc
  .text.msgb_free
-                0x0000000000804370        0x4 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
-                0x0000000000804370                msgb_free
+                0x0000000000804490        0x4 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
+                0x0000000000804490                msgb_free
  .text.msgb_enqueue
-                0x0000000000804374       0x18 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
-                0x0000000000804374                msgb_enqueue
+                0x0000000000804494       0x18 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
+                0x0000000000804494                msgb_enqueue
  .text.msgb_dequeue
-                0x000000000080438c       0x40 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
-                0x000000000080438c                msgb_dequeue
+                0x00000000008044ac       0x40 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
+                0x00000000008044ac                msgb_dequeue
  .text.osmo_panic
-                0x00000000008043cc       0x4c ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(panic.o)
-                0x00000000008043cc                osmo_panic
+                0x00000000008044ec       0x4c ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(panic.o)
+                0x00000000008044ec                osmo_panic
  .text._talloc_zero
-                0x0000000000804418       0xa0 comm/libcomm.a(msgb.o)
-                0x0000000000804418                _talloc_zero
+                0x0000000000804538       0xa0 comm/libcomm.a(msgb.o)
+                0x0000000000804538                _talloc_zero
  .text.talloc_free
-                0x00000000008044b8        0xc comm/libcomm.a(msgb.o)
-                0x00000000008044b8                talloc_free
+                0x00000000008045d8        0xc comm/libcomm.a(msgb.o)
+                0x00000000008045d8                talloc_free
  *(.ramtext*)
  *(.glue_7t)
  .glue_7t       0x0000000000000000        0x0 linker stubs
@@ -835,685 +892,699 @@ Linker script and memory map
  .vfp11_veneer  0x0000000000000000        0x0 linker stubs
  *(.v4_bx)
  .v4_bx         0x0000000000000000        0x0 linker stubs
-                0x00000000008044c4                . = ALIGN (0x4)
+                0x00000000008045e4                . = ALIGN (0x4)
                 0x000000000080018c                PROVIDE (_text_start, LOADADDR (.text))
-                0x00000000008044c4                PROVIDE (_text_end, (LOADADDR (.text) + SIZEOF (.text)))
+                0x00000000008045e4                PROVIDE (_text_end, (LOADADDR (.text) + SIZEOF (.text)))
 
-.ctors          0x00000000008044c4        0x8
-                0x00000000008044c4        0x4 LONG 0x0 ((SIZEOF (.ctors) / 0x4) - 0x2)
+.ctors          0x00000000008045e4        0x8
+                0x00000000008045e4        0x4 LONG 0x0 ((SIZEOF (.ctors) / 0x4) - 0x2)
  *(SORT(.ctors))
-                0x00000000008044c8        0x4 LONG 0x0
-                0x00000000008044c4                PROVIDE (_ctor_start, LOADADDR (.ctors))
-                0x00000000008044cc                PROVIDE (_ctor_end, (LOADADDR (.ctors) + SIZEOF (.ctors)))
+ *(SORT(.init_array))
+                0x00000000008045e8        0x4 LONG 0x0
+                0x00000000008045e4                PROVIDE (_ctor_start, LOADADDR (.ctors))
+                0x00000000008045ec                PROVIDE (_ctor_end, (LOADADDR (.ctors) + SIZEOF (.ctors)))
 
-.dtors          0x00000000008044cc        0x8
-                0x00000000008044cc        0x4 LONG 0x0 ((SIZEOF (.dtors) / 0x4) - 0x2)
+.dtors          0x00000000008045ec        0x8
+                0x00000000008045ec        0x4 LONG 0x0 ((SIZEOF (.dtors) / 0x4) - 0x2)
  *(SORT(.dtors))
-                0x00000000008044d0        0x4 LONG 0x0
-                0x00000000008044cc                PROVIDE (_dtor_start, LOADADDR (.dtors))
-                0x00000000008044d4                PROVIDE (_dtor_end, (LOADADDR (.dtors) + SIZEOF (.dtors)))
-                0x00000000008044d4                . = ALIGN (0x4)
+                0x00000000008045f0        0x4 LONG 0x0
+                0x00000000008045ec                PROVIDE (_dtor_start, LOADADDR (.dtors))
+                0x00000000008045f4                PROVIDE (_dtor_end, (LOADADDR (.dtors) + SIZEOF (.dtors)))
+                0x00000000008045f4                . = ALIGN (0x4)
 
-.rodata         0x00000000008044d4     0x175a
+.rodata         0x00000000008045f4     0x1752
  *(.rodata*)
  .rodata.str1.1
-                0x00000000008044d4      0x133 apps/hello_world/main.o
-                                        0x135 (size before relaxing)
+                0x00000000008045f4      0x129 apps/hello_world/main.o
+                                        0x12b (size before relaxing)
  .rodata.str1.1
-                0x0000000000804607       0x58 abb/twl3025.o
- *fill*         0x000000000080465f        0x1 00
- .rodata        0x0000000000804660       0x18 board/se_j100/init.o
- .rodata        0x0000000000804678      0x4bc fb/helvR08.o
-                0x0000000000804678                font_helvR08
- .rodata        0x0000000000804b34      0x70c fb/helvB14.o
-                0x0000000000804b34                font_helvB14
- .rodata        0x0000000000805240      0x5b0 fb/c64.o
-                0x0000000000805240                font_c64
- .rodata        0x00000000008057f0       0x9c fb/symbols.o
-                0x00000000008057f0                font_symbols
- .rodata        0x000000000080588c       0x9c fb/fb_ssd1963.o
+                0x000000000080471d       0x58 abb/twl3025.o
+ *fill*         0x0000000000804775        0x3 00
+ .rodata        0x0000000000804778       0x18 board/se_j100/init.o
+ .rodata        0x0000000000804790      0x4bc fb/helvR08.o
+                0x0000000000804790                font_helvR08
+ .rodata        0x0000000000804c4c      0x70c fb/helvB14.o
+                0x0000000000804c4c                font_helvB14
+ .rodata        0x0000000000805358      0x5b0 fb/c64.o
+                0x0000000000805358                font_c64
+ .rodata        0x0000000000805908       0x9c fb/symbols.o
+                0x0000000000805908                font_symbols
+ .rodata        0x00000000008059a4       0x9c fb/fb_ssd1963.o
  .rodata.str1.1
-                0x0000000000805928       0x26 fb/fb_ssd1963.o
+                0x0000000000805a40       0x26 fb/fb_ssd1963.o
  .rodata.str1.1
-                0x000000000080594e       0x40 calypso/libcalypso.a(clock.o)
- *fill*         0x000000000080598e        0x2 00
- .rodata        0x0000000000805990       0x18 calypso/libcalypso.a(irq.o)
+                0x0000000000805a66       0x40 calypso/libcalypso.a(clock.o)
+ *fill*         0x0000000000805aa6        0x2 00
+ .rodata        0x0000000000805aa8       0x18 calypso/libcalypso.a(irq.o)
  .rodata.str1.1
-                0x00000000008059a8       0x1c calypso/libcalypso.a(keypad.o)
+                0x0000000000805ac0       0x1c calypso/libcalypso.a(keypad.o)
  .rodata.str1.1
-                0x00000000008059c4       0xf4 calypso/libcalypso.a(misc.o)
+                0x0000000000805adc       0xf4 calypso/libcalypso.a(misc.o)
                                          0xfc (size before relaxing)
  .rodata.str1.1
-                0x0000000000805ab8       0x1f calypso/libcalypso.a(timer.o)
- *fill*         0x0000000000805ad7        0x1 00
- .rodata        0x0000000000805ad8       0x18 calypso/libcalypso.a(uart.o)
+                0x0000000000805bd0       0x1f calypso/libcalypso.a(timer.o)
+ *fill*         0x0000000000805bef        0x1 00
+ .rodata        0x0000000000805bf0       0x18 calypso/libcalypso.a(uart.o)
  .rodata.str1.1
-                0x0000000000805af0       0x61 calypso/libcalypso.a(uart.o)
- *fill*         0x0000000000805b51        0x3 00
- .rodata        0x0000000000805b54       0x50 lib/libmini.a(vsprintf.o)
+                0x0000000000805c08       0x61 calypso/libcalypso.a(uart.o)
+ *fill*         0x0000000000805c69        0x3 00
+ .rodata        0x0000000000805c6c       0x50 lib/libmini.a(vsprintf.o)
  .rodata.str1.1
-                0x0000000000805ba4       0x71 comm/libcomm.a(sercomm.o)
+                0x0000000000805cbc       0x71 comm/libcomm.a(sercomm.o)
  .rodata.str1.1
                 0x0000000000000000       0x3e comm/libcomm.a(sercomm_cons.o)
  .rodata.str1.1
-                0x0000000000805c15       0x19 comm/libcomm.a(msgb.o)
-                0x00000000008044d4                PROVIDE (_rodata_start, LOADADDR (.rodata))
-                0x0000000000805c2e                PROVIDE (_rodata_end, (LOADADDR (.rodata) + SIZEOF (.rodata)))
+                0x0000000000805d2d       0x19 comm/libcomm.a(msgb.o)
+                0x00000000008045f4                PROVIDE (_rodata_start, LOADADDR (.rodata))
+                0x0000000000805d46                PROVIDE (_rodata_end, (LOADADDR (.rodata) + SIZEOF (.rodata)))
 
-.rel.dyn        0x0000000000805c30        0x0
+.rel.dyn        0x0000000000805d48        0x0
  .rel.got       0x0000000000000000        0x0 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
-                0x0000000000805c30                . = ALIGN (0x4)
+                0x0000000000805d48                . = ALIGN (0x4)
 
-.data           0x0000000000805c30      0x17c
+.data           0x0000000000805d48      0x180
  *(.data)
- .data          0x0000000000805c30       0x1c apps/hello_world/main.o
-                0x0000000000805c30                hr
- .data          0x0000000000805c4c       0x10 fb/font.o
-                0x0000000000805c4c                fb_fonts
- .data          0x0000000000805c5c       0x48 fb/fb_ssd1963.o
-                0x0000000000805c5c                fb_rgb332
-                0x0000000000805c60                framebuffer
- .data          0x0000000000805ca4      0x100 lib/libmini.a(ctype.o)
-                0x0000000000805ca4                _ctype
- .data          0x0000000000805da4        0x8 comm/libcomm.a(timer.o)
-                0x0000000000805c30                PROVIDE (_data_start, LOADADDR (.data))
-                0x0000000000805dac                PROVIDE (_data_end, (LOADADDR (.data) + SIZEOF (.data)))
-                0x0000000000805dac                . = ALIGN (0x4)
+ .data          0x0000000000805d48       0x1c apps/hello_world/main.o
+                0x0000000000805d48                hr
+ .data          0x0000000000805d64       0x10 fb/font.o
+                0x0000000000805d64                fb_fonts
+ .data          0x0000000000805d74       0x4c fb/fb_ssd1963.o
+                0x0000000000805d74                fb_rgb332
+                0x0000000000805d78                framebuffer
+ .data          0x0000000000805dc0      0x100 lib/libmini.a(ctype.o)
+                0x0000000000805dc0                _ctype
+ .data          0x0000000000805ec0        0x8 comm/libcomm.a(timer.o)
+                0x0000000000805d48                PROVIDE (_data_start, LOADADDR (.data))
+                0x0000000000805ec8                PROVIDE (_data_end, (LOADADDR (.data) + SIZEOF (.data)))
+                0x0000000000805ec8                . = ALIGN (0x4)
 
-.got            0x0000000000805dac       0x10
+.got            0x0000000000805ec8       0x10
  *(.got)
- .got           0x0000000000805dac        0x4 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
+ .got           0x0000000000805ec8        0x4 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
  *(.got.plt)
- .got.plt       0x0000000000805db0        0xc ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
-                0x0000000000805db0                _GLOBAL_OFFSET_TABLE_
+ .got.plt       0x0000000000805ecc        0xc ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
+                0x0000000000805ecc                _GLOBAL_OFFSET_TABLE_
  *(.igot.plt)
  *(.got)
  *(.igot)
-                0x0000000000805dac                PROVIDE (_got_start, LOADADDR (.got))
-                0x0000000000805dbc                PROVIDE (_got_end, (LOADADDR (.got) + SIZEOF (.got)))
+                0x0000000000805ec8                PROVIDE (_got_start, LOADADDR (.got))
+                0x0000000000805ed8                PROVIDE (_got_end, (LOADADDR (.got) + SIZEOF (.got)))
 
-.bss            0x0000000000810000     0x5c94
+.bss            0x0000000000810000     0x5c98
                 0x0000000000810000                . = ALIGN (0x4)
                 0x0000000000810000                __bss_start = .
  *(.bss)
- .bss           0x0000000000810000        0x4 abb/twl3025.o
- .bss           0x0000000000810004     0x1800 fb/fb_ssd1963.o
- .bss           0x0000000000811804       0x80 calypso/libcalypso.a(irq.o)
- .bss           0x0000000000811884        0x4 calypso/libcalypso.a(rtc.o)
- .bss           0x0000000000811888       0x28 calypso/libcalypso.a(keypad.o)
-                0x0000000000811894                lastbuttons
-                0x0000000000811898                power_hold
- .bss           0x00000000008118b0        0x1 calypso/libcalypso.a(uart.o)
- *fill*         0x00000000008118b1        0x3 00
- .bss           0x00000000008118b4      0x400 lib/libmini.a(printf.o)
- .bss           0x0000000000811cb4     0x1010 lib/libmini.a(console.o)
- .bss           0x0000000000812cc4      0x62c comm/libcomm.a(sercomm.o)
- .bss           0x00000000008132f0        0x4 comm/libcomm.a(sercomm_cons.o)
- .bss           0x00000000008132f4        0x4 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(panic.o)
- .bss           0x00000000008132f8     0x2980 comm/libcomm.a(msgb.o)
- COMMON         0x0000000000815c78       0x14 battery/dummy.o
-                0x0000000000815c78                battery_info
- COMMON         0x0000000000815c8c        0x4 comm/libcomm.a(timer.o)
-                0x0000000000815c8c                jiffies
- COMMON         0x0000000000815c90        0x4 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
-                0x0000000000815c90                tall_msgb_ctx
-                0x0000000000815c94                . = ALIGN (0x4)
-                0x0000000000815c94                __bss_end = .
+ .bss           0x0000000000810000        0x8 abb/twl3025.o
+ .bss           0x0000000000810008     0x1800 fb/fb_ssd1963.o
+ .bss           0x0000000000811808       0x80 calypso/libcalypso.a(irq.o)
+ .bss           0x0000000000811888        0x4 calypso/libcalypso.a(rtc.o)
+ .bss           0x000000000081188c       0x28 calypso/libcalypso.a(keypad.o)
+                0x0000000000811898                lastbuttons
+                0x000000000081189c                power_hold
+ .bss           0x00000000008118b4        0x1 calypso/libcalypso.a(uart.o)
+ *fill*         0x00000000008118b5        0x3 00
+ .bss           0x00000000008118b8      0x400 lib/libmini.a(printf.o)
+ .bss           0x0000000000811cb8     0x1010 lib/libmini.a(console.o)
+ .bss           0x0000000000812cc8      0x62c comm/libcomm.a(sercomm.o)
+ .bss           0x00000000008132f4        0x4 comm/libcomm.a(sercomm_cons.o)
+ .bss           0x00000000008132f8        0x4 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(panic.o)
+ .bss           0x00000000008132fc     0x2980 comm/libcomm.a(msgb.o)
+ COMMON         0x0000000000815c7c       0x14 battery/dummy.o
+                0x0000000000815c7c                battery_info
+ COMMON         0x0000000000815c90        0x4 comm/libcomm.a(timer.o)
+                0x0000000000815c90                jiffies
+ COMMON         0x0000000000815c94        0x4 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
+                0x0000000000815c94                tall_msgb_ctx
+                0x0000000000815c98                . = ALIGN (0x4)
+                0x0000000000815c98                __bss_end = .
                 0x0000000000810000                PROVIDE (_bss_start, __bss_start)
-                0x0000000000815c94                PROVIDE (_bss_end, __bss_end)
-                0x0000000000815c94                . = ALIGN (0x4)
-                0x0000000000815c94                _end = .
-                0x0000000000815c94                PROVIDE (end, .)
-START GROUP
-LOAD apps/hello_world/main.o
-LOAD abb/twl3025.o
-LOAD rf/trf6151.o
-LOAD flash/cfi_flash.o
-LOAD board/common/calypso_uart.o
-LOAD board/common/calypso_pwl.o
-LOAD board/compal/rffe_dualband.o
-LOAD board/compal/rf_power.o
-LOAD board/se_j100/init.o
-LOAD battery/dummy.o
-LOAD fb/framebuffer.o
-LOAD fb/font.o
-LOAD fb/helvR08.o
-LOAD fb/helvB14.o
-LOAD fb/c64.o
-LOAD fb/symbols.o
-LOAD fb/fb_rgb332.o
-LOAD fb/fb_ssd1963.o
-LOAD board/compal/start.ram.o
-LOAD board/compal/exceptions_redirected.o
-LOAD board/compal/handlers.o
-LOAD board/se_j100/hello_world.compalram.manifest.o
-LOAD calypso/libcalypso.a
-LOAD layer1/liblayer1.a
-LOAD lib/libmini.a
-LOAD comm/libcomm.a
-LOAD ../../shared/libosmocore/build-target/src/.libs/libosmocore.a
-LOAD ../../shared/libosmocore/build-target/src/gsm/.libs/libosmogsm.a
-END GROUP
+                0x0000000000815c98                PROVIDE (_bss_end, __bss_end)
+                0x0000000000815c98                . = ALIGN (0x4)
+                0x0000000000815c98                _end = .
+                0x0000000000815c98                PROVIDE (end, .)
 OUTPUT(board/se_j100/hello_world.compalram.elf elf32-littlearm)
 
-.debug_abbrev   0x0000000000000000     0x3742
- .debug_abbrev  0x0000000000000000      0x2fa apps/hello_world/main.o
- .debug_abbrev  0x00000000000002fa      0x2b1 abb/twl3025.o
- .debug_abbrev  0x00000000000005ab      0x2df rf/trf6151.o
- .debug_abbrev  0x000000000000088a      0x324 flash/cfi_flash.o
- .debug_abbrev  0x0000000000000bae      0x121 board/compal/rffe_dualband.o
- .debug_abbrev  0x0000000000000ccf       0x72 board/compal/rf_power.o
- .debug_abbrev  0x0000000000000d41      0x15b board/se_j100/init.o
- .debug_abbrev  0x0000000000000e9c       0x8c battery/dummy.o
- .debug_abbrev  0x0000000000000f28       0xc0 fb/framebuffer.o
- .debug_abbrev  0x0000000000000fe8       0xd9 fb/font.o
- .debug_abbrev  0x00000000000010c1       0xaf fb/helvR08.o
- .debug_abbrev  0x0000000000001170       0xaf fb/helvB14.o
- .debug_abbrev  0x000000000000121f       0xaf fb/c64.o
- .debug_abbrev  0x00000000000012ce       0x97 fb/symbols.o
- .debug_abbrev  0x0000000000001365      0x29f fb/fb_rgb332.o
- .debug_abbrev  0x0000000000001604      0x184 fb/fb_ssd1963.o
- .debug_abbrev  0x0000000000001788       0x40 board/se_j100/hello_world.compalram.manifest.o
- .debug_abbrev  0x00000000000017c8      0x154 calypso/libcalypso.a(clock.o)
- .debug_abbrev  0x000000000000191c       0x43 calypso/libcalypso.a(dma.o)
- .debug_abbrev  0x000000000000195f      0x198 calypso/libcalypso.a(irq.o)
- .debug_abbrev  0x0000000000001af7       0x8c calypso/libcalypso.a(rtc.o)
- .debug_abbrev  0x0000000000001b83       0xd0 calypso/libcalypso.a(spi.o)
- .debug_abbrev  0x0000000000001c53      0x27c calypso/libcalypso.a(tpu.o)
- .debug_abbrev  0x0000000000001ecf      0x127 calypso/libcalypso.a(tsp.o)
- .debug_abbrev  0x0000000000001ff6      0x164 calypso/libcalypso.a(keypad.o)
- .debug_abbrev  0x000000000000215a       0xaa calypso/libcalypso.a(misc.o)
- .debug_abbrev  0x0000000000002204      0x10b calypso/libcalypso.a(timer.o)
- .debug_abbrev  0x000000000000230f       0xaa calypso/libcalypso.a(backlight.o)
- .debug_abbrev  0x00000000000023b9      0x1f6 calypso/libcalypso.a(uart.o)
- .debug_abbrev  0x00000000000025af       0xf4 calypso/libcalypso.a(uwire.o)
- .debug_abbrev  0x00000000000026a3       0x78 calypso/libcalypso.a(arm.o)
- .debug_abbrev  0x000000000000271b      0x213 lib/libmini.a(vsprintf.o)
- .debug_abbrev  0x000000000000292e       0xae lib/libmini.a(string.o)
- .debug_abbrev  0x00000000000029dc       0x53 lib/libmini.a(ctype.o)
- .debug_abbrev  0x0000000000002a2f       0xaf lib/libmini.a(printf.o)
- .debug_abbrev  0x0000000000002ade      0x20b lib/libmini.a(console.o)
- .debug_abbrev  0x0000000000002ce9       0x7a lib/libmini.a(ctors.o)
- .debug_abbrev  0x0000000000002d63       0x81 lib/libmini.a(delay.o)
- .debug_abbrev  0x0000000000002de4      0x350 comm/libcomm.a(sercomm.o)
- .debug_abbrev  0x0000000000003134      0x24e comm/libcomm.a(sercomm_cons.o)
- .debug_abbrev  0x0000000000003382      0x237 comm/libcomm.a(timer.o)
- .debug_abbrev  0x00000000000035b9      0x189 comm/libcomm.a(msgb.o)
+.debug_abbrev   0x0000000000000000     0x39a2
+ .debug_abbrev  0x0000000000000000      0x2ed apps/hello_world/main.o
+ .debug_abbrev  0x00000000000002ed      0x2b9 abb/twl3025.o
+ .debug_abbrev  0x00000000000005a6      0x2ee rf/trf6151.o
+ .debug_abbrev  0x0000000000000894      0x324 flash/cfi_flash.o
+ .debug_abbrev  0x0000000000000bb8       0x78 board/common/tx_calchan.o
+ .debug_abbrev  0x0000000000000c30      0x121 board/compal/rffe_dualband.o
+ .debug_abbrev  0x0000000000000d51       0x87 board/compal/rf_tables.o
+ .debug_abbrev  0x0000000000000dd8      0x110 board/compal/readcal_common.o
+ .debug_abbrev  0x0000000000000ee8      0x15b board/se_j100/init.o
+ .debug_abbrev  0x0000000000001043       0x41 board/compal/readcal_small.o
+ .debug_abbrev  0x0000000000001084       0x89 board/se_j100/tx_ramps.o
+ .debug_abbrev  0x000000000000110d       0x8c battery/dummy.o
+ .debug_abbrev  0x0000000000001199       0xc0 fb/framebuffer.o
+ .debug_abbrev  0x0000000000001259       0xd9 fb/font.o
+ .debug_abbrev  0x0000000000001332       0xaf fb/helvR08.o
+ .debug_abbrev  0x00000000000013e1       0xaf fb/helvB14.o
+ .debug_abbrev  0x0000000000001490       0xaf fb/c64.o
+ .debug_abbrev  0x000000000000153f       0x97 fb/symbols.o
+ .debug_abbrev  0x00000000000015d6      0x29f fb/fb_rgb332.o
+ .debug_abbrev  0x0000000000001875      0x184 fb/fb_ssd1963.o
+ .debug_abbrev  0x00000000000019f9       0x40 board/se_j100/hello_world.compalram.manifest.o
+ .debug_abbrev  0x0000000000001a39      0x154 calypso/libcalypso.a(clock.o)
+ .debug_abbrev  0x0000000000001b8d       0x43 calypso/libcalypso.a(dma.o)
+ .debug_abbrev  0x0000000000001bd0      0x198 calypso/libcalypso.a(irq.o)
+ .debug_abbrev  0x0000000000001d68       0x8c calypso/libcalypso.a(rtc.o)
+ .debug_abbrev  0x0000000000001df4       0xd0 calypso/libcalypso.a(spi.o)
+ .debug_abbrev  0x0000000000001ec4      0x27c calypso/libcalypso.a(tpu.o)
+ .debug_abbrev  0x0000000000002140      0x127 calypso/libcalypso.a(tsp.o)
+ .debug_abbrev  0x0000000000002267      0x164 calypso/libcalypso.a(keypad.o)
+ .debug_abbrev  0x00000000000023cb       0xaa calypso/libcalypso.a(misc.o)
+ .debug_abbrev  0x0000000000002475      0x10b calypso/libcalypso.a(timer.o)
+ .debug_abbrev  0x0000000000002580       0xaa calypso/libcalypso.a(backlight.o)
+ .debug_abbrev  0x000000000000262a      0x1f6 calypso/libcalypso.a(uart.o)
+ .debug_abbrev  0x0000000000002820       0xf4 calypso/libcalypso.a(uwire.o)
+ .debug_abbrev  0x0000000000002914       0x78 calypso/libcalypso.a(arm.o)
+ .debug_abbrev  0x000000000000298c      0x213 lib/libmini.a(vsprintf.o)
+ .debug_abbrev  0x0000000000002b9f       0xae lib/libmini.a(string.o)
+ .debug_abbrev  0x0000000000002c4d       0x53 lib/libmini.a(ctype.o)
+ .debug_abbrev  0x0000000000002ca0       0xaf lib/libmini.a(printf.o)
+ .debug_abbrev  0x0000000000002d4f      0x20b lib/libmini.a(console.o)
+ .debug_abbrev  0x0000000000002f5a       0x7a lib/libmini.a(ctors.o)
+ .debug_abbrev  0x0000000000002fd4       0x81 lib/libmini.a(delay.o)
+ .debug_abbrev  0x0000000000003055      0x350 comm/libcomm.a(sercomm.o)
+ .debug_abbrev  0x00000000000033a5      0x24e comm/libcomm.a(sercomm_cons.o)
+ .debug_abbrev  0x00000000000035f3      0x237 comm/libcomm.a(timer.o)
+ .debug_abbrev  0x000000000000382a      0x178 comm/libcomm.a(msgb.o)
 
-.debug_info     0x0000000000000000     0x9774
- .debug_info    0x0000000000000000      0x8e0 apps/hello_world/main.o
- .debug_info    0x00000000000008e0      0x784 abb/twl3025.o
- .debug_info    0x0000000000001064      0xa18 rf/trf6151.o
- .debug_info    0x0000000000001a7c      0xa9e flash/cfi_flash.o
- .debug_info    0x000000000000251a      0x2ab board/compal/rffe_dualband.o
- .debug_info    0x00000000000027c5       0xce board/compal/rf_power.o
- .debug_info    0x0000000000002893      0x438 board/se_j100/init.o
- .debug_info    0x0000000000002ccb       0xdb battery/dummy.o
- .debug_info    0x0000000000002da6      0x1f4 fb/framebuffer.o
- .debug_info    0x0000000000002f9a      0x275 fb/font.o
- .debug_info    0x000000000000320f      0x17f fb/helvR08.o
- .debug_info    0x000000000000338e      0x17f fb/helvB14.o
- .debug_info    0x000000000000350d      0x17f fb/c64.o
- .debug_info    0x000000000000368c      0x17c fb/symbols.o
- .debug_info    0x0000000000003808      0x8fe fb/fb_rgb332.o
- .debug_info    0x0000000000004106      0x4a0 fb/fb_ssd1963.o
- .debug_info    0x00000000000045a6       0x80 board/se_j100/hello_world.compalram.manifest.o
- .debug_info    0x0000000000004626      0x44d calypso/libcalypso.a(clock.o)
- .debug_info    0x0000000000004a73       0x57 calypso/libcalypso.a(dma.o)
- .debug_info    0x0000000000004aca      0x480 calypso/libcalypso.a(irq.o)
- .debug_info    0x0000000000004f4a      0x1d1 calypso/libcalypso.a(rtc.o)
- .debug_info    0x000000000000511b      0x188 calypso/libcalypso.a(spi.o)
- .debug_info    0x00000000000052a3      0x57d calypso/libcalypso.a(tpu.o)
- .debug_info    0x0000000000005820      0x35d calypso/libcalypso.a(tsp.o)
- .debug_info    0x0000000000005b7d      0x461 calypso/libcalypso.a(keypad.o)
- .debug_info    0x0000000000005fde      0x11c calypso/libcalypso.a(misc.o)
- .debug_info    0x00000000000060fa      0x320 calypso/libcalypso.a(timer.o)
- .debug_info    0x000000000000641a       0xf9 calypso/libcalypso.a(backlight.o)
- .debug_info    0x0000000000006513      0x719 calypso/libcalypso.a(uart.o)
- .debug_info    0x0000000000006c2c      0x16f calypso/libcalypso.a(uwire.o)
- .debug_info    0x0000000000006d9b       0x91 calypso/libcalypso.a(arm.o)
- .debug_info    0x0000000000006e2c      0x9fa lib/libmini.a(vsprintf.o)
- .debug_info    0x0000000000007826      0x131 lib/libmini.a(string.o)
- .debug_info    0x0000000000007957       0x63 lib/libmini.a(ctype.o)
- .debug_info    0x00000000000079ba      0x109 lib/libmini.a(printf.o)
- .debug_info    0x0000000000007ac3      0x3a5 lib/libmini.a(console.o)
- .debug_info    0x0000000000007e68       0xab lib/libmini.a(ctors.o)
- .debug_info    0x0000000000007f13       0x9a lib/libmini.a(delay.o)
- .debug_info    0x0000000000007fad      0x949 comm/libcomm.a(sercomm.o)
- .debug_info    0x00000000000088f6      0x589 comm/libcomm.a(sercomm_cons.o)
- .debug_info    0x0000000000008e7f      0x5ca comm/libcomm.a(timer.o)
- .debug_info    0x0000000000009449      0x32b comm/libcomm.a(msgb.o)
+.debug_info     0x0000000000000000     0x9ea6
+ .debug_info    0x0000000000000000      0x8df apps/hello_world/main.o
+ .debug_info    0x00000000000008df      0x812 abb/twl3025.o
+ .debug_info    0x00000000000010f1      0xa03 rf/trf6151.o
+ .debug_info    0x0000000000001af4      0xb79 flash/cfi_flash.o
+ .debug_info    0x000000000000266d      0x109 board/common/tx_calchan.o
+ .debug_info    0x0000000000002776      0x2ab board/compal/rffe_dualband.o
+ .debug_info    0x0000000000002a21      0x140 board/compal/rf_tables.o
+ .debug_info    0x0000000000002b61      0x26f board/compal/readcal_common.o
+ .debug_info    0x0000000000002dd0      0x452 board/se_j100/init.o
+ .debug_info    0x0000000000003222       0x84 board/compal/readcal_small.o
+ .debug_info    0x00000000000032a6      0x11b board/se_j100/tx_ramps.o
+ .debug_info    0x00000000000033c1       0xdb battery/dummy.o
+ .debug_info    0x000000000000349c      0x202 fb/framebuffer.o
+ .debug_info    0x000000000000369e      0x275 fb/font.o
+ .debug_info    0x0000000000003913      0x17f fb/helvR08.o
+ .debug_info    0x0000000000003a92      0x17f fb/helvB14.o
+ .debug_info    0x0000000000003c11      0x17f fb/c64.o
+ .debug_info    0x0000000000003d90      0x17c fb/symbols.o
+ .debug_info    0x0000000000003f0c      0x90c fb/fb_rgb332.o
+ .debug_info    0x0000000000004818      0x4ae fb/fb_ssd1963.o
+ .debug_info    0x0000000000004cc6       0x80 board/se_j100/hello_world.compalram.manifest.o
+ .debug_info    0x0000000000004d46      0x44d calypso/libcalypso.a(clock.o)
+ .debug_info    0x0000000000005193       0x57 calypso/libcalypso.a(dma.o)
+ .debug_info    0x00000000000051ea      0x47f calypso/libcalypso.a(irq.o)
+ .debug_info    0x0000000000005669      0x1d1 calypso/libcalypso.a(rtc.o)
+ .debug_info    0x000000000000583a      0x188 calypso/libcalypso.a(spi.o)
+ .debug_info    0x00000000000059c2      0x596 calypso/libcalypso.a(tpu.o)
+ .debug_info    0x0000000000005f58      0x35d calypso/libcalypso.a(tsp.o)
+ .debug_info    0x00000000000062b5      0x46e calypso/libcalypso.a(keypad.o)
+ .debug_info    0x0000000000006723      0x11c calypso/libcalypso.a(misc.o)
+ .debug_info    0x000000000000683f      0x320 calypso/libcalypso.a(timer.o)
+ .debug_info    0x0000000000006b5f       0xf9 calypso/libcalypso.a(backlight.o)
+ .debug_info    0x0000000000006c58      0x719 calypso/libcalypso.a(uart.o)
+ .debug_info    0x0000000000007371      0x16f calypso/libcalypso.a(uwire.o)
+ .debug_info    0x00000000000074e0       0x91 calypso/libcalypso.a(arm.o)
+ .debug_info    0x0000000000007571      0x9fa lib/libmini.a(vsprintf.o)
+ .debug_info    0x0000000000007f6b      0x131 lib/libmini.a(string.o)
+ .debug_info    0x000000000000809c       0x63 lib/libmini.a(ctype.o)
+ .debug_info    0x00000000000080ff      0x109 lib/libmini.a(printf.o)
+ .debug_info    0x0000000000008208      0x3a5 lib/libmini.a(console.o)
+ .debug_info    0x00000000000085ad       0xab lib/libmini.a(ctors.o)
+ .debug_info    0x0000000000008658       0x9a lib/libmini.a(delay.o)
+ .debug_info    0x00000000000086f2      0x948 comm/libcomm.a(sercomm.o)
+ .debug_info    0x000000000000903a      0x589 comm/libcomm.a(sercomm_cons.o)
+ .debug_info    0x00000000000095c3      0x5ca comm/libcomm.a(timer.o)
+ .debug_info    0x0000000000009b8d      0x319 comm/libcomm.a(msgb.o)
 
-.debug_line     0x0000000000000000     0x3757
+.debug_line     0x0000000000000000     0x3a80
  .debug_line    0x0000000000000000      0x2ac apps/hello_world/main.o
- .debug_line    0x00000000000002ac      0x2c4 abb/twl3025.o
- .debug_line    0x0000000000000570      0x370 rf/trf6151.o
- .debug_line    0x00000000000008e0      0x1d8 flash/cfi_flash.o
- .debug_line    0x0000000000000ab8      0x19b board/compal/rffe_dualband.o
- .debug_line    0x0000000000000c53       0x8f board/compal/rf_power.o
- .debug_line    0x0000000000000ce2      0x15e board/se_j100/init.o
- .debug_line    0x0000000000000e40       0x5c battery/dummy.o
- .debug_line    0x0000000000000e9c       0x9a fb/framebuffer.o
- .debug_line    0x0000000000000f36       0xb6 fb/font.o
- .debug_line    0x0000000000000fec       0x99 fb/helvR08.o
- .debug_line    0x0000000000001085       0x99 fb/helvB14.o
- .debug_line    0x000000000000111e       0x95 fb/c64.o
- .debug_line    0x00000000000011b3       0x99 fb/symbols.o
- .debug_line    0x000000000000124c      0x2c1 fb/fb_rgb332.o
- .debug_line    0x000000000000150d      0x169 fb/fb_ssd1963.o
- .debug_line    0x0000000000001676       0x31 board/se_j100/hello_world.compalram.manifest.o
- .debug_line    0x00000000000016a7      0x19d calypso/libcalypso.a(clock.o)
- .debug_line    0x0000000000001844       0x3f calypso/libcalypso.a(dma.o)
- .debug_line    0x0000000000001883      0x18b calypso/libcalypso.a(irq.o)
- .debug_line    0x0000000000001a0e       0x6f calypso/libcalypso.a(rtc.o)
- .debug_line    0x0000000000001a7d       0xe1 calypso/libcalypso.a(spi.o)
- .debug_line    0x0000000000001b5e      0x275 calypso/libcalypso.a(tpu.o)
- .debug_line    0x0000000000001dd3      0x185 calypso/libcalypso.a(tsp.o)
- .debug_line    0x0000000000001f58      0x195 calypso/libcalypso.a(keypad.o)
- .debug_line    0x00000000000020ed       0x8c calypso/libcalypso.a(misc.o)
- .debug_line    0x0000000000002179      0x156 calypso/libcalypso.a(timer.o)
- .debug_line    0x00000000000022cf       0xc4 calypso/libcalypso.a(backlight.o)
- .debug_line    0x0000000000002393      0x28c calypso/libcalypso.a(uart.o)
- .debug_line    0x000000000000261f      0x10a calypso/libcalypso.a(uwire.o)
- .debug_line    0x0000000000002729       0x4f calypso/libcalypso.a(arm.o)
- .debug_line    0x0000000000002778      0x573 lib/libmini.a(vsprintf.o)
- .debug_line    0x0000000000002ceb       0xb2 lib/libmini.a(string.o)
- .debug_line    0x0000000000002d9d       0x3f lib/libmini.a(ctype.o)
- .debug_line    0x0000000000002ddc       0x80 lib/libmini.a(printf.o)
- .debug_line    0x0000000000002e5c      0x149 lib/libmini.a(console.o)
- .debug_line    0x0000000000002fa5       0x47 lib/libmini.a(ctors.o)
- .debug_line    0x0000000000002fec       0x66 lib/libmini.a(delay.o)
- .debug_line    0x0000000000003052      0x2be comm/libcomm.a(sercomm.o)
- .debug_line    0x0000000000003310      0x199 comm/libcomm.a(sercomm_cons.o)
- .debug_line    0x00000000000034a9      0x1ad comm/libcomm.a(timer.o)
- .debug_line    0x0000000000003656      0x101 comm/libcomm.a(msgb.o)
+ .debug_line    0x00000000000002ac      0x2ff abb/twl3025.o
+ .debug_line    0x00000000000005ab      0x360 rf/trf6151.o
+ .debug_line    0x000000000000090b      0x1fe flash/cfi_flash.o
+ .debug_line    0x0000000000000b09       0xa7 board/common/tx_calchan.o
+ .debug_line    0x0000000000000bb0      0x197 board/compal/rffe_dualband.o
+ .debug_line    0x0000000000000d47       0xa6 board/compal/rf_tables.o
+ .debug_line    0x0000000000000ded      0x10e board/compal/readcal_common.o
+ .debug_line    0x0000000000000efb      0x15e board/se_j100/init.o
+ .debug_line    0x0000000000001059       0x4f board/compal/readcal_small.o
+ .debug_line    0x00000000000010a8       0xa6 board/se_j100/tx_ramps.o
+ .debug_line    0x000000000000114e       0x5c battery/dummy.o
+ .debug_line    0x00000000000011aa       0x9a fb/framebuffer.o
+ .debug_line    0x0000000000001244       0xb6 fb/font.o
+ .debug_line    0x00000000000012fa       0x99 fb/helvR08.o
+ .debug_line    0x0000000000001393       0x99 fb/helvB14.o
+ .debug_line    0x000000000000142c       0x95 fb/c64.o
+ .debug_line    0x00000000000014c1       0x99 fb/symbols.o
+ .debug_line    0x000000000000155a      0x2c5 fb/fb_rgb332.o
+ .debug_line    0x000000000000181f      0x169 fb/fb_ssd1963.o
+ .debug_line    0x0000000000001988       0x31 board/se_j100/hello_world.compalram.manifest.o
+ .debug_line    0x00000000000019b9      0x19d calypso/libcalypso.a(clock.o)
+ .debug_line    0x0000000000001b56       0x3f calypso/libcalypso.a(dma.o)
+ .debug_line    0x0000000000001b95      0x18b calypso/libcalypso.a(irq.o)
+ .debug_line    0x0000000000001d20       0x6e calypso/libcalypso.a(rtc.o)
+ .debug_line    0x0000000000001d8e       0xe0 calypso/libcalypso.a(spi.o)
+ .debug_line    0x0000000000001e6e      0x276 calypso/libcalypso.a(tpu.o)
+ .debug_line    0x00000000000020e4      0x185 calypso/libcalypso.a(tsp.o)
+ .debug_line    0x0000000000002269      0x1ae calypso/libcalypso.a(keypad.o)
+ .debug_line    0x0000000000002417       0x8c calypso/libcalypso.a(misc.o)
+ .debug_line    0x00000000000024a3      0x156 calypso/libcalypso.a(timer.o)
+ .debug_line    0x00000000000025f9       0xc4 calypso/libcalypso.a(backlight.o)
+ .debug_line    0x00000000000026bd      0x28c calypso/libcalypso.a(uart.o)
+ .debug_line    0x0000000000002949      0x10a calypso/libcalypso.a(uwire.o)
+ .debug_line    0x0000000000002a53       0x4f calypso/libcalypso.a(arm.o)
+ .debug_line    0x0000000000002aa2      0x573 lib/libmini.a(vsprintf.o)
+ .debug_line    0x0000000000003015       0xb2 lib/libmini.a(string.o)
+ .debug_line    0x00000000000030c7       0x3f lib/libmini.a(ctype.o)
+ .debug_line    0x0000000000003106       0x80 lib/libmini.a(printf.o)
+ .debug_line    0x0000000000003186      0x149 lib/libmini.a(console.o)
+ .debug_line    0x00000000000032cf       0x47 lib/libmini.a(ctors.o)
+ .debug_line    0x0000000000003316       0x66 lib/libmini.a(delay.o)
+ .debug_line    0x000000000000337c      0x2be comm/libcomm.a(sercomm.o)
+ .debug_line    0x000000000000363a      0x199 comm/libcomm.a(sercomm_cons.o)
+ .debug_line    0x00000000000037d3      0x1ac comm/libcomm.a(timer.o)
+ .debug_line    0x000000000000397f      0x101 comm/libcomm.a(msgb.o)
 
-.debug_loc      0x0000000000000000     0x559e
+.debug_loc      0x0000000000000000     0x55f6
  .debug_loc     0x0000000000000000      0x1c5 apps/hello_world/main.o
- .debug_loc     0x00000000000001c5      0x413 abb/twl3025.o
- .debug_loc     0x00000000000005d8      0x784 rf/trf6151.o
- .debug_loc     0x0000000000000d5c      0x60c flash/cfi_flash.o
- .debug_loc     0x0000000000001368      0x153 board/compal/rffe_dualband.o
- .debug_loc     0x00000000000014bb       0x9e board/se_j100/init.o
- .debug_loc     0x0000000000001559       0x4f fb/font.o
- .debug_loc     0x00000000000015a8      0x746 fb/fb_rgb332.o
- .debug_loc     0x0000000000001cee      0x151 fb/fb_ssd1963.o
- .debug_loc     0x0000000000001e3f      0x297 calypso/libcalypso.a(clock.o)
- .debug_loc     0x00000000000020d6      0x215 calypso/libcalypso.a(irq.o)
- .debug_loc     0x00000000000022eb       0x20 calypso/libcalypso.a(rtc.o)
- .debug_loc     0x000000000000230b      0x155 calypso/libcalypso.a(spi.o)
- .debug_loc     0x0000000000002460      0x31e calypso/libcalypso.a(tpu.o)
- .debug_loc     0x000000000000277e      0x153 calypso/libcalypso.a(tsp.o)
- .debug_loc     0x00000000000028d1      0x174 calypso/libcalypso.a(keypad.o)
- .debug_loc     0x0000000000002a45       0xfa calypso/libcalypso.a(misc.o)
- .debug_loc     0x0000000000002b3f      0x154 calypso/libcalypso.a(timer.o)
- .debug_loc     0x0000000000002c93       0x44 calypso/libcalypso.a(backlight.o)
- .debug_loc     0x0000000000002cd7      0x4b2 calypso/libcalypso.a(uart.o)
- .debug_loc     0x0000000000003189       0xef calypso/libcalypso.a(uwire.o)
- .debug_loc     0x0000000000003278     0x1604 lib/libmini.a(vsprintf.o)
- .debug_loc     0x000000000000487c       0x8b lib/libmini.a(string.o)
- .debug_loc     0x0000000000004907       0x4a lib/libmini.a(printf.o)
- .debug_loc     0x0000000000004951      0x23b lib/libmini.a(console.o)
- .debug_loc     0x0000000000004b8c       0x7b lib/libmini.a(ctors.o)
- .debug_loc     0x0000000000004c07       0xa9 lib/libmini.a(delay.o)
- .debug_loc     0x0000000000004cb0      0x2fc comm/libcomm.a(sercomm.o)
- .debug_loc     0x0000000000004fac      0x2ea comm/libcomm.a(sercomm_cons.o)
- .debug_loc     0x0000000000005296      0x291 comm/libcomm.a(timer.o)
- .debug_loc     0x0000000000005527       0x77 comm/libcomm.a(msgb.o)
+ .debug_loc     0x00000000000001c5      0x43e abb/twl3025.o
+ .debug_loc     0x0000000000000603      0x6fd rf/trf6151.o
+ .debug_loc     0x0000000000000d00      0x601 flash/cfi_flash.o
+ .debug_loc     0x0000000000001301      0x10a board/compal/rffe_dualband.o
+ .debug_loc     0x000000000000140b      0x11c board/compal/readcal_common.o
+ .debug_loc     0x0000000000001527       0x9e board/se_j100/init.o
+ .debug_loc     0x00000000000015c5       0x4f fb/font.o
+ .debug_loc     0x0000000000001614      0x746 fb/fb_rgb332.o
+ .debug_loc     0x0000000000001d5a      0x151 fb/fb_ssd1963.o
+ .debug_loc     0x0000000000001eab      0x297 calypso/libcalypso.a(clock.o)
+ .debug_loc     0x0000000000002142      0x215 calypso/libcalypso.a(irq.o)
+ .debug_loc     0x0000000000002357       0x20 calypso/libcalypso.a(rtc.o)
+ .debug_loc     0x0000000000002377      0x155 calypso/libcalypso.a(spi.o)
+ .debug_loc     0x00000000000024cc      0x31e calypso/libcalypso.a(tpu.o)
+ .debug_loc     0x00000000000027ea      0x153 calypso/libcalypso.a(tsp.o)
+ .debug_loc     0x000000000000293d      0x161 calypso/libcalypso.a(keypad.o)
+ .debug_loc     0x0000000000002a9e       0xfa calypso/libcalypso.a(misc.o)
+ .debug_loc     0x0000000000002b98      0x154 calypso/libcalypso.a(timer.o)
+ .debug_loc     0x0000000000002cec       0x44 calypso/libcalypso.a(backlight.o)
+ .debug_loc     0x0000000000002d30      0x4b2 calypso/libcalypso.a(uart.o)
+ .debug_loc     0x00000000000031e2       0xef calypso/libcalypso.a(uwire.o)
+ .debug_loc     0x00000000000032d1     0x1603 lib/libmini.a(vsprintf.o)
+ .debug_loc     0x00000000000048d4       0x8b lib/libmini.a(string.o)
+ .debug_loc     0x000000000000495f       0x4a lib/libmini.a(printf.o)
+ .debug_loc     0x00000000000049a9      0x23b lib/libmini.a(console.o)
+ .debug_loc     0x0000000000004be4       0x7b lib/libmini.a(ctors.o)
+ .debug_loc     0x0000000000004c5f       0xa9 lib/libmini.a(delay.o)
+ .debug_loc     0x0000000000004d08      0x2fc comm/libcomm.a(sercomm.o)
+ .debug_loc     0x0000000000005004      0x2ea comm/libcomm.a(sercomm_cons.o)
+ .debug_loc     0x00000000000052ee      0x291 comm/libcomm.a(timer.o)
+ .debug_loc     0x000000000000557f       0x77 comm/libcomm.a(msgb.o)
 
 .debug_pubnames
-                0x0000000000000000     0x10e6
+                0x0000000000000000     0x12af
  .debug_pubnames
                 0x0000000000000000       0x49 apps/hello_world/main.o
  .debug_pubnames
-                0x0000000000000049      0x13c abb/twl3025.o
+                0x0000000000000049      0x16b abb/twl3025.o
  .debug_pubnames
-                0x0000000000000185      0x164 rf/trf6151.o
+                0x00000000000001b4      0x164 rf/trf6151.o
  .debug_pubnames
-                0x00000000000002e9       0xa6 flash/cfi_flash.o
+                0x0000000000000318       0xb7 flash/cfi_flash.o
  .debug_pubnames
-                0x000000000000038f       0xd6 board/compal/rffe_dualband.o
+                0x00000000000003cf       0x70 board/common/tx_calchan.o
  .debug_pubnames
-                0x0000000000000465       0x3c board/compal/rf_power.o
+                0x000000000000043f       0xd6 board/compal/rffe_dualband.o
  .debug_pubnames
-                0x00000000000004a1       0x21 board/se_j100/init.o
+                0x0000000000000515       0x90 board/compal/rf_tables.o
  .debug_pubnames
-                0x00000000000004c2       0x3a battery/dummy.o
+                0x00000000000005a5       0x32 board/compal/readcal_common.o
  .debug_pubnames
-                0x00000000000004fc       0x34 fb/font.o
+                0x00000000000005d7       0x21 board/se_j100/init.o
  .debug_pubnames
-                0x0000000000000530       0x23 fb/helvR08.o
+                0x00000000000005f8       0x32 board/compal/readcal_small.o
  .debug_pubnames
-                0x0000000000000553       0x23 fb/helvB14.o
+                0x000000000000062a       0x73 board/se_j100/tx_ramps.o
  .debug_pubnames
-                0x0000000000000576       0x1f fb/c64.o
+                0x000000000000069d       0x3a battery/dummy.o
  .debug_pubnames
-                0x0000000000000595       0x23 fb/symbols.o
+                0x00000000000006d7       0x34 fb/font.o
  .debug_pubnames
-                0x00000000000005b8       0x64 fb/fb_rgb332.o
+                0x000000000000070b       0x23 fb/helvR08.o
  .debug_pubnames
-                0x000000000000061c       0x30 fb/fb_ssd1963.o
+                0x000000000000072e       0x23 fb/helvB14.o
  .debug_pubnames
-                0x000000000000064c       0x6d board/se_j100/hello_world.compalram.manifest.o
+                0x0000000000000751       0x1f fb/c64.o
  .debug_pubnames
-                0x00000000000006b9       0xd0 calypso/libcalypso.a(clock.o)
+                0x0000000000000770       0x23 fb/symbols.o
  .debug_pubnames
-                0x0000000000000789       0x1f calypso/libcalypso.a(dma.o)
+                0x0000000000000793       0x64 fb/fb_rgb332.o
  .debug_pubnames
-                0x00000000000007a8       0x95 calypso/libcalypso.a(irq.o)
+                0x00000000000007f7       0x30 fb/fb_ssd1963.o
  .debug_pubnames
-                0x000000000000083d       0x1f calypso/libcalypso.a(rtc.o)
+                0x0000000000000827       0x6d board/se_j100/hello_world.compalram.manifest.o
  .debug_pubnames
-                0x000000000000085c       0x2c calypso/libcalypso.a(spi.o)
+                0x0000000000000894       0xd0 calypso/libcalypso.a(clock.o)
  .debug_pubnames
-                0x0000000000000888      0x12d calypso/libcalypso.a(tpu.o)
+                0x0000000000000964       0x1f calypso/libcalypso.a(dma.o)
  .debug_pubnames
-                0x00000000000009b5       0x9a calypso/libcalypso.a(tsp.o)
+                0x0000000000000983       0x95 calypso/libcalypso.a(irq.o)
  .debug_pubnames
-                0x0000000000000a4f       0x8a calypso/libcalypso.a(keypad.o)
+                0x0000000000000a18       0x1f calypso/libcalypso.a(rtc.o)
  .debug_pubnames
-                0x0000000000000ad9       0x41 calypso/libcalypso.a(misc.o)
+                0x0000000000000a37       0x2c calypso/libcalypso.a(spi.o)
  .debug_pubnames
-                0x0000000000000b1a       0x8a calypso/libcalypso.a(timer.o)
+                0x0000000000000a63      0x12d calypso/libcalypso.a(tpu.o)
  .debug_pubnames
-                0x0000000000000ba4       0x2f calypso/libcalypso.a(backlight.o)
+                0x0000000000000b90       0x9a calypso/libcalypso.a(tsp.o)
  .debug_pubnames
-                0x0000000000000bd3       0xa3 calypso/libcalypso.a(uart.o)
+                0x0000000000000c2a       0x8a calypso/libcalypso.a(keypad.o)
  .debug_pubnames
-                0x0000000000000c76       0x30 calypso/libcalypso.a(uwire.o)
+                0x0000000000000cb4       0x41 calypso/libcalypso.a(misc.o)
  .debug_pubnames
-                0x0000000000000ca6       0x47 calypso/libcalypso.a(arm.o)
+                0x0000000000000cf5       0x8a calypso/libcalypso.a(timer.o)
  .debug_pubnames
-                0x0000000000000ced       0xb3 lib/libmini.a(vsprintf.o)
+                0x0000000000000d7f       0x2f calypso/libcalypso.a(backlight.o)
  .debug_pubnames
-                0x0000000000000da0       0x29 lib/libmini.a(string.o)
+                0x0000000000000dae       0xa3 calypso/libcalypso.a(uart.o)
  .debug_pubnames
-                0x0000000000000dc9       0x1d lib/libmini.a(ctype.o)
+                0x0000000000000e51       0x30 calypso/libcalypso.a(uwire.o)
  .debug_pubnames
-                0x0000000000000de6       0x1d lib/libmini.a(printf.o)
+                0x0000000000000e81       0x47 calypso/libcalypso.a(arm.o)
  .debug_pubnames
-                0x0000000000000e03       0x89 lib/libmini.a(console.o)
+                0x0000000000000ec8       0xb3 lib/libmini.a(vsprintf.o)
  .debug_pubnames
-                0x0000000000000e8c       0x26 lib/libmini.a(ctors.o)
+                0x0000000000000f7b       0x29 lib/libmini.a(string.o)
  .debug_pubnames
-                0x0000000000000eb2       0x2c lib/libmini.a(delay.o)
+                0x0000000000000fa4       0x1d lib/libmini.a(ctype.o)
  .debug_pubnames
-                0x0000000000000ede       0xdd comm/libcomm.a(sercomm.o)
+                0x0000000000000fc1       0x1d lib/libmini.a(printf.o)
  .debug_pubnames
-                0x0000000000000fbb       0x37 comm/libcomm.a(sercomm_cons.o)
+                0x0000000000000fde       0x89 lib/libmini.a(console.o)
  .debug_pubnames
-                0x0000000000000ff2       0xaf comm/libcomm.a(timer.o)
+                0x0000000000001067       0x26 lib/libmini.a(ctors.o)
  .debug_pubnames
-                0x00000000000010a1       0x45 comm/libcomm.a(msgb.o)
+                0x000000000000108d       0x2c lib/libmini.a(delay.o)
+ .debug_pubnames
+                0x00000000000010b9       0xdd comm/libcomm.a(sercomm.o)
+ .debug_pubnames
+                0x0000000000001196       0x37 comm/libcomm.a(sercomm_cons.o)
+ .debug_pubnames
+                0x00000000000011cd       0xaf comm/libcomm.a(timer.o)
+ .debug_pubnames
+                0x000000000000127c       0x33 comm/libcomm.a(msgb.o)
 
 .debug_pubtypes
-                0x0000000000000000      0xdc1
+                0x0000000000000000      0xee8
  .debug_pubtypes
                 0x0000000000000000       0xd4 apps/hello_world/main.o
  .debug_pubtypes
-                0x00000000000000d4       0xa2 abb/twl3025.o
+                0x00000000000000d4       0xc2 abb/twl3025.o
  .debug_pubtypes
-                0x0000000000000176       0xa3 rf/trf6151.o
+                0x0000000000000196       0xa3 rf/trf6151.o
  .debug_pubtypes
-                0x0000000000000219      0x109 flash/cfi_flash.o
+                0x0000000000000239      0x109 flash/cfi_flash.o
  .debug_pubtypes
-                0x0000000000000322       0x5f board/compal/rffe_dualband.o
+                0x0000000000000342       0x3e board/common/tx_calchan.o
  .debug_pubtypes
-                0x0000000000000381       0x1e board/compal/rf_power.o
+                0x0000000000000380       0x5f board/compal/rffe_dualband.o
  .debug_pubtypes
-                0x000000000000039f       0xb7 board/se_j100/init.o
+                0x00000000000003df       0x4a board/compal/rf_tables.o
  .debug_pubtypes
-                0x0000000000000456       0x35 battery/dummy.o
+                0x0000000000000429       0x5a board/compal/readcal_common.o
  .debug_pubtypes
-                0x000000000000048b       0x4b fb/framebuffer.o
+                0x0000000000000483       0xb7 board/se_j100/init.o
  .debug_pubtypes
-                0x00000000000004d6       0x4e fb/font.o
+                0x000000000000053a       0x12 board/compal/readcal_small.o
  .debug_pubtypes
-                0x0000000000000524       0x42 fb/helvR08.o
+                0x000000000000054c       0x31 board/se_j100/tx_ramps.o
  .debug_pubtypes
-                0x0000000000000566       0x42 fb/helvB14.o
+                0x000000000000057d       0x35 battery/dummy.o
  .debug_pubtypes
-                0x00000000000005a8       0x42 fb/c64.o
+                0x00000000000005b2       0x4b fb/framebuffer.o
  .debug_pubtypes
-                0x00000000000005ea       0x42 fb/symbols.o
+                0x00000000000005fd       0x4e fb/font.o
  .debug_pubtypes
-                0x000000000000062c       0x88 fb/fb_rgb332.o
+                0x000000000000064b       0x42 fb/helvR08.o
  .debug_pubtypes
-                0x00000000000006b4       0x9d fb/fb_ssd1963.o
+                0x000000000000068d       0x42 fb/helvB14.o
  .debug_pubtypes
-                0x0000000000000751       0x97 calypso/libcalypso.a(clock.o)
+                0x00000000000006cf       0x42 fb/c64.o
  .debug_pubtypes
-                0x00000000000007e8       0x1e calypso/libcalypso.a(dma.o)
+                0x0000000000000711       0x42 fb/symbols.o
  .debug_pubtypes
-                0x0000000000000806       0x6a calypso/libcalypso.a(irq.o)
+                0x0000000000000753       0x88 fb/fb_rgb332.o
  .debug_pubtypes
-                0x0000000000000870       0x29 calypso/libcalypso.a(rtc.o)
+                0x00000000000007db       0x9d fb/fb_ssd1963.o
  .debug_pubtypes
-                0x0000000000000899       0x45 calypso/libcalypso.a(spi.o)
+                0x0000000000000878       0x97 calypso/libcalypso.a(clock.o)
  .debug_pubtypes
-                0x00000000000008de       0x89 calypso/libcalypso.a(tpu.o)
+                0x000000000000090f       0x1e calypso/libcalypso.a(dma.o)
  .debug_pubtypes
-                0x0000000000000967       0x6a calypso/libcalypso.a(tsp.o)
+                0x000000000000092d       0x6a calypso/libcalypso.a(irq.o)
  .debug_pubtypes
-                0x00000000000009d1       0x72 calypso/libcalypso.a(keypad.o)
+                0x0000000000000997       0x29 calypso/libcalypso.a(rtc.o)
  .debug_pubtypes
-                0x0000000000000a43       0x12 calypso/libcalypso.a(misc.o)
+                0x00000000000009c0       0x45 calypso/libcalypso.a(spi.o)
  .debug_pubtypes
-                0x0000000000000a55       0x6d calypso/libcalypso.a(timer.o)
+                0x0000000000000a05       0x89 calypso/libcalypso.a(tpu.o)
  .debug_pubtypes
-                0x0000000000000ac2       0x37 calypso/libcalypso.a(backlight.o)
+                0x0000000000000a8e       0x6a calypso/libcalypso.a(tsp.o)
  .debug_pubtypes
-                0x0000000000000af9       0x7c calypso/libcalypso.a(uart.o)
+                0x0000000000000af8       0x72 calypso/libcalypso.a(keypad.o)
  .debug_pubtypes
-                0x0000000000000b75       0x3a calypso/libcalypso.a(uwire.o)
+                0x0000000000000b6a       0x12 calypso/libcalypso.a(misc.o)
  .debug_pubtypes
-                0x0000000000000baf       0x3c lib/libmini.a(vsprintf.o)
+                0x0000000000000b7c       0x6d calypso/libcalypso.a(timer.o)
  .debug_pubtypes
-                0x0000000000000beb       0x1d lib/libmini.a(string.o)
+                0x0000000000000be9       0x37 calypso/libcalypso.a(backlight.o)
  .debug_pubtypes
-                0x0000000000000c08       0x31 lib/libmini.a(printf.o)
+                0x0000000000000c20       0x7c calypso/libcalypso.a(uart.o)
  .debug_pubtypes
-                0x0000000000000c39       0x28 lib/libmini.a(console.o)
+                0x0000000000000c9c       0x3a calypso/libcalypso.a(uwire.o)
  .debug_pubtypes
-                0x0000000000000c61       0x7c comm/libcomm.a(sercomm.o)
+                0x0000000000000cd6       0x3c lib/libmini.a(vsprintf.o)
  .debug_pubtypes
-                0x0000000000000cdd       0x54 comm/libcomm.a(sercomm_cons.o)
+                0x0000000000000d12       0x1d lib/libmini.a(string.o)
  .debug_pubtypes
-                0x0000000000000d31       0x40 comm/libcomm.a(timer.o)
+                0x0000000000000d2f       0x31 lib/libmini.a(printf.o)
  .debug_pubtypes
-                0x0000000000000d71       0x50 comm/libcomm.a(msgb.o)
+                0x0000000000000d60       0x28 lib/libmini.a(console.o)
+ .debug_pubtypes
+                0x0000000000000d88       0x7c comm/libcomm.a(sercomm.o)
+ .debug_pubtypes
+                0x0000000000000e04       0x54 comm/libcomm.a(sercomm_cons.o)
+ .debug_pubtypes
+                0x0000000000000e58       0x40 comm/libcomm.a(timer.o)
+ .debug_pubtypes
+                0x0000000000000e98       0x50 comm/libcomm.a(msgb.o)
 
-.debug_aranges  0x0000000000000000      0x9e8
+.debug_aranges  0x0000000000000000      0xa40
  .debug_aranges
                 0x0000000000000000       0x58 apps/hello_world/main.o
  .debug_aranges
-                0x0000000000000058       0xa8 abb/twl3025.o
+                0x0000000000000058       0xb8 abb/twl3025.o
  .debug_aranges
-                0x0000000000000100       0xa8 rf/trf6151.o
+                0x0000000000000110       0xa0 rf/trf6151.o
  .debug_aranges
-                0x00000000000001a8       0x50 flash/cfi_flash.o
+                0x00000000000001b0       0x58 flash/cfi_flash.o
  .debug_aranges
-                0x00000000000001f8       0x60 board/compal/rffe_dualband.o
+                0x0000000000000208       0x60 board/compal/rffe_dualband.o
  .debug_aranges
-                0x0000000000000258       0x20 board/se_j100/init.o
+                0x0000000000000268       0x28 board/compal/readcal_common.o
  .debug_aranges
-                0x0000000000000278       0x20 battery/dummy.o
+                0x0000000000000290       0x20 board/se_j100/init.o
  .debug_aranges
-                0x0000000000000298       0x20 fb/font.o
+                0x00000000000002b0       0x20 board/compal/readcal_small.o
  .debug_aranges
-                0x00000000000002b8       0x50 fb/fb_rgb332.o
+                0x00000000000002d0       0x20 battery/dummy.o
  .debug_aranges
-                0x0000000000000308       0x30 fb/fb_ssd1963.o
+                0x00000000000002f0       0x20 fb/font.o
  .debug_aranges
-                0x0000000000000338       0x68 calypso/libcalypso.a(clock.o)
+                0x0000000000000310       0x50 fb/fb_rgb332.o
  .debug_aranges
-                0x00000000000003a0       0x20 calypso/libcalypso.a(dma.o)
+                0x0000000000000360       0x30 fb/fb_ssd1963.o
  .debug_aranges
-                0x00000000000003c0       0x60 calypso/libcalypso.a(irq.o)
+                0x0000000000000390       0x68 calypso/libcalypso.a(clock.o)
  .debug_aranges
-                0x0000000000000420       0x28 calypso/libcalypso.a(rtc.o)
+                0x00000000000003f8       0x20 calypso/libcalypso.a(dma.o)
  .debug_aranges
-                0x0000000000000448       0x28 calypso/libcalypso.a(spi.o)
+                0x0000000000000418       0x60 calypso/libcalypso.a(irq.o)
  .debug_aranges
-                0x0000000000000470       0x98 calypso/libcalypso.a(tpu.o)
+                0x0000000000000478       0x28 calypso/libcalypso.a(rtc.o)
  .debug_aranges
-                0x0000000000000508       0x60 calypso/libcalypso.a(tsp.o)
+                0x00000000000004a0       0x28 calypso/libcalypso.a(spi.o)
  .debug_aranges
-                0x0000000000000568       0x48 calypso/libcalypso.a(keypad.o)
+                0x00000000000004c8       0x98 calypso/libcalypso.a(tpu.o)
  .debug_aranges
-                0x00000000000005b0       0x30 calypso/libcalypso.a(misc.o)
+                0x0000000000000560       0x60 calypso/libcalypso.a(tsp.o)
  .debug_aranges
-                0x00000000000005e0       0x58 calypso/libcalypso.a(timer.o)
+                0x00000000000005c0       0x48 calypso/libcalypso.a(keypad.o)
  .debug_aranges
-                0x0000000000000638       0x28 calypso/libcalypso.a(backlight.o)
+                0x0000000000000608       0x30 calypso/libcalypso.a(misc.o)
  .debug_aranges
-                0x0000000000000660       0x90 calypso/libcalypso.a(uart.o)
+                0x0000000000000638       0x58 calypso/libcalypso.a(timer.o)
  .debug_aranges
-                0x00000000000006f0       0x30 calypso/libcalypso.a(uwire.o)
+                0x0000000000000690       0x28 calypso/libcalypso.a(backlight.o)
  .debug_aranges
-                0x0000000000000720       0x28 calypso/libcalypso.a(arm.o)
+                0x00000000000006b8       0x90 calypso/libcalypso.a(uart.o)
  .debug_aranges
-                0x0000000000000748       0x98 lib/libmini.a(vsprintf.o)
+                0x0000000000000748       0x30 calypso/libcalypso.a(uwire.o)
  .debug_aranges
-                0x00000000000007e0       0x28 lib/libmini.a(string.o)
+                0x0000000000000778       0x28 calypso/libcalypso.a(arm.o)
  .debug_aranges
-                0x0000000000000808       0x20 lib/libmini.a(printf.o)
+                0x00000000000007a0       0x98 lib/libmini.a(vsprintf.o)
  .debug_aranges
-                0x0000000000000828       0x60 lib/libmini.a(console.o)
+                0x0000000000000838       0x28 lib/libmini.a(string.o)
  .debug_aranges
-                0x0000000000000888       0x20 lib/libmini.a(ctors.o)
+                0x0000000000000860       0x20 lib/libmini.a(printf.o)
  .debug_aranges
-                0x00000000000008a8       0x28 lib/libmini.a(delay.o)
+                0x0000000000000880       0x60 lib/libmini.a(console.o)
  .debug_aranges
-                0x00000000000008d0       0x68 comm/libcomm.a(sercomm.o)
+                0x00000000000008e0       0x20 lib/libmini.a(ctors.o)
  .debug_aranges
-                0x0000000000000938       0x30 comm/libcomm.a(sercomm_cons.o)
+                0x0000000000000900       0x28 lib/libmini.a(delay.o)
  .debug_aranges
-                0x0000000000000968       0x58 comm/libcomm.a(timer.o)
+                0x0000000000000928       0x68 comm/libcomm.a(sercomm.o)
  .debug_aranges
-                0x00000000000009c0       0x28 comm/libcomm.a(msgb.o)
+                0x0000000000000990       0x30 comm/libcomm.a(sercomm_cons.o)
+ .debug_aranges
+                0x00000000000009c0       0x58 comm/libcomm.a(timer.o)
+ .debug_aranges
+                0x0000000000000a18       0x28 comm/libcomm.a(msgb.o)
 
-.debug_ranges   0x0000000000000000      0xbc8
+.debug_ranges   0x0000000000000000      0xbd8
  .debug_ranges  0x0000000000000000      0x100 apps/hello_world/main.o
- .debug_ranges  0x0000000000000100       0xc8 abb/twl3025.o
- .debug_ranges  0x00000000000001c8       0x98 rf/trf6151.o
- .debug_ranges  0x0000000000000260      0x110 flash/cfi_flash.o
- .debug_ranges  0x0000000000000370       0x50 board/compal/rffe_dualband.o
+ .debug_ranges  0x0000000000000100       0xd8 abb/twl3025.o
+ .debug_ranges  0x00000000000001d8       0x90 rf/trf6151.o
+ .debug_ranges  0x0000000000000268       0xf0 flash/cfi_flash.o
+ .debug_ranges  0x0000000000000358       0x50 board/compal/rffe_dualband.o
+ .debug_ranges  0x00000000000003a8       0x18 board/compal/readcal_common.o
  .debug_ranges  0x00000000000003c0       0x10 board/se_j100/init.o
- .debug_ranges  0x00000000000003d0       0x10 battery/dummy.o
- .debug_ranges  0x00000000000003e0       0x10 fb/font.o
- .debug_ranges  0x00000000000003f0       0xc0 fb/fb_rgb332.o
- .debug_ranges  0x00000000000004b0       0x50 fb/fb_ssd1963.o
- .debug_ranges  0x0000000000000500       0x58 calypso/libcalypso.a(clock.o)
- .debug_ranges  0x0000000000000558       0x10 calypso/libcalypso.a(dma.o)
- .debug_ranges  0x0000000000000568       0x50 calypso/libcalypso.a(irq.o)
- .debug_ranges  0x00000000000005b8       0x18 calypso/libcalypso.a(rtc.o)
- .debug_ranges  0x00000000000005d0       0x18 calypso/libcalypso.a(spi.o)
- .debug_ranges  0x00000000000005e8       0xd0 calypso/libcalypso.a(tpu.o)
- .debug_ranges  0x00000000000006b8       0x50 calypso/libcalypso.a(tsp.o)
- .debug_ranges  0x0000000000000708       0x38 calypso/libcalypso.a(keypad.o)
- .debug_ranges  0x0000000000000740       0x38 calypso/libcalypso.a(misc.o)
- .debug_ranges  0x0000000000000778       0x48 calypso/libcalypso.a(timer.o)
- .debug_ranges  0x00000000000007c0       0x18 calypso/libcalypso.a(backlight.o)
- .debug_ranges  0x00000000000007d8       0x98 calypso/libcalypso.a(uart.o)
- .debug_ranges  0x0000000000000870       0x20 calypso/libcalypso.a(uwire.o)
- .debug_ranges  0x0000000000000890       0x18 calypso/libcalypso.a(arm.o)
- .debug_ranges  0x00000000000008a8       0xd0 lib/libmini.a(vsprintf.o)
- .debug_ranges  0x0000000000000978       0x18 lib/libmini.a(string.o)
- .debug_ranges  0x0000000000000990       0x10 lib/libmini.a(printf.o)
- .debug_ranges  0x00000000000009a0       0x68 lib/libmini.a(console.o)
- .debug_ranges  0x0000000000000a08       0x10 lib/libmini.a(ctors.o)
- .debug_ranges  0x0000000000000a18       0x18 lib/libmini.a(delay.o)
- .debug_ranges  0x0000000000000a30       0xb8 comm/libcomm.a(sercomm.o)
- .debug_ranges  0x0000000000000ae8       0x50 comm/libcomm.a(sercomm_cons.o)
- .debug_ranges  0x0000000000000b38       0x78 comm/libcomm.a(timer.o)
- .debug_ranges  0x0000000000000bb0       0x18 comm/libcomm.a(msgb.o)
+ .debug_ranges  0x00000000000003d0       0x10 board/compal/readcal_small.o
+ .debug_ranges  0x00000000000003e0       0x10 battery/dummy.o
+ .debug_ranges  0x00000000000003f0       0x10 fb/font.o
+ .debug_ranges  0x0000000000000400       0xc0 fb/fb_rgb332.o
+ .debug_ranges  0x00000000000004c0       0x50 fb/fb_ssd1963.o
+ .debug_ranges  0x0000000000000510       0x58 calypso/libcalypso.a(clock.o)
+ .debug_ranges  0x0000000000000568       0x10 calypso/libcalypso.a(dma.o)
+ .debug_ranges  0x0000000000000578       0x50 calypso/libcalypso.a(irq.o)
+ .debug_ranges  0x00000000000005c8       0x18 calypso/libcalypso.a(rtc.o)
+ .debug_ranges  0x00000000000005e0       0x18 calypso/libcalypso.a(spi.o)
+ .debug_ranges  0x00000000000005f8       0xd0 calypso/libcalypso.a(tpu.o)
+ .debug_ranges  0x00000000000006c8       0x50 calypso/libcalypso.a(tsp.o)
+ .debug_ranges  0x0000000000000718       0x38 calypso/libcalypso.a(keypad.o)
+ .debug_ranges  0x0000000000000750       0x38 calypso/libcalypso.a(misc.o)
+ .debug_ranges  0x0000000000000788       0x48 calypso/libcalypso.a(timer.o)
+ .debug_ranges  0x00000000000007d0       0x18 calypso/libcalypso.a(backlight.o)
+ .debug_ranges  0x00000000000007e8       0x98 calypso/libcalypso.a(uart.o)
+ .debug_ranges  0x0000000000000880       0x20 calypso/libcalypso.a(uwire.o)
+ .debug_ranges  0x00000000000008a0       0x18 calypso/libcalypso.a(arm.o)
+ .debug_ranges  0x00000000000008b8       0xd0 lib/libmini.a(vsprintf.o)
+ .debug_ranges  0x0000000000000988       0x18 lib/libmini.a(string.o)
+ .debug_ranges  0x00000000000009a0       0x10 lib/libmini.a(printf.o)
+ .debug_ranges  0x00000000000009b0       0x68 lib/libmini.a(console.o)
+ .debug_ranges  0x0000000000000a18       0x10 lib/libmini.a(ctors.o)
+ .debug_ranges  0x0000000000000a28       0x18 lib/libmini.a(delay.o)
+ .debug_ranges  0x0000000000000a40       0xb8 comm/libcomm.a(sercomm.o)
+ .debug_ranges  0x0000000000000af8       0x50 comm/libcomm.a(sercomm_cons.o)
+ .debug_ranges  0x0000000000000b48       0x78 comm/libcomm.a(timer.o)
+ .debug_ranges  0x0000000000000bc0       0x18 comm/libcomm.a(msgb.o)
 
-.debug_str      0x0000000000000000     0x2f0e
- .debug_str     0x0000000000000000      0x42d apps/hello_world/main.o
-                                        0x4f0 (size before relaxing)
- .debug_str     0x000000000000042d      0x5f0 abb/twl3025.o
-                                        0x6e6 (size before relaxing)
- .debug_str     0x0000000000000a1d      0x3f4 rf/trf6151.o
-                                        0x5b6 (size before relaxing)
- .debug_str     0x0000000000000e11      0x58f flash/cfi_flash.o
-                                        0x695 (size before relaxing)
- .debug_str     0x00000000000013a0       0xab board/compal/rffe_dualband.o
-                                        0x276 (size before relaxing)
- .debug_str     0x000000000000144b       0x3a board/compal/rf_power.o
-                                         0xf5 (size before relaxing)
- .debug_str     0x0000000000001485      0x1f1 board/se_j100/init.o
-                                        0x45e (size before relaxing)
- .debug_str     0x0000000000001676       0x23 battery/dummy.o
-                                         0xf5 (size before relaxing)
- .debug_str     0x0000000000001699       0x11 fb/framebuffer.o
+.debug_str      0x0000000000000000     0x32c1
+ .debug_str     0x0000000000000000      0x453 apps/hello_world/main.o
+                                        0x511 (size before relaxing)
+ .debug_str     0x0000000000000453      0x655 abb/twl3025.o
+                                        0x75a (size before relaxing)
+ .debug_str     0x0000000000000aa8      0x3f4 rf/trf6151.o
+                                        0x5c0 (size before relaxing)
+ .debug_str     0x0000000000000e9c      0x629 flash/cfi_flash.o
+                                        0x739 (size before relaxing)
+ .debug_str     0x00000000000014c5       0x83 board/common/tx_calchan.o
+                                        0x155 (size before relaxing)
+ .debug_str     0x0000000000001548       0xab board/compal/rffe_dualband.o
+                                        0x280 (size before relaxing)
+ .debug_str     0x00000000000015f3       0xa8 board/compal/rf_tables.o
+                                        0x179 (size before relaxing)
+ .debug_str     0x000000000000169b       0xc9 board/compal/readcal_common.o
+                                        0x214 (size before relaxing)
+ .debug_str     0x0000000000001764      0x1f1 board/se_j100/init.o
+                                        0x484 (size before relaxing)
+ .debug_str     0x0000000000001955       0x39 board/compal/readcal_small.o
+                                         0xf1 (size before relaxing)
+ .debug_str     0x000000000000198e       0x87 board/se_j100/tx_ramps.o
+                                        0x147 (size before relaxing)
+ .debug_str     0x0000000000001a15       0x23 battery/dummy.o
+                                         0xff (size before relaxing)
+ .debug_str     0x0000000000001a38       0x11 fb/framebuffer.o
+                                        0x199 (size before relaxing)
+ .debug_str     0x0000000000001a49       0xb3 fb/font.o
+                                        0x19f (size before relaxing)
+ .debug_str     0x0000000000001afc       0x34 fb/helvR08.o
+                                        0x158 (size before relaxing)
+ .debug_str     0x0000000000001b30       0x34 fb/helvB14.o
+                                        0x158 (size before relaxing)
+ .debug_str     0x0000000000001b64       0x28 fb/c64.o
+                                        0x148 (size before relaxing)
+ .debug_str     0x0000000000001b8c       0x34 fb/symbols.o
+                                        0x158 (size before relaxing)
+ .debug_str     0x0000000000001bc0      0x18b fb/fb_rgb332.o
+                                        0x3a4 (size before relaxing)
+ .debug_str     0x0000000000001d4b      0x111 fb/fb_ssd1963.o
+                                        0x2dd (size before relaxing)
+ .debug_str     0x0000000000001e5c       0x5c board/se_j100/hello_world.compalram.manifest.o
+                                         0x95 (size before relaxing)
+ .debug_str     0x0000000000001eb8      0x161 calypso/libcalypso.a(clock.o)
+                                        0x3d8 (size before relaxing)
+ .debug_str     0x0000000000002019       0x3c calypso/libcalypso.a(dma.o)
+                                         0x70 (size before relaxing)
+ .debug_str     0x0000000000002055      0x112 calypso/libcalypso.a(irq.o)
+                                        0x352 (size before relaxing)
+ .debug_str     0x0000000000002167       0xe4 calypso/libcalypso.a(rtc.o)
+                                        0x302 (size before relaxing)
+ .debug_str     0x000000000000224b       0xb2 calypso/libcalypso.a(spi.o)
                                         0x189 (size before relaxing)
- .debug_str     0x00000000000016aa       0xb3 fb/font.o
-                                        0x195 (size before relaxing)
- .debug_str     0x000000000000175d       0x34 fb/helvR08.o
-                                        0x14e (size before relaxing)
- .debug_str     0x0000000000001791       0x34 fb/helvB14.o
-                                        0x14e (size before relaxing)
- .debug_str     0x00000000000017c5       0x28 fb/c64.o
-                                        0x13e (size before relaxing)
- .debug_str     0x00000000000017ed       0x34 fb/symbols.o
-                                        0x14e (size before relaxing)
- .debug_str     0x0000000000001821      0x18b fb/fb_rgb332.o
-                                        0x394 (size before relaxing)
- .debug_str     0x00000000000019ac      0x111 fb/fb_ssd1963.o
-                                        0x2cd (size before relaxing)
- .debug_str     0x0000000000001abd       0x5c board/se_j100/hello_world.compalram.manifest.o
-                                         0x8b (size before relaxing)
- .debug_str     0x0000000000001b19      0x161 calypso/libcalypso.a(clock.o)
-                                        0x3ce (size before relaxing)
- .debug_str     0x0000000000001c7a       0x3c calypso/libcalypso.a(dma.o)
-                                         0x66 (size before relaxing)
- .debug_str     0x0000000000001cb6      0x112 calypso/libcalypso.a(irq.o)
-                                        0x348 (size before relaxing)
- .debug_str     0x0000000000001dc8       0xe4 calypso/libcalypso.a(rtc.o)
-                                        0x2f8 (size before relaxing)
- .debug_str     0x0000000000001eac       0xb2 calypso/libcalypso.a(spi.o)
-                                        0x17f (size before relaxing)
- .debug_str     0x0000000000001f5e      0x27e calypso/libcalypso.a(tpu.o)
-                                        0x3ef (size before relaxing)
- .debug_str     0x00000000000021dc      0x1a1 calypso/libcalypso.a(tsp.o)
-                                        0x303 (size before relaxing)
- .debug_str     0x000000000000237d       0xd8 calypso/libcalypso.a(keypad.o)
-                                        0x3e0 (size before relaxing)
- .debug_str     0x0000000000002455       0x32 calypso/libcalypso.a(misc.o)
-                                         0xe5 (size before relaxing)
- .debug_str     0x0000000000002487      0x145 calypso/libcalypso.a(timer.o)
-                                        0x34c (size before relaxing)
- .debug_str     0x00000000000025cc       0x44 calypso/libcalypso.a(backlight.o)
-                                        0x109 (size before relaxing)
- .debug_str     0x0000000000002610      0x28e calypso/libcalypso.a(uart.o)
-                                        0x4e9 (size before relaxing)
- .debug_str     0x000000000000289e       0x66 calypso/libcalypso.a(uwire.o)
-                                        0x13b (size before relaxing)
- .debug_str     0x0000000000002904       0x3b calypso/libcalypso.a(arm.o)
-                                         0x7c (size before relaxing)
- .debug_str     0x000000000000293f      0x111 lib/libmini.a(vsprintf.o)
-                                        0x220 (size before relaxing)
- .debug_str     0x0000000000002a50       0x1c lib/libmini.a(string.o)
-                                         0xe3 (size before relaxing)
- .debug_str     0x0000000000002a6c        0xc lib/libmini.a(ctype.o)
-                                         0x5d (size before relaxing)
- .debug_str     0x0000000000002a78       0x1b lib/libmini.a(printf.o)
-                                        0x103 (size before relaxing)
- .debug_str     0x0000000000002a93       0xdc lib/libmini.a(console.o)
-                                        0x1f8 (size before relaxing)
- .debug_str     0x0000000000002b6f       0x41 lib/libmini.a(ctors.o)
-                                         0x7c (size before relaxing)
- .debug_str     0x0000000000002bb0       0x1e lib/libmini.a(delay.o)
-                                         0x55 (size before relaxing)
- .debug_str     0x0000000000002bce      0x1c3 comm/libcomm.a(sercomm.o)
-                                        0x3cf (size before relaxing)
- .debug_str     0x0000000000002d91       0x5d comm/libcomm.a(sercomm_cons.o)
-                                        0x270 (size before relaxing)
- .debug_str     0x0000000000002dee       0xca comm/libcomm.a(timer.o)
-                                        0x334 (size before relaxing)
- .debug_str     0x0000000000002eb8       0x56 comm/libcomm.a(msgb.o)
-                                        0x188 (size before relaxing)
+ .debug_str     0x00000000000022fd      0x296 calypso/libcalypso.a(tpu.o)
+                                        0x411 (size before relaxing)
+ .debug_str     0x0000000000002593      0x1a1 calypso/libcalypso.a(tsp.o)
+                                        0x30d (size before relaxing)
+ .debug_str     0x0000000000002734       0xe8 calypso/libcalypso.a(keypad.o)
+                                        0x410 (size before relaxing)
+ .debug_str     0x000000000000281c       0x32 calypso/libcalypso.a(misc.o)
+                                         0xef (size before relaxing)
+ .debug_str     0x000000000000284e      0x145 calypso/libcalypso.a(timer.o)
+                                        0x356 (size before relaxing)
+ .debug_str     0x0000000000002993       0x44 calypso/libcalypso.a(backlight.o)
+                                        0x113 (size before relaxing)
+ .debug_str     0x00000000000029d7      0x28e calypso/libcalypso.a(uart.o)
+                                        0x4f3 (size before relaxing)
+ .debug_str     0x0000000000002c65       0x66 calypso/libcalypso.a(uwire.o)
+                                        0x145 (size before relaxing)
+ .debug_str     0x0000000000002ccb       0x3b calypso/libcalypso.a(arm.o)
+                                         0x86 (size before relaxing)
+ .debug_str     0x0000000000002d06      0x10b lib/libmini.a(vsprintf.o)
+                                        0x22a (size before relaxing)
+ .debug_str     0x0000000000002e11       0x1c lib/libmini.a(string.o)
+                                         0xed (size before relaxing)
+ .debug_str     0x0000000000002e2d        0xc lib/libmini.a(ctype.o)
+                                         0x67 (size before relaxing)
+ .debug_str     0x0000000000002e39       0x1b lib/libmini.a(printf.o)
+                                        0x10d (size before relaxing)
+ .debug_str     0x0000000000002e54       0xdc lib/libmini.a(console.o)
+                                        0x202 (size before relaxing)
+ .debug_str     0x0000000000002f30       0x41 lib/libmini.a(ctors.o)
+                                         0x86 (size before relaxing)
+ .debug_str     0x0000000000002f71       0x1e lib/libmini.a(delay.o)
+                                         0x5f (size before relaxing)
+ .debug_str     0x0000000000002f8f      0x1c3 comm/libcomm.a(sercomm.o)
+                                        0x3d9 (size before relaxing)
+ .debug_str     0x0000000000003152       0x5d comm/libcomm.a(sercomm_cons.o)
+                                        0x27a (size before relaxing)
+ .debug_str     0x00000000000031af       0xca comm/libcomm.a(timer.o)
+                                        0x33e (size before relaxing)
+ .debug_str     0x0000000000003279       0x48 comm/libcomm.a(msgb.o)
+                                        0x184 (size before relaxing)
 
 .comment        0x0000000000000000       0x11
  .comment       0x0000000000000000       0x11 apps/hello_world/main.o
@@ -1521,9 +1592,13 @@ OUTPUT(board/se_j100/hello_world.compalram.elf elf32-littlearm)
  .comment       0x0000000000000000       0x12 abb/twl3025.o
  .comment       0x0000000000000000       0x12 rf/trf6151.o
  .comment       0x0000000000000000       0x12 flash/cfi_flash.o
+ .comment       0x0000000000000000       0x12 board/common/tx_calchan.o
  .comment       0x0000000000000000       0x12 board/compal/rffe_dualband.o
- .comment       0x0000000000000000       0x12 board/compal/rf_power.o
+ .comment       0x0000000000000000       0x12 board/compal/rf_tables.o
+ .comment       0x0000000000000000       0x12 board/compal/readcal_common.o
  .comment       0x0000000000000000       0x12 board/se_j100/init.o
+ .comment       0x0000000000000000       0x12 board/compal/readcal_small.o
+ .comment       0x0000000000000000       0x12 board/se_j100/tx_ramps.o
  .comment       0x0000000000000000       0x12 battery/dummy.o
  .comment       0x0000000000000000       0x12 fb/framebuffer.o
  .comment       0x0000000000000000       0x12 fb/font.o
@@ -1578,137 +1653,147 @@ OUTPUT(board/se_j100/hello_world.compalram.elf elf32-littlearm)
  .ARM.attributes
                 0x0000000000000050       0x10 board/common/calypso_pwl.o
  .ARM.attributes
-                0x0000000000000060       0x10 board/compal/rffe_dualband.o
+                0x0000000000000060       0x10 board/common/tx_calchan.o
  .ARM.attributes
-                0x0000000000000070       0x10 board/compal/rf_power.o
+                0x0000000000000070       0x10 board/compal/rffe_dualband.o
  .ARM.attributes
-                0x0000000000000080       0x10 board/se_j100/init.o
+                0x0000000000000080       0x10 board/compal/rf_tables.o
  .ARM.attributes
-                0x0000000000000090       0x10 battery/dummy.o
+                0x0000000000000090       0x10 board/compal/readcal_common.o
  .ARM.attributes
-                0x00000000000000a0       0x10 fb/framebuffer.o
+                0x00000000000000a0       0x10 board/se_j100/init.o
  .ARM.attributes
-                0x00000000000000b0       0x10 fb/font.o
+                0x00000000000000b0       0x10 board/compal/readcal_small.o
  .ARM.attributes
-                0x00000000000000c0       0x10 fb/helvR08.o
+                0x00000000000000c0       0x10 board/se_j100/tx_ramps.o
  .ARM.attributes
-                0x00000000000000d0       0x10 fb/helvB14.o
+                0x00000000000000d0       0x10 battery/dummy.o
  .ARM.attributes
-                0x00000000000000e0       0x10 fb/c64.o
+                0x00000000000000e0       0x10 fb/framebuffer.o
  .ARM.attributes
-                0x00000000000000f0       0x10 fb/symbols.o
+                0x00000000000000f0       0x10 fb/font.o
  .ARM.attributes
-                0x0000000000000100       0x10 fb/fb_rgb332.o
+                0x0000000000000100       0x10 fb/helvR08.o
  .ARM.attributes
-                0x0000000000000110       0x10 fb/fb_ssd1963.o
+                0x0000000000000110       0x10 fb/helvB14.o
  .ARM.attributes
-                0x0000000000000120       0x10 board/compal/start.ram.o
+                0x0000000000000120       0x10 fb/c64.o
  .ARM.attributes
-                0x0000000000000130       0x10 board/compal/exceptions_redirected.o
+                0x0000000000000130       0x10 fb/symbols.o
  .ARM.attributes
-                0x0000000000000140       0x10 board/compal/handlers.o
+                0x0000000000000140       0x10 fb/fb_rgb332.o
  .ARM.attributes
-                0x0000000000000150       0x10 board/se_j100/hello_world.compalram.manifest.o
+                0x0000000000000150       0x10 fb/fb_ssd1963.o
  .ARM.attributes
-                0x0000000000000160       0x10 calypso/libcalypso.a(clock.o)
+                0x0000000000000160       0x10 board/compal/start.ram.o
  .ARM.attributes
-                0x0000000000000170       0x10 calypso/libcalypso.a(dma.o)
+                0x0000000000000170       0x10 board/compal/exceptions_redirected.o
  .ARM.attributes
-                0x0000000000000180       0x10 calypso/libcalypso.a(irq.o)
+                0x0000000000000180       0x10 board/compal/handlers.o
  .ARM.attributes
-                0x0000000000000190       0x10 calypso/libcalypso.a(rtc.o)
+                0x0000000000000190       0x10 board/se_j100/hello_world.compalram.manifest.o
  .ARM.attributes
-                0x00000000000001a0       0x10 calypso/libcalypso.a(spi.o)
+                0x00000000000001a0       0x10 calypso/libcalypso.a(clock.o)
  .ARM.attributes
-                0x00000000000001b0       0x10 calypso/libcalypso.a(tpu.o)
+                0x00000000000001b0       0x10 calypso/libcalypso.a(dma.o)
  .ARM.attributes
-                0x00000000000001c0       0x10 calypso/libcalypso.a(tsp.o)
+                0x00000000000001c0       0x10 calypso/libcalypso.a(irq.o)
  .ARM.attributes
-                0x00000000000001d0       0x10 calypso/libcalypso.a(keypad.o)
+                0x00000000000001d0       0x10 calypso/libcalypso.a(rtc.o)
  .ARM.attributes
-                0x00000000000001e0       0x10 calypso/libcalypso.a(misc.o)
+                0x00000000000001e0       0x10 calypso/libcalypso.a(spi.o)
  .ARM.attributes
-                0x00000000000001f0       0x10 calypso/libcalypso.a(timer.o)
+                0x00000000000001f0       0x10 calypso/libcalypso.a(tpu.o)
  .ARM.attributes
-                0x0000000000000200       0x10 calypso/libcalypso.a(backlight.o)
+                0x0000000000000200       0x10 calypso/libcalypso.a(tsp.o)
  .ARM.attributes
-                0x0000000000000210       0x10 calypso/libcalypso.a(uart.o)
+                0x0000000000000210       0x10 calypso/libcalypso.a(keypad.o)
  .ARM.attributes
-                0x0000000000000220       0x10 calypso/libcalypso.a(uwire.o)
+                0x0000000000000220       0x10 calypso/libcalypso.a(misc.o)
  .ARM.attributes
-                0x0000000000000230       0x10 calypso/libcalypso.a(arm.o)
+                0x0000000000000230       0x10 calypso/libcalypso.a(timer.o)
  .ARM.attributes
-                0x0000000000000240       0x10 lib/libmini.a(vsprintf.o)
+                0x0000000000000240       0x10 calypso/libcalypso.a(backlight.o)
  .ARM.attributes
-                0x0000000000000250       0x10 lib/libmini.a(string.o)
+                0x0000000000000250       0x10 calypso/libcalypso.a(uart.o)
  .ARM.attributes
-                0x0000000000000260       0x10 lib/libmini.a(ctype.o)
+                0x0000000000000260       0x10 calypso/libcalypso.a(uwire.o)
  .ARM.attributes
-                0x0000000000000270       0x10 lib/libmini.a(printf.o)
+                0x0000000000000270       0x10 calypso/libcalypso.a(arm.o)
  .ARM.attributes
-                0x0000000000000280       0x10 lib/libmini.a(console.o)
+                0x0000000000000280       0x10 lib/libmini.a(vsprintf.o)
  .ARM.attributes
-                0x0000000000000290       0x10 lib/libmini.a(ctors.o)
+                0x0000000000000290       0x10 lib/libmini.a(string.o)
  .ARM.attributes
-                0x00000000000002a0       0x10 lib/libmini.a(delay.o)
+                0x00000000000002a0       0x10 lib/libmini.a(ctype.o)
  .ARM.attributes
-                0x00000000000002b0       0x10 lib/libmini.a(div64.o)
+                0x00000000000002b0       0x10 lib/libmini.a(printf.o)
  .ARM.attributes
-                0x00000000000002c0       0x10 lib/libmini.a(lib1funcs.o)
+                0x00000000000002c0       0x10 lib/libmini.a(console.o)
  .ARM.attributes
-                0x00000000000002d0       0x10 lib/libmini.a(memcpy.o)
+                0x00000000000002d0       0x10 lib/libmini.a(ctors.o)
  .ARM.attributes
-                0x00000000000002e0       0x10 lib/libmini.a(memset.o)
+                0x00000000000002e0       0x10 lib/libmini.a(delay.o)
  .ARM.attributes
-                0x00000000000002f0       0x10 comm/libcomm.a(sercomm.o)
+                0x00000000000002f0       0x10 lib/libmini.a(div64.o)
  .ARM.attributes
-                0x0000000000000300       0x10 comm/libcomm.a(sercomm_cons.o)
+                0x0000000000000300       0x10 lib/libmini.a(lib1funcs.o)
  .ARM.attributes
-                0x0000000000000310       0x10 comm/libcomm.a(timer.o)
+                0x0000000000000310       0x10 lib/libmini.a(memcpy.o)
  .ARM.attributes
-                0x0000000000000320       0x10 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
+                0x0000000000000320       0x10 lib/libmini.a(memset.o)
  .ARM.attributes
-                0x0000000000000330       0x10 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(panic.o)
+                0x0000000000000330       0x10 comm/libcomm.a(sercomm.o)
  .ARM.attributes
-                0x0000000000000340       0x10 ../../shared/libosmocore/build-target/src/gsm/.libs/libosmogsm.a(gsm_utils.o)
+                0x0000000000000340       0x10 comm/libcomm.a(sercomm_cons.o)
  .ARM.attributes
-                0x0000000000000350       0x10 comm/libcomm.a(msgb.o)
+                0x0000000000000350       0x10 comm/libcomm.a(timer.o)
+ .ARM.attributes
+                0x0000000000000360       0x10 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
+ .ARM.attributes
+                0x0000000000000370       0x10 ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(panic.o)
+ .ARM.attributes
+                0x0000000000000380       0x10 ../../shared/libosmocore/build-target/src/gsm/.libs/libosmogsm.a(gsm_utils.o)
+ .ARM.attributes
+                0x0000000000000390       0x10 comm/libcomm.a(msgb.o)
 
-.debug_frame    0x0000000000000000     0x1650
+.debug_frame    0x0000000000000000     0x16e8
  .debug_frame   0x0000000000000000       0xe4 apps/hello_world/main.o
- .debug_frame   0x00000000000000e4      0x1cc abb/twl3025.o
- .debug_frame   0x00000000000002b0      0x1a8 rf/trf6151.o
- .debug_frame   0x0000000000000458       0xac flash/cfi_flash.o
- .debug_frame   0x0000000000000504       0xb4 board/compal/rffe_dualband.o
- .debug_frame   0x00000000000005b8       0x34 board/se_j100/init.o
- .debug_frame   0x00000000000005ec       0x20 battery/dummy.o
- .debug_frame   0x000000000000060c       0x20 fb/font.o
- .debug_frame   0x000000000000062c      0x108 fb/fb_rgb332.o
- .debug_frame   0x0000000000000734       0x74 fb/fb_ssd1963.o
- .debug_frame   0x00000000000007a8       0xd0 calypso/libcalypso.a(clock.o)
- .debug_frame   0x0000000000000878       0x20 calypso/libcalypso.a(dma.o)
- .debug_frame   0x0000000000000898       0xb0 calypso/libcalypso.a(irq.o)
- .debug_frame   0x0000000000000948       0x38 calypso/libcalypso.a(rtc.o)
- .debug_frame   0x0000000000000980       0x3c calypso/libcalypso.a(spi.o)
- .debug_frame   0x00000000000009bc      0x13c calypso/libcalypso.a(tpu.o)
- .debug_frame   0x0000000000000af8       0xc4 calypso/libcalypso.a(tsp.o)
- .debug_frame   0x0000000000000bbc       0xac calypso/libcalypso.a(keypad.o)
- .debug_frame   0x0000000000000c68       0x6c calypso/libcalypso.a(misc.o)
- .debug_frame   0x0000000000000cd4       0x98 calypso/libcalypso.a(timer.o)
- .debug_frame   0x0000000000000d6c       0x30 calypso/libcalypso.a(backlight.o)
- .debug_frame   0x0000000000000d9c      0x18c calypso/libcalypso.a(uart.o)
- .debug_frame   0x0000000000000f28       0x50 calypso/libcalypso.a(uwire.o)
- .debug_frame   0x0000000000000f78       0x30 calypso/libcalypso.a(arm.o)
- .debug_frame   0x0000000000000fa8      0x23c lib/libmini.a(vsprintf.o)
- .debug_frame   0x00000000000011e4       0x30 lib/libmini.a(string.o)
- .debug_frame   0x0000000000001214       0x3c lib/libmini.a(printf.o)
- .debug_frame   0x0000000000001250      0x128 lib/libmini.a(console.o)
- .debug_frame   0x0000000000001378       0x2c lib/libmini.a(ctors.o)
- .debug_frame   0x00000000000013a4       0x38 lib/libmini.a(delay.o)
- .debug_frame   0x00000000000013dc       0xf8 comm/libcomm.a(sercomm.o)
- .debug_frame   0x00000000000014d4       0x80 comm/libcomm.a(sercomm_cons.o)
- .debug_frame   0x0000000000001554       0xb4 comm/libcomm.a(timer.o)
- .debug_frame   0x0000000000001608       0x48 comm/libcomm.a(msgb.o)
+ .debug_frame   0x00000000000000e4      0x1f8 abb/twl3025.o
+ .debug_frame   0x00000000000002dc      0x18c rf/trf6151.o
+ .debug_frame   0x0000000000000468       0xc8 flash/cfi_flash.o
+ .debug_frame   0x0000000000000530       0xb0 board/compal/rffe_dualband.o
+ .debug_frame   0x00000000000005e0       0x48 board/compal/readcal_common.o
+ .debug_frame   0x0000000000000628       0x34 board/se_j100/init.o
+ .debug_frame   0x000000000000065c       0x20 board/compal/readcal_small.o
+ .debug_frame   0x000000000000067c       0x20 battery/dummy.o
+ .debug_frame   0x000000000000069c       0x20 fb/font.o
+ .debug_frame   0x00000000000006bc      0x108 fb/fb_rgb332.o
+ .debug_frame   0x00000000000007c4       0x74 fb/fb_ssd1963.o
+ .debug_frame   0x0000000000000838       0xd0 calypso/libcalypso.a(clock.o)
+ .debug_frame   0x0000000000000908       0x20 calypso/libcalypso.a(dma.o)
+ .debug_frame   0x0000000000000928       0xb0 calypso/libcalypso.a(irq.o)
+ .debug_frame   0x00000000000009d8       0x38 calypso/libcalypso.a(rtc.o)
+ .debug_frame   0x0000000000000a10       0x3c calypso/libcalypso.a(spi.o)
+ .debug_frame   0x0000000000000a4c      0x13c calypso/libcalypso.a(tpu.o)
+ .debug_frame   0x0000000000000b88       0xc4 calypso/libcalypso.a(tsp.o)
+ .debug_frame   0x0000000000000c4c       0xb4 calypso/libcalypso.a(keypad.o)
+ .debug_frame   0x0000000000000d00       0x6c calypso/libcalypso.a(misc.o)
+ .debug_frame   0x0000000000000d6c       0x98 calypso/libcalypso.a(timer.o)
+ .debug_frame   0x0000000000000e04       0x30 calypso/libcalypso.a(backlight.o)
+ .debug_frame   0x0000000000000e34      0x18c calypso/libcalypso.a(uart.o)
+ .debug_frame   0x0000000000000fc0       0x50 calypso/libcalypso.a(uwire.o)
+ .debug_frame   0x0000000000001010       0x30 calypso/libcalypso.a(arm.o)
+ .debug_frame   0x0000000000001040      0x23c lib/libmini.a(vsprintf.o)
+ .debug_frame   0x000000000000127c       0x30 lib/libmini.a(string.o)
+ .debug_frame   0x00000000000012ac       0x3c lib/libmini.a(printf.o)
+ .debug_frame   0x00000000000012e8      0x128 lib/libmini.a(console.o)
+ .debug_frame   0x0000000000001410       0x2c lib/libmini.a(ctors.o)
+ .debug_frame   0x000000000000143c       0x38 lib/libmini.a(delay.o)
+ .debug_frame   0x0000000000001474       0xf8 comm/libcomm.a(sercomm.o)
+ .debug_frame   0x000000000000156c       0x80 comm/libcomm.a(sercomm_cons.o)
+ .debug_frame   0x00000000000015ec       0xb4 comm/libcomm.a(timer.o)
+ .debug_frame   0x00000000000016a0       0x48 comm/libcomm.a(msgb.o)
 
 Cross Reference Table
 
@@ -1748,6 +1833,9 @@ _talloc_zero                                      comm/libcomm.a(msgb.o)
                                                   ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
 add_mod5000                                       calypso/libcalypso.a(tpu.o)
                                                   rf/trf6151.o
+afc_initial_dac_value                             board/compal/rf_tables.o
+afc_slope                                         board/compal/rf_tables.o
+apc_offset                                        board/se_j100/tx_ramps.o
 arm_disable_interrupts                            calypso/libcalypso.a(arm.o)
 arm_enable_interrupts                             calypso/libcalypso.a(arm.o)
                                                   calypso/libcalypso.a(irq.o)
@@ -1790,8 +1878,6 @@ cons_puts                                         lib/libmini.a(console.o)
 cons_rb_append                                    lib/libmini.a(console.o)
 cons_rb_flush                                     lib/libmini.a(console.o)
                                                   calypso/libcalypso.a(uart.o)
-dbm2apc_gsm900                                    board/compal/rf_power.o
-dbm2apc_gsm900_max                                board/compal/rf_power.o
 dbm2rxlev                                         ../../shared/libosmocore/build-target/src/gsm/.libs/libosmogsm.a(gsm_utils.o)
 delay_ms                                          lib/libmini.a(delay.o)
                                                   calypso/libcalypso.a(spi.o)
@@ -1831,6 +1917,7 @@ flash_block_getlock                               flash/cfi_flash.o
 flash_block_lock                                  flash/cfi_flash.o
 flash_block_lockdown                              flash/cfi_flash.o
 flash_block_unlock                                flash/cfi_flash.o
+flash_get_id                                      flash/cfi_flash.o
 flash_init                                        flash/cfi_flash.o
 flash_program                                     flash/cfi_flash.o
 font_c64                                          fb/c64.o
@@ -1967,6 +2054,7 @@ printf                                            lib/libmini.a(printf.o)
                                                   calypso/libcalypso.a(keypad.o)
                                                   calypso/libcalypso.a(clock.o)
                                                   fb/fb_ssd1963.o
+                                                  board/compal/readcal_common.o
                                                   flash/cfi_flash.o
                                                   abb/twl3025.o
                                                   apps/hello_world/main.o
@@ -1984,7 +2072,26 @@ puts                                              lib/libmini.a(vsprintf.o)
 puts_asm                                          board/common/calypso_uart.o
 pwl_init                                          board/common/calypso_pwl.o
 pwl_set_level                                     board/common/calypso_pwl.o
+read_compal_factory_records                       board/compal/readcal_common.o
+                                                  board/compal/readcal_small.o
+read_factory_rf_calibration                       board/compal/readcal_small.o
 rf_arfcn                                          rf/trf6151.o
+rf_tx_chan_cal_1800                               board/common/tx_calchan.o
+rf_tx_chan_cal_1900                               board/common/tx_calchan.o
+rf_tx_chan_cal_850                                board/common/tx_calchan.o
+rf_tx_chan_cal_900                                board/common/tx_calchan.o
+rf_tx_levels_1800                                 board/compal/rf_tables.o
+                                                  board/compal/readcal_common.o
+rf_tx_levels_1900                                 board/compal/rf_tables.o
+                                                  board/compal/readcal_common.o
+rf_tx_levels_850                                  board/compal/rf_tables.o
+                                                  board/compal/readcal_common.o
+rf_tx_levels_900                                  board/compal/rf_tables.o
+                                                  board/compal/readcal_common.o
+rf_tx_ramps_1800                                  board/se_j100/tx_ramps.o
+rf_tx_ramps_1900                                  board/se_j100/tx_ramps.o
+rf_tx_ramps_850                                   board/se_j100/tx_ramps.o
+rf_tx_ramps_900                                   board/se_j100/tx_ramps.o
 rffe_compute_gain                                 board/compal/rffe_dualband.o
 rffe_get_gain                                     board/compal/rffe_dualband.o
 rffe_get_rx_ports                                 board/compal/rffe_dualband.o
@@ -2043,8 +2150,7 @@ strtoul                                           lib/libmini.a(vsprintf.o)
 strtoull                                          lib/libmini.a(vsprintf.o)
 system_inherent_gain                              board/compal/rffe_dualband.o
                                                   rf/trf6151.o
-tall_msgb_ctx                                     comm/libcomm.a(msgb.o)
-                                                  ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
+tall_msgb_ctx                                     ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
 talloc_free                                       comm/libcomm.a(msgb.o)
                                                   ../../shared/libosmocore/build-target/src/.libs/libosmocore.a(msgb.o)
 timer_init                                        comm/libcomm.a(timer.o)
@@ -2113,10 +2219,13 @@ twl3025_afcout_set                                abb/twl3025.o
 twl3025_clk13m                                    abb/twl3025.o
 twl3025_default_ramp                              abb/twl3025.o
 twl3025_downlink                                  abb/twl3025.o
+twl3025_get_pwon                                  abb/twl3025.o
+                                                  calypso/libcalypso.a(keypad.o)
 twl3025_init                                      abb/twl3025.o
                                                   board/se_j100/init.o
 twl3025_power_off                                 abb/twl3025.o
                                                   calypso/libcalypso.a(keypad.o)
+twl3025_power_off_now                             abb/twl3025.o
 twl3025_reg_read                                  abb/twl3025.o
 twl3025_reg_write                                 abb/twl3025.o
 twl3025_tsp_write                                 abb/twl3025.o

@@ -1,0 +1,1705 @@
+   1              		.file	"twl3025.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.tpu_enq_at,"ax",%progbits
+  12              		.align	2
+  14              	tpu_enq_at:
+  15              	.LFB3:
+  16              		.file 1 "include/calypso/tpu.h"
+   1:include/calypso/tpu.h **** #ifndef _CALYPSO_TPU_H
+   2:include/calypso/tpu.h **** #define _CALYPSO_TPU_H
+   3:include/calypso/tpu.h **** 
+   4:include/calypso/tpu.h **** #define BITS_PER_TDMA		1250
+   5:include/calypso/tpu.h **** #define QBITS_PER_TDMA		(BITS_PER_TDMA * 4)	/* 5000 */
+   6:include/calypso/tpu.h **** #define TPU_RANGE		QBITS_PER_TDMA
+   7:include/calypso/tpu.h **** #define	SWITCH_TIME		(TPU_RANGE-10)
+   8:include/calypso/tpu.h **** 
+   9:include/calypso/tpu.h **** /* Assert or de-assert TPU reset */
+  10:include/calypso/tpu.h **** void tpu_reset(int active);
+  11:include/calypso/tpu.h **** /* Enable or Disable a new scenario loaded into the TPU */
+  12:include/calypso/tpu.h **** void tpu_enable(int active);
+  13:include/calypso/tpu.h **** /* Enable or Disable the clock of the TPU Module */
+  14:include/calypso/tpu.h **** void tpu_clk_enable(int active);
+  15:include/calypso/tpu.h **** /* Enable Frame Interrupt generation on next frame.  DSP will reset it */
+  16:include/calypso/tpu.h **** void tpu_dsp_frameirq_enable(void);
+  17:include/calypso/tpu.h **** /* Is a Frame interrupt still pending for the DSP ? */
+  18:include/calypso/tpu.h **** int tpu_dsp_fameirq_pending(void);
+  19:include/calypso/tpu.h **** /* Rewind the TPU, i.e. restart enqueueing instructions at the base addr */
+  20:include/calypso/tpu.h **** void tpu_rewind(void);
+  21:include/calypso/tpu.h **** /* Enqueue a raw TPU instruction */
+  22:include/calypso/tpu.h **** void tpu_enqueue(uint16_t instr);
+  23:include/calypso/tpu.h **** /* Initialize TPU and TPU driver */
+  24:include/calypso/tpu.h **** void tpu_init(void);
+  25:include/calypso/tpu.h **** /* (Busy)Wait until TPU is idle */
+  26:include/calypso/tpu.h **** void tpu_wait_idle(void);
+  27:include/calypso/tpu.h **** /* Enable FRAME interrupt generation */
+  28:include/calypso/tpu.h **** void tpu_frame_irq_en(int mcu, int dsp);
+  29:include/calypso/tpu.h **** /* Force the generation of a DSP interrupt */
+  30:include/calypso/tpu.h **** void tpu_force_dsp_frame_irq(void);
+  31:include/calypso/tpu.h **** 
+  32:include/calypso/tpu.h **** /* Get the current TPU SYNCHRO register */
+  33:include/calypso/tpu.h **** uint16_t tpu_get_synchro(void);
+  34:include/calypso/tpu.h **** /* Get the current TPU OFFSET register */
+  35:include/calypso/tpu.h **** uint16_t tpu_get_offset(void);
+  36:include/calypso/tpu.h **** 
+  37:include/calypso/tpu.h **** enum tpu_instr {
+  38:include/calypso/tpu.h **** 	TPU_INSTR_AT		= (1 << 13),
+  39:include/calypso/tpu.h **** 	TPU_INSTR_OFFSET	= (2 << 13),
+  40:include/calypso/tpu.h **** 	TPU_INSTR_SYNCHRO	= (3 << 13),	/* Loading delta synchro value in TPU synchro register */
+  41:include/calypso/tpu.h **** 	TPU_INSTR_WAIT		= (5 << 13),	/* Wait a certain period (in GSM qbits) */
+  42:include/calypso/tpu.h **** 	TPU_INSTR_SLEEP		= (0 << 13),	/* Stop the sequencer by disabling TPU ENABLE bit in ctrl reg */
+  43:include/calypso/tpu.h **** 	/* data processing */
+  44:include/calypso/tpu.h **** 	TPU_INSTR_MOVE		= (4 << 13),
+  45:include/calypso/tpu.h **** };
+  46:include/calypso/tpu.h **** 
+  47:include/calypso/tpu.h **** /* Addresses internal to the TPU, only accessible via MOVE */
+  48:include/calypso/tpu.h **** enum tpu_reg_int {
+  49:include/calypso/tpu.h **** 	TPUI_TSP_CTRL1	= 0x00,
+  50:include/calypso/tpu.h **** 	TPUI_TSP_CTRL2	= 0x01,
+  51:include/calypso/tpu.h **** 	TPUI_TX_1	= 0x04,
+  52:include/calypso/tpu.h **** 	TPUI_TX_2	= 0x03,
+  53:include/calypso/tpu.h **** 	TPUI_TX_3	= 0x02,
+  54:include/calypso/tpu.h **** 	TPUI_TX_4	= 0x05,
+  55:include/calypso/tpu.h **** 	TPUI_TSP_ACT_L	= 0x06,
+  56:include/calypso/tpu.h **** 	TPUI_TSP_ACT_U	= 0x07,
+  57:include/calypso/tpu.h **** 	TPUI_TSP_SET1	= 0x09,
+  58:include/calypso/tpu.h **** 	TPUI_TSP_SET2	= 0x0a,
+  59:include/calypso/tpu.h **** 	TPUI_TSP_SET3	= 0x0b,
+  60:include/calypso/tpu.h **** 	TPUI_DSP_INT_PG	= 0x10,
+  61:include/calypso/tpu.h **** 	TPUI_GAUGING_EN = 0x11,
+  62:include/calypso/tpu.h **** };
+  63:include/calypso/tpu.h **** 
+  64:include/calypso/tpu.h **** enum tpui_ctrl2_bits {
+  65:include/calypso/tpu.h **** 	TPUI_CTRL2_RD		= (1 << 0),
+  66:include/calypso/tpu.h **** 	TPUI_CTRL2_WR		= (1 << 1),
+  67:include/calypso/tpu.h **** };
+  68:include/calypso/tpu.h **** 
+  69:include/calypso/tpu.h **** static inline uint16_t tpu_mod5000(int16_t time)
+  70:include/calypso/tpu.h **** {
+  71:include/calypso/tpu.h **** 	if (time < 0)
+  72:include/calypso/tpu.h **** 		return time + 5000;
+  73:include/calypso/tpu.h **** 	if (time >= 5000)
+  74:include/calypso/tpu.h **** 		return time - 5000;
+  75:include/calypso/tpu.h **** 	return time;
+  76:include/calypso/tpu.h **** }
+  77:include/calypso/tpu.h **** 
+  78:include/calypso/tpu.h **** /* Enqueue a SLEEP operation (stop sequencer by disabling TPU ENABLE bit) */
+  79:include/calypso/tpu.h **** static inline void tpu_enq_sleep(void)
+  80:include/calypso/tpu.h **** {
+  81:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_SLEEP);
+  82:include/calypso/tpu.h **** }
+  83:include/calypso/tpu.h **** 
+  84:include/calypso/tpu.h **** /* Enqueue a MOVE operation */
+  85:include/calypso/tpu.h **** static inline void tpu_enq_move(uint8_t addr, uint8_t data)
+  86:include/calypso/tpu.h **** {
+  87:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_MOVE | (data << 5) | (addr & 0x1f));
+  88:include/calypso/tpu.h **** }
+  89:include/calypso/tpu.h **** 
+  90:include/calypso/tpu.h **** /* Enqueue an AT operation */
+  91:include/calypso/tpu.h **** static inline void tpu_enq_at(int16_t time)
+  92:include/calypso/tpu.h **** {
+  17              		.loc 1 92 0
+  18              		.cfi_startproc
+  19              		@ args = 0, pretend = 0, frame = 0
+  20              		@ frame_needed = 0, uses_anonymous_args = 0
+  21              		@ link register save eliminated.
+  22              	.LVL0:
+  23              	.LBB8:
+  24              	.LBB9:
+  71:include/calypso/tpu.h **** 	if (time < 0)
+  25              		.loc 1 71 0
+  26 0000 000050E3 		cmp	r0, #0
+  27              	.LVL1:
+  72:include/calypso/tpu.h **** 		return time + 5000;
+  28              		.loc 1 72 0
+  29 0004 4E0D80B2 		addlt	r0, r0, #4992
+  30 0008 080080B2 		addlt	r0, r0, #8
+  71:include/calypso/tpu.h **** 	if (time < 0)
+  31              		.loc 1 71 0
+  32 000c 030000BA 		blt	.L4
+  73:include/calypso/tpu.h **** 	if (time >= 5000)
+  33              		.loc 1 73 0
+  34 0010 18309FE5 		ldr	r3, .L5
+  35 0014 030050E1 		cmp	r0, r3
+  74:include/calypso/tpu.h **** 		return time - 5000;
+  36              		.loc 1 74 0
+  37 0018 4E0D40C2 		subgt	r0, r0, #4992
+  38 001c 080040C2 		subgt	r0, r0, #8
+  39              	.L4:
+  75:include/calypso/tpu.h **** 	return time;
+  40              		.loc 1 75 0
+  41 0020 0008A0E1 		mov	r0, r0, asl #16
+  42 0024 2008A0E1 		mov	r0, r0, lsr #16
+  43              	.LBE9:
+  44              	.LBE8:
+  93:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_AT | tpu_mod5000(time));
+  45              		.loc 1 93 0
+  46 0028 020A80E3 		orr	r0, r0, #8192
+  94:include/calypso/tpu.h **** }
+  47              		.loc 1 94 0
+  93:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_AT | tpu_mod5000(time));
+  48              		.loc 1 93 0
+  49 002c FEFFFFEA 		b	tpu_enqueue
+  50              	.L6:
+  51              		.align	2
+  52              	.L5:
+  53 0030 87130000 		.word	4999
+  54              		.cfi_endproc
+  55              	.LFE3:
+  57              		.section	.text.tpu_enq_wait,"ax",%progbits
+  58              		.align	2
+  60              	tpu_enq_wait:
+  61              	.LFB5:
+  95:include/calypso/tpu.h **** 
+  96:include/calypso/tpu.h **** /* Enqueue a SYNC operation */
+  97:include/calypso/tpu.h **** static inline void tpu_enq_sync(int16_t time)
+  98:include/calypso/tpu.h **** {
+  99:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_SYNCHRO | time);
+ 100:include/calypso/tpu.h **** }
+ 101:include/calypso/tpu.h **** 
+ 102:include/calypso/tpu.h **** /* Enqueue a WAIT operation */
+ 103:include/calypso/tpu.h **** static inline void tpu_enq_wait(int16_t time)
+ 104:include/calypso/tpu.h **** {
+  62              		.loc 1 104 0
+  63              		.cfi_startproc
+  64              		@ args = 0, pretend = 0, frame = 0
+  65              		@ frame_needed = 0, uses_anonymous_args = 0
+  66              		@ link register save eliminated.
+  67              	.LVL2:
+ 105:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_WAIT | time);
+  68              		.loc 1 105 0
+  69 0000 08309FE5 		ldr	r3, .L8
+  70 0004 033000E0 		and	r3, r0, r3
+  71 0008 0A0A83E3 		orr	r0, r3, #40960
+  72              	.LVL3:
+ 106:include/calypso/tpu.h **** }
+  73              		.loc 1 106 0
+ 105:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_WAIT | time);
+  74              		.loc 1 105 0
+  75 000c FEFFFFEA 		b	tpu_enqueue
+  76              	.L9:
+  77              		.align	2
+  78              	.L8:
+  79 0010 FF5F0000 		.word	24575
+  80              		.cfi_endproc
+  81              	.LFE5:
+  83              		.section	.text.twl3025_wait_ibic_access,"ax",%progbits
+  84              		.align	2
+  86              	twl3025_wait_ibic_access:
+  87              	.LFB16:
+  88              		.file 2 "abb/twl3025.c"
+   1:abb/twl3025.c **** /* Driver for Analog Baseband Circuit (TWL3025) */
+   2:abb/twl3025.c **** 
+   3:abb/twl3025.c **** /* (C) 2010 by Harald Welte <laforge@gnumonks.org>
+   4:abb/twl3025.c ****  *
+   5:abb/twl3025.c ****  * All Rights Reserved
+   6:abb/twl3025.c ****  *
+   7:abb/twl3025.c ****  * This program is free software; you can redistribute it and/or modify
+   8:abb/twl3025.c ****  * it under the terms of the GNU General Public License as published by
+   9:abb/twl3025.c ****  * the Free Software Foundation; either version 2 of the License, or
+  10:abb/twl3025.c ****  * (at your option) any later version.
+  11:abb/twl3025.c ****  *
+  12:abb/twl3025.c ****  * This program is distributed in the hope that it will be useful,
+  13:abb/twl3025.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  14:abb/twl3025.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  15:abb/twl3025.c ****  * GNU General Public License for more details.
+  16:abb/twl3025.c ****  *
+  17:abb/twl3025.c ****  */
+  18:abb/twl3025.c **** 
+  19:abb/twl3025.c **** #include <stdint.h>
+  20:abb/twl3025.c **** #include <stdio.h>
+  21:abb/twl3025.c **** 
+  22:abb/twl3025.c **** #include <debug.h>
+  23:abb/twl3025.c **** #include <delay.h>
+  24:abb/twl3025.c **** #include <memory.h>
+  25:abb/twl3025.c **** #include <spi.h>
+  26:abb/twl3025.c **** #include <calypso/irq.h>
+  27:abb/twl3025.c **** #include <calypso/tsp.h>
+  28:abb/twl3025.c **** #include <calypso/tpu.h>
+  29:abb/twl3025.c **** #include <abb/twl3025.h>
+  30:abb/twl3025.c **** #include <asm/system.h>
+  31:abb/twl3025.c **** 
+  32:abb/twl3025.c **** /* TWL3025 */
+  33:abb/twl3025.c **** #define REG_PAGE(n)	(n >> 7)
+  34:abb/twl3025.c **** #define REG_ADDR(n)	(n & 0x3f)
+  35:abb/twl3025.c **** 
+  36:abb/twl3025.c **** #define TWL3025_DEV_IDX		0	/* On the SPI bus */
+  37:abb/twl3025.c **** #define TWL3025_TSP_DEV_IDX	0	/* On the TSP bus */
+  38:abb/twl3025.c **** 
+  39:abb/twl3025.c **** /* values encountered on a GTA-02 for GSM900 (the same for GSM1800!?) */
+  40:abb/twl3025.c **** const uint16_t twl3025_default_ramp[16] = {
+  41:abb/twl3025.c **** 	ABB_RAMP_VAL( 0,  0),
+  42:abb/twl3025.c **** 	ABB_RAMP_VAL( 0, 11),
+  43:abb/twl3025.c **** 	ABB_RAMP_VAL( 0, 31),
+  44:abb/twl3025.c **** 	ABB_RAMP_VAL( 0, 31),
+  45:abb/twl3025.c **** 	ABB_RAMP_VAL( 0, 31),
+  46:abb/twl3025.c **** 	ABB_RAMP_VAL( 0, 24),
+  47:abb/twl3025.c **** 	ABB_RAMP_VAL( 0,  0),
+  48:abb/twl3025.c **** 	ABB_RAMP_VAL( 0,  0),
+  49:abb/twl3025.c **** 	ABB_RAMP_VAL( 9,  0),
+  50:abb/twl3025.c **** 	ABB_RAMP_VAL(18,  0),
+  51:abb/twl3025.c **** 	ABB_RAMP_VAL(25,  0),
+  52:abb/twl3025.c **** 	ABB_RAMP_VAL(31,  0),
+  53:abb/twl3025.c **** 	ABB_RAMP_VAL(30,  0),
+  54:abb/twl3025.c **** 	ABB_RAMP_VAL(15,  0),
+  55:abb/twl3025.c **** 	ABB_RAMP_VAL( 0,  0),
+  56:abb/twl3025.c **** 	ABB_RAMP_VAL( 0,  0),
+  57:abb/twl3025.c **** };
+  58:abb/twl3025.c **** 
+  59:abb/twl3025.c **** typedef enum pwon_state {
+  60:abb/twl3025.c **** 	PWON_IDLE,
+  61:abb/twl3025.c **** 	PWON_DETECTED,
+  62:abb/twl3025.c **** 	PWON_REPORTED,
+  63:abb/twl3025.c **** } pwon_state_t;
+  64:abb/twl3025.c **** 
+  65:abb/twl3025.c **** struct twl3025 {
+  66:abb/twl3025.c **** 	uint8_t page;
+  67:abb/twl3025.c **** 	pwon_state_t pwon;
+  68:abb/twl3025.c **** };
+  69:abb/twl3025.c **** static struct twl3025 twl3025_state;
+  70:abb/twl3025.c **** 
+  71:abb/twl3025.c **** /* Switch the register page of the TWL3025 */
+  72:abb/twl3025.c **** static void twl3025_switch_page(uint8_t page)
+  73:abb/twl3025.c **** {
+  74:abb/twl3025.c **** 	if (page == 0)
+  75:abb/twl3025.c **** 		twl3025_reg_write(PAGEREG, 1 << 0);
+  76:abb/twl3025.c **** 	else
+  77:abb/twl3025.c **** 		twl3025_reg_write(PAGEREG, 1 << 1);
+  78:abb/twl3025.c **** 
+  79:abb/twl3025.c **** 	twl3025_state.page = page;
+  80:abb/twl3025.c **** }
+  81:abb/twl3025.c **** 
+  82:abb/twl3025.c **** static void handle_charger(void)
+  83:abb/twl3025.c **** {
+  84:abb/twl3025.c **** 	uint16_t status;
+  85:abb/twl3025.c **** 	printd("handle_charger();");
+  86:abb/twl3025.c **** 
+  87:abb/twl3025.c **** 	status = twl3025_reg_read(VRPCSTS);
+  88:abb/twl3025.c **** //	printd("\nvrpcsts: 0x%02x", status);
+  89:abb/twl3025.c **** 
+  90:abb/twl3025.c **** 	if (status & 0x40) {
+  91:abb/twl3025.c **** 		printd(" inserted\n");
+  92:abb/twl3025.c **** 	} else {
+  93:abb/twl3025.c **** 		printd(" removed\n");
+  94:abb/twl3025.c **** 	}
+  95:abb/twl3025.c **** 
+  96:abb/twl3025.c **** //	twl3025_dump_madc();
+  97:abb/twl3025.c **** }
+  98:abb/twl3025.c **** 
+  99:abb/twl3025.c **** static void handle_adc_done(void)
+ 100:abb/twl3025.c **** {
+ 101:abb/twl3025.c **** 	printd("handle_adc_done();");
+ 102:abb/twl3025.c **** }
+ 103:abb/twl3025.c **** 
+ 104:abb/twl3025.c **** static void twl3025_irq(enum irq_nr nr)
+ 105:abb/twl3025.c **** {
+ 106:abb/twl3025.c **** 	uint16_t src;
+ 107:abb/twl3025.c **** 	printd("twl3025_irq: 0x%02x\n",nr);
+ 108:abb/twl3025.c **** 	switch (nr){
+ 109:abb/twl3025.c **** 	case IRQ_EXTERNAL: // charger in/out, pwrbtn, adc done
+ 110:abb/twl3025.c **** 		src = twl3025_reg_read(ITSTATREG);
+ 111:abb/twl3025.c **** //		printd("itstatreg 0x%02x\n", src);
+ 112:abb/twl3025.c **** 		if ((src & 0x04) && twl3025_state.pwon == PWON_IDLE)
+ 113:abb/twl3025.c **** 			twl3025_state.pwon = PWON_DETECTED;
+ 114:abb/twl3025.c **** 		if (src & 0x08)
+ 115:abb/twl3025.c **** 			handle_charger();
+ 116:abb/twl3025.c **** 		if (src & 0x20)
+ 117:abb/twl3025.c **** 			handle_adc_done();
+ 118:abb/twl3025.c **** 		break;
+ 119:abb/twl3025.c **** 	case IRQ_EXTERNAL_FIQ: // vcc <2.8V emergency power off
+ 120:abb/twl3025.c **** 		puts("\nBROWNOUT!1!");
+ 121:abb/twl3025.c **** 		twl3025_power_off();
+ 122:abb/twl3025.c **** 		break;
+ 123:abb/twl3025.c **** 	default:
+ 124:abb/twl3025.c **** 		return;
+ 125:abb/twl3025.c **** 	}
+ 126:abb/twl3025.c **** }
+ 127:abb/twl3025.c **** 
+ 128:abb/twl3025.c **** void twl3025_init(void)
+ 129:abb/twl3025.c **** {
+ 130:abb/twl3025.c **** 	spi_init();
+ 131:abb/twl3025.c **** 	twl3025_switch_page(0);
+ 132:abb/twl3025.c **** 	twl3025_clk13m(1);
+ 133:abb/twl3025.c **** 	twl3025_reg_write(AFCCTLADD, 0x01);	/* AFCCK(1:0) must not be zero! */
+ 134:abb/twl3025.c **** 	twl3025_unit_enable(TWL3025_UNIT_AFC, 1);
+ 135:abb/twl3025.c **** 	twl3025_state.pwon = PWON_IDLE;
+ 136:abb/twl3025.c **** 
+ 137:abb/twl3025.c **** 	irq_register_handler(IRQ_EXTERNAL, &twl3025_irq);
+ 138:abb/twl3025.c **** 	irq_config(IRQ_EXTERNAL, 0, 0, 0);
+ 139:abb/twl3025.c **** 	irq_enable(IRQ_EXTERNAL);
+ 140:abb/twl3025.c **** 
+ 141:abb/twl3025.c **** 	irq_register_handler(IRQ_EXTERNAL_FIQ, &twl3025_irq);
+ 142:abb/twl3025.c **** 	irq_config(IRQ_EXTERNAL_FIQ, 1, 0, 0);
+ 143:abb/twl3025.c **** 	irq_enable(IRQ_EXTERNAL_FIQ);
+ 144:abb/twl3025.c **** }
+ 145:abb/twl3025.c **** 
+ 146:abb/twl3025.c **** void twl3025_reg_write(uint8_t reg, uint16_t data)
+ 147:abb/twl3025.c **** {
+ 148:abb/twl3025.c **** 	uint16_t tx;
+ 149:abb/twl3025.c **** 
+ 150:abb/twl3025.c **** 	printd("tw3025_reg_write(%u,%u)=0x%04x\n", REG_PAGE(reg),
+ 151:abb/twl3025.c **** 		REG_ADDR(reg), data);
+ 152:abb/twl3025.c **** 
+ 153:abb/twl3025.c **** 	if (reg != PAGEREG && REG_PAGE(reg) != twl3025_state.page)
+ 154:abb/twl3025.c **** 		twl3025_switch_page(REG_PAGE(reg));
+ 155:abb/twl3025.c **** 
+ 156:abb/twl3025.c **** 	tx = ((data & 0x3ff) << 6) | (REG_ADDR(reg) << 1);
+ 157:abb/twl3025.c **** 
+ 158:abb/twl3025.c **** 	spi_xfer(TWL3025_DEV_IDX, 16, &tx, NULL);
+ 159:abb/twl3025.c **** }
+ 160:abb/twl3025.c **** 
+ 161:abb/twl3025.c **** void twl3025_tsp_write(uint8_t data)
+ 162:abb/twl3025.c **** {
+ 163:abb/twl3025.c **** 	tsp_write(TWL3025_TSP_DEV_IDX, 7, data);
+ 164:abb/twl3025.c **** }
+ 165:abb/twl3025.c **** 
+ 166:abb/twl3025.c **** uint16_t twl3025_reg_read(uint8_t reg)
+ 167:abb/twl3025.c **** {
+ 168:abb/twl3025.c **** 	uint16_t tx, rx;
+ 169:abb/twl3025.c **** 
+ 170:abb/twl3025.c **** 	if (REG_PAGE(reg) != twl3025_state.page)
+ 171:abb/twl3025.c **** 		twl3025_switch_page(REG_PAGE(reg));
+ 172:abb/twl3025.c **** 
+ 173:abb/twl3025.c **** 	tx = (REG_ADDR(reg) << 1) | 1;
+ 174:abb/twl3025.c **** 
+ 175:abb/twl3025.c **** 	/* A read cycle contains two SPI transfers */
+ 176:abb/twl3025.c **** 	spi_xfer(TWL3025_DEV_IDX, 16, &tx, &rx);
+ 177:abb/twl3025.c **** 	delay_ms(1);
+ 178:abb/twl3025.c **** 	spi_xfer(TWL3025_DEV_IDX, 16, &tx, &rx);
+ 179:abb/twl3025.c **** 
+ 180:abb/twl3025.c **** 	rx >>= 6;
+ 181:abb/twl3025.c **** 
+ 182:abb/twl3025.c **** 	printd("tw3025_reg_read(%u,%u)=0x%04x\n", REG_PAGE(reg),
+ 183:abb/twl3025.c **** 		REG_ADDR(reg), rx);
+ 184:abb/twl3025.c **** 
+ 185:abb/twl3025.c **** 	return rx;
+ 186:abb/twl3025.c **** }
+ 187:abb/twl3025.c **** 
+ 188:abb/twl3025.c **** static void twl3025_wait_ibic_access(void)
+ 189:abb/twl3025.c **** {
+  89              		.loc 2 189 0
+  90              		.cfi_startproc
+  91              		@ args = 0, pretend = 0, frame = 0
+  92              		@ frame_needed = 0, uses_anonymous_args = 0
+  93              		@ link register save eliminated.
+ 190:abb/twl3025.c **** 	/* Wait 6 * 32kHz clock cycles for first IBIC access (187us + 10% = 210us) */
+ 191:abb/twl3025.c **** 	delay_ms(1);
+  94              		.loc 2 191 0
+  95 0000 0100A0E3 		mov	r0, #1
+ 192:abb/twl3025.c **** }
+  96              		.loc 2 192 0
+ 191:abb/twl3025.c **** 	delay_ms(1);
+  97              		.loc 2 191 0
+  98 0004 FEFFFFEA 		b	delay_ms
+  99              		.cfi_endproc
+ 100              	.LFE16:
+ 102              		.section	.text.twl3025_reg_write,"ax",%progbits
+ 103              		.align	2
+ 104              		.global	twl3025_reg_write
+ 106              	twl3025_reg_write:
+ 107              	.LFB13:
+ 147:abb/twl3025.c **** {
+ 108              		.loc 2 147 0
+ 109              		.cfi_startproc
+ 110              		@ args = 0, pretend = 0, frame = 4
+ 111              		@ frame_needed = 0, uses_anonymous_args = 0
+ 112              	.LVL4:
+ 113 0000 31402DE9 		stmfd	sp!, {r0, r4, r5, lr}
+ 114              	.LCFI0:
+ 115              		.cfi_def_cfa_offset 16
+ 147:abb/twl3025.c **** {
+ 116              		.loc 2 147 0
+ 117 0004 FF4000E2 		and	r4, r0, #255
+ 118              		.cfi_offset 14, -4
+ 119              		.cfi_offset 5, -8
+ 120              		.cfi_offset 4, -12
+ 121              		.cfi_offset 0, -16
+ 122 0008 0118A0E1 		mov	r1, r1, asl #16
+ 123              	.LVL5:
+ 153:abb/twl3025.c **** 	if (reg != PAGEREG && REG_PAGE(reg) != twl3025_state.page)
+ 124              		.loc 2 153 0
+ 125 000c 010054E3 		cmp	r4, #1
+ 147:abb/twl3025.c **** {
+ 126              		.loc 2 147 0
+ 127 0010 2158A0E1 		mov	r5, r1, lsr #16
+ 153:abb/twl3025.c **** 	if (reg != PAGEREG && REG_PAGE(reg) != twl3025_state.page)
+ 128              		.loc 2 153 0
+ 129 0014 0400000A 		beq	.L12
+ 153:abb/twl3025.c **** 	if (reg != PAGEREG && REG_PAGE(reg) != twl3025_state.page)
+ 130              		.loc 2 153 0 is_stmt 0 discriminator 1
+ 131 0018 34309FE5 		ldr	r3, .L13
+ 132 001c 0030D3E5 		ldrb	r3, [r3, #0]	@ zero_extendqisi2
+ 133 0020 A403A0E1 		mov	r0, r4, lsr #7
+ 134              	.LVL6:
+ 135 0024 000053E1 		cmp	r3, r0
+ 154:abb/twl3025.c **** 		twl3025_switch_page(REG_PAGE(reg));
+ 136              		.loc 2 154 0 is_stmt 1
+ 137 0028 FEFFFF1B 		blne	twl3025_switch_page
+ 138              	.L12:
+ 156:abb/twl3025.c **** 	tx = ((data & 0x3ff) << 6) | (REG_ADDR(reg) << 1);
+ 139              		.loc 2 156 0
+ 140 002c 0553A0E1 		mov	r5, r5, asl #6
+ 141 0030 3F4004E2 		and	r4, r4, #63
+ 142 0034 844085E1 		orr	r4, r5, r4, asl #1
+ 143 0038 04208DE2 		add	r2, sp, #4
+ 158:abb/twl3025.c **** 	spi_xfer(TWL3025_DEV_IDX, 16, &tx, NULL);
+ 144              		.loc 2 158 0
+ 145 003c 0000A0E3 		mov	r0, #0
+ 156:abb/twl3025.c **** 	tx = ((data & 0x3ff) << 6) | (REG_ADDR(reg) << 1);
+ 146              		.loc 2 156 0
+ 147 0040 B24062E1 		strh	r4, [r2, #-2]!	@ movhi
+ 148              	.LVL7:
+ 158:abb/twl3025.c **** 	spi_xfer(TWL3025_DEV_IDX, 16, &tx, NULL);
+ 149              		.loc 2 158 0
+ 150 0044 1010A0E3 		mov	r1, #16
+ 151 0048 0030A0E1 		mov	r3, r0
+ 152 004c FEFFFFEB 		bl	spi_xfer
+ 159:abb/twl3025.c **** }
+ 153              		.loc 2 159 0
+ 154 0050 3880BDE8 		ldmfd	sp!, {r3, r4, r5, pc}
+ 155              	.L14:
+ 156              		.align	2
+ 157              	.L13:
+ 158 0054 00000000 		.word	.LANCHOR0
+ 159              		.cfi_endproc
+ 160              	.LFE13:
+ 162              		.section	.text.twl3025_switch_page,"ax",%progbits
+ 163              		.align	2
+ 165              	twl3025_switch_page:
+ 166              	.LFB8:
+  73:abb/twl3025.c **** {
+ 167              		.loc 2 73 0
+ 168              		.cfi_startproc
+ 169              		@ args = 0, pretend = 0, frame = 0
+ 170              		@ frame_needed = 0, uses_anonymous_args = 0
+ 171              	.LVL8:
+ 172 0000 10402DE9 		stmfd	sp!, {r4, lr}
+ 173              	.LCFI1:
+ 174              		.cfi_def_cfa_offset 8
+  74:abb/twl3025.c **** 	if (page == 0)
+ 175              		.loc 2 74 0
+ 176 0004 004050E2 		subs	r4, r0, #0
+ 177              		.cfi_offset 14, -4
+ 178              		.cfi_offset 4, -8
+  75:abb/twl3025.c **** 		twl3025_reg_write(PAGEREG, 1 << 0);
+ 179              		.loc 2 75 0
+ 180 0008 01008002 		addeq	r0, r0, #1
+ 181              	.LVL9:
+ 182 000c 0010A001 		moveq	r1, r0
+  77:abb/twl3025.c **** 		twl3025_reg_write(PAGEREG, 1 << 1);
+ 183              		.loc 2 77 0
+ 184 0010 0100A013 		movne	r0, #1
+ 185 0014 0210A013 		movne	r1, #2
+ 186 0018 FEFFFFEB 		bl	twl3025_reg_write
+  79:abb/twl3025.c **** 	twl3025_state.page = page;
+ 187              		.loc 2 79 0
+ 188 001c 04309FE5 		ldr	r3, .L19
+ 189 0020 0040C3E5 		strb	r4, [r3, #0]
+  80:abb/twl3025.c **** }
+ 190              		.loc 2 80 0
+ 191 0024 1080BDE8 		ldmfd	sp!, {r4, pc}
+ 192              	.L20:
+ 193              		.align	2
+ 194              	.L19:
+ 195 0028 00000000 		.word	.LANCHOR0
+ 196              		.cfi_endproc
+ 197              	.LFE8:
+ 199              		.section	.text.twl3025_tsp_write,"ax",%progbits
+ 200              		.align	2
+ 201              		.global	twl3025_tsp_write
+ 203              	twl3025_tsp_write:
+ 204              	.LFB14:
+ 162:abb/twl3025.c **** {
+ 205              		.loc 2 162 0
+ 206              		.cfi_startproc
+ 207              		@ args = 0, pretend = 0, frame = 0
+ 208              		@ frame_needed = 0, uses_anonymous_args = 0
+ 209              		@ link register save eliminated.
+ 210              	.LVL10:
+ 162:abb/twl3025.c **** {
+ 211              		.loc 2 162 0
+ 212 0000 FF2000E2 		and	r2, r0, #255
+ 163:abb/twl3025.c **** 	tsp_write(TWL3025_TSP_DEV_IDX, 7, data);
+ 213              		.loc 2 163 0
+ 214 0004 0710A0E3 		mov	r1, #7
+ 215 0008 0000A0E3 		mov	r0, #0
+ 216              	.LVL11:
+ 164:abb/twl3025.c **** }
+ 217              		.loc 2 164 0
+ 163:abb/twl3025.c **** 	tsp_write(TWL3025_TSP_DEV_IDX, 7, data);
+ 218              		.loc 2 163 0
+ 219 000c FEFFFFEA 		b	tsp_write
+ 220              		.cfi_endproc
+ 221              	.LFE14:
+ 223              		.section	.text.twl3025_reg_read,"ax",%progbits
+ 224              		.align	2
+ 225              		.global	twl3025_reg_read
+ 227              	twl3025_reg_read:
+ 228              	.LFB15:
+ 167:abb/twl3025.c **** {
+ 229              		.loc 2 167 0
+ 230              		.cfi_startproc
+ 231              		@ args = 0, pretend = 0, frame = 4
+ 232              		@ frame_needed = 0, uses_anonymous_args = 0
+ 233              	.LVL12:
+ 234 0000 31402DE9 		stmfd	sp!, {r0, r4, r5, lr}
+ 235              	.LCFI2:
+ 236              		.cfi_def_cfa_offset 16
+ 170:abb/twl3025.c **** 	if (REG_PAGE(reg) != twl3025_state.page)
+ 237              		.loc 2 170 0
+ 238 0004 64309FE5 		ldr	r3, .L24
+ 167:abb/twl3025.c **** {
+ 239              		.loc 2 167 0
+ 240 0008 FF4000E2 		and	r4, r0, #255
+ 241              		.cfi_offset 14, -4
+ 242              		.cfi_offset 5, -8
+ 243              		.cfi_offset 4, -12
+ 244              		.cfi_offset 0, -16
+ 170:abb/twl3025.c **** 	if (REG_PAGE(reg) != twl3025_state.page)
+ 245              		.loc 2 170 0
+ 246 000c 0030D3E5 		ldrb	r3, [r3, #0]	@ zero_extendqisi2
+ 247 0010 A403A0E1 		mov	r0, r4, lsr #7
+ 248              	.LVL13:
+ 249 0014 000053E1 		cmp	r3, r0
+ 171:abb/twl3025.c **** 		twl3025_switch_page(REG_PAGE(reg));
+ 250              		.loc 2 171 0
+ 251 0018 FEFFFF1B 		blne	twl3025_switch_page
+ 252              	.L23:
+ 173:abb/twl3025.c **** 	tx = (REG_ADDR(reg) << 1) | 1;
+ 253              		.loc 2 173 0
+ 254 001c 3F3004E2 		and	r3, r4, #63
+ 255 0020 8330A0E1 		mov	r3, r3, asl #1
+ 256 0024 04408DE2 		add	r4, sp, #4
+ 257 0028 013083E3 		orr	r3, r3, #1
+ 258 002c B23064E1 		strh	r3, [r4, #-2]!	@ movhi
+ 259              	.LVL14:
+ 176:abb/twl3025.c **** 	spi_xfer(TWL3025_DEV_IDX, 16, &tx, &rx);
+ 260              		.loc 2 176 0
+ 261 0030 1010A0E3 		mov	r1, #16
+ 262 0034 0420A0E1 		mov	r2, r4
+ 263 0038 0D30A0E1 		mov	r3, sp
+ 264 003c 0000A0E3 		mov	r0, #0
+ 265 0040 FEFFFFEB 		bl	spi_xfer
+ 177:abb/twl3025.c **** 	delay_ms(1);
+ 266              		.loc 2 177 0
+ 267 0044 0100A0E3 		mov	r0, #1
+ 268 0048 FEFFFFEB 		bl	delay_ms
+ 178:abb/twl3025.c **** 	spi_xfer(TWL3025_DEV_IDX, 16, &tx, &rx);
+ 269              		.loc 2 178 0
+ 270 004c 1010A0E3 		mov	r1, #16
+ 271 0050 0420A0E1 		mov	r2, r4
+ 272 0054 0D30A0E1 		mov	r3, sp
+ 273 0058 0000A0E3 		mov	r0, #0
+ 274 005c FEFFFFEB 		bl	spi_xfer
+ 275              	.LVL15:
+ 180:abb/twl3025.c **** 	rx >>= 6;
+ 276              		.loc 2 180 0
+ 277 0060 B000DDE1 		ldrh	r0, [sp, #0]
+ 278              	.LVL16:
+ 176:abb/twl3025.c **** 	spi_xfer(TWL3025_DEV_IDX, 16, &tx, &rx);
+ 279              		.loc 2 176 0
+ 280 0064 0D50A0E1 		mov	r5, sp
+ 186:abb/twl3025.c **** }
+ 281              		.loc 2 186 0
+ 282 0068 2003A0E1 		mov	r0, r0, lsr #6
+ 283              	.LVL17:
+ 284 006c 3880BDE8 		ldmfd	sp!, {r3, r4, r5, pc}
+ 285              	.L25:
+ 286              		.align	2
+ 287              	.L24:
+ 288 0070 00000000 		.word	.LANCHOR0
+ 289              		.cfi_endproc
+ 290              	.LFE15:
+ 292              		.section	.text.twl3025_get_pwon,"ax",%progbits
+ 293              		.align	2
+ 294              		.global	twl3025_get_pwon
+ 296              	twl3025_get_pwon:
+ 297              	.LFB17:
+ 193:abb/twl3025.c **** 
+ 194:abb/twl3025.c **** int twl3025_get_pwon(void)
+ 195:abb/twl3025.c **** {
+ 298              		.loc 2 195 0
+ 299              		.cfi_startproc
+ 300              		@ args = 0, pretend = 0, frame = 0
+ 301              		@ frame_needed = 0, uses_anonymous_args = 0
+ 302 0000 10402DE9 		stmfd	sp!, {r4, lr}
+ 303              	.LCFI3:
+ 304              		.cfi_def_cfa_offset 8
+ 196:abb/twl3025.c **** 	switch (twl3025_state.pwon) {
+ 305              		.loc 2 196 0
+ 306 0004 48409FE5 		ldr	r4, .L32
+ 307              		.cfi_offset 14, -4
+ 308              		.cfi_offset 4, -8
+ 309 0008 043094E5 		ldr	r3, [r4, #4]
+ 310 000c 010053E3 		cmp	r3, #1
+ 311 0010 0200000A 		beq	.L28
+ 312 0014 020053E3 		cmp	r3, #2
+ 313 0018 0800001A 		bne	.L27
+ 314 001c 010000EA 		b	.L31
+ 315              	.L28:
+ 197:abb/twl3025.c **** 	case PWON_DETECTED:
+ 198:abb/twl3025.c **** 		twl3025_state.pwon = PWON_REPORTED;
+ 316              		.loc 2 198 0
+ 317 0020 0230A0E3 		mov	r3, #2
+ 318 0024 040000EA 		b	.L30
+ 319              	.L31:
+ 199:abb/twl3025.c **** 		break;
+ 200:abb/twl3025.c **** 	case PWON_REPORTED:
+ 201:abb/twl3025.c **** 		if (twl3025_reg_read(VRPCSTS) & 0x10)
+ 320              		.loc 2 201 0
+ 321 0028 1F00A0E3 		mov	r0, #31
+ 322 002c FEFFFFEB 		bl	twl3025_reg_read
+ 323 0030 100010E3 		tst	r0, #16
+ 324 0034 0100000A 		beq	.L27
+ 202:abb/twl3025.c **** 			twl3025_state.pwon = PWON_IDLE;
+ 325              		.loc 2 202 0
+ 326 0038 0030A0E3 		mov	r3, #0
+ 327              	.L30:
+ 328 003c 043084E5 		str	r3, [r4, #4]
+ 329              	.L27:
+ 203:abb/twl3025.c **** 		break;
+ 204:abb/twl3025.c **** 	case PWON_IDLE:
+ 205:abb/twl3025.c **** 	default:
+ 206:abb/twl3025.c **** 		break;
+ 207:abb/twl3025.c **** 	}
+ 208:abb/twl3025.c **** 
+ 209:abb/twl3025.c **** 	return (twl3025_state.pwon != PWON_IDLE);
+ 330              		.loc 2 209 0
+ 331 0040 0C309FE5 		ldr	r3, .L32
+ 332 0044 040093E5 		ldr	r0, [r3, #4]
+ 210:abb/twl3025.c **** }
+ 333              		.loc 2 210 0
+ 334 0048 000050E2 		subs	r0, r0, #0
+ 335 004c 0100A013 		movne	r0, #1
+ 336 0050 1080BDE8 		ldmfd	sp!, {r4, pc}
+ 337              	.L33:
+ 338              		.align	2
+ 339              	.L32:
+ 340 0054 00000000 		.word	.LANCHOR0
+ 341              		.cfi_endproc
+ 342              	.LFE17:
+ 344              		.section	.text.twl3025_power_off,"ax",%progbits
+ 345              		.align	2
+ 346              		.global	twl3025_power_off
+ 348              	twl3025_power_off:
+ 349              	.LFB18:
+ 211:abb/twl3025.c **** 
+ 212:abb/twl3025.c **** void twl3025_power_off(void)
+ 213:abb/twl3025.c **** {
+ 350              		.loc 2 213 0
+ 351              		.cfi_startproc
+ 352              		@ args = 0, pretend = 0, frame = 0
+ 353              		@ frame_needed = 0, uses_anonymous_args = 0
+ 354 0000 04E02DE5 		str	lr, [sp, #-4]!
+ 355              	.LCFI4:
+ 356              		.cfi_def_cfa_offset 4
+ 357              	.LBB10:
+ 214:abb/twl3025.c **** 	unsigned long flags;
+ 215:abb/twl3025.c **** 
+ 216:abb/twl3025.c **** 	/* turn off all IRQs, since received frames cannot be
+ 217:abb/twl3025.c **** 	 * handled form here. (otherwise the message allocation
+ 218:abb/twl3025.c **** 	 * runs out of memory) */
+ 219:abb/twl3025.c **** 	local_firq_save(flags);
+ 358              		.loc 2 219 0
+ 359              	@ 219 "abb/twl3025.c" 1
+ 360 0004 00300FE1 		mrs	r3, cpsr		@ local_firq_save
+ 361 0008 C02083E3 		orr	r2, r3, #0xC0
+ 362 000c 02F021E1 		msr	cpsr_c, r2
+ 363              	@ 0 "" 2
+ 364              	.L35:
+ 365              	.LBE10:
+ 220:abb/twl3025.c **** 
+ 221:abb/twl3025.c **** 	/* poll PWON status and power off the phone when the
+ 222:abb/twl3025.c **** 	 * powerbutton has been released (otherwise it will
+ 223:abb/twl3025.c **** 	 * poweron immediately again) */
+ 224:abb/twl3025.c **** 	while (!(twl3025_reg_read(VRPCSTS) & 0x10)) { };
+ 366              		.loc 2 224 0 discriminator 1
+ 367 0010 1F00A0E3 		mov	r0, #31
+ 368              		.cfi_offset 14, -4
+ 369 0014 FEFFFFEB 		bl	twl3025_reg_read
+ 370 0018 100010E3 		tst	r0, #16
+ 371 001c FBFFFF0A 		beq	.L35
+ 225:abb/twl3025.c **** 	twl3025_reg_write(VRPCDEV, 0x01);
+ 372              		.loc 2 225 0
+ 373 0020 1E00A0E3 		mov	r0, #30
+ 374 0024 0110A0E3 		mov	r1, #1
+ 226:abb/twl3025.c **** }
+ 375              		.loc 2 226 0
+ 376 0028 04E09DE4 		ldr	lr, [sp], #4
+ 225:abb/twl3025.c **** 	twl3025_reg_write(VRPCDEV, 0x01);
+ 377              		.loc 2 225 0
+ 378 002c FEFFFFEA 		b	twl3025_reg_write
+ 379              		.cfi_endproc
+ 380              	.LFE18:
+ 382              		.section	.text.twl3025_irq,"ax",%progbits
+ 383              		.align	2
+ 385              	twl3025_irq:
+ 386              	.LFB11:
+ 105:abb/twl3025.c **** {
+ 387              		.loc 2 105 0
+ 388              		.cfi_startproc
+ 389              		@ args = 0, pretend = 0, frame = 0
+ 390              		@ frame_needed = 0, uses_anonymous_args = 0
+ 391              	.LVL18:
+ 108:abb/twl3025.c **** 	switch (nr){
+ 392              		.loc 2 108 0
+ 393 0000 0C0050E3 		cmp	r0, #12
+ 105:abb/twl3025.c **** {
+ 394              		.loc 2 105 0
+ 395 0004 04E02DE5 		str	lr, [sp, #-4]!
+ 396              	.LCFI5:
+ 397              		.cfi_def_cfa_offset 4
+ 108:abb/twl3025.c **** 	switch (nr){
+ 398              		.loc 2 108 0
+ 399 0008 0200000A 		beq	.L39
+ 400              		.cfi_offset 14, -4
+ 401 000c 110050E3 		cmp	r0, #17
+ 402 0010 04F09D14 		ldrne	pc, [sp], #4
+ 403 0014 0D0000EA 		b	.L42
+ 404              	.L39:
+ 110:abb/twl3025.c **** 		src = twl3025_reg_read(ITSTATREG);
+ 405              		.loc 2 110 0
+ 406 0018 1B00A0E3 		mov	r0, #27
+ 407              	.LVL19:
+ 408 001c FEFFFFEB 		bl	twl3025_reg_read
+ 409              	.LVL20:
+ 112:abb/twl3025.c **** 		if ((src & 0x04) && twl3025_state.pwon == PWON_IDLE)
+ 410              		.loc 2 112 0
+ 411 0020 040010E3 		tst	r0, #4
+ 412 0024 0400000A 		beq	.L41
+ 112:abb/twl3025.c **** 		if ((src & 0x04) && twl3025_state.pwon == PWON_IDLE)
+ 413              		.loc 2 112 0 is_stmt 0 discriminator 1
+ 414 0028 30309FE5 		ldr	r3, .L43
+ 415 002c 042093E5 		ldr	r2, [r3, #4]
+ 416 0030 000052E3 		cmp	r2, #0
+ 113:abb/twl3025.c **** 			twl3025_state.pwon = PWON_DETECTED;
+ 417              		.loc 2 113 0 is_stmt 1 discriminator 1
+ 418 0034 01208202 		addeq	r2, r2, #1
+ 419 0038 04208305 		streq	r2, [r3, #4]
+ 420              	.L41:
+ 114:abb/twl3025.c **** 		if (src & 0x08)
+ 421              		.loc 2 114 0
+ 422 003c 080010E3 		tst	r0, #8
+ 423 0040 04F09D04 		ldreq	pc, [sp], #4
+ 424              	.LBB11:
+ 425              	.LBB12:
+  87:abb/twl3025.c **** 	status = twl3025_reg_read(VRPCSTS);
+ 426              		.loc 2 87 0
+ 427 0044 1F00A0E3 		mov	r0, #31
+ 428              	.LVL21:
+ 429              	.LBE12:
+ 430              	.LBE11:
+ 126:abb/twl3025.c **** }
+ 431              		.loc 2 126 0
+ 432 0048 04E09DE4 		ldr	lr, [sp], #4
+ 433              	.LBB14:
+ 434              	.LBB13:
+  87:abb/twl3025.c **** 	status = twl3025_reg_read(VRPCSTS);
+ 435              		.loc 2 87 0
+ 436 004c FEFFFFEA 		b	twl3025_reg_read
+ 437              	.LVL22:
+ 438              	.L42:
+ 439              	.LBE13:
+ 440              	.LBE14:
+ 120:abb/twl3025.c **** 		puts("\nBROWNOUT!1!");
+ 441              		.loc 2 120 0
+ 442 0050 0C009FE5 		ldr	r0, .L43+4
+ 443              	.LVL23:
+ 444 0054 FEFFFFEB 		bl	puts
+ 126:abb/twl3025.c **** }
+ 445              		.loc 2 126 0
+ 446 0058 04E09DE4 		ldr	lr, [sp], #4
+ 121:abb/twl3025.c **** 		twl3025_power_off();
+ 447              		.loc 2 121 0
+ 448 005c FEFFFFEA 		b	twl3025_power_off
+ 449              	.L44:
+ 450              		.align	2
+ 451              	.L43:
+ 452 0060 00000000 		.word	.LANCHOR0
+ 453 0064 00000000 		.word	.LC0
+ 454              		.cfi_endproc
+ 455              	.LFE11:
+ 457              		.section	.text.twl3025_power_off_now,"ax",%progbits
+ 458              		.align	2
+ 459              		.global	twl3025_power_off_now
+ 461              	twl3025_power_off_now:
+ 462              	.LFB19:
+ 227:abb/twl3025.c **** 
+ 228:abb/twl3025.c **** void twl3025_power_off_now(void)
+ 229:abb/twl3025.c **** {
+ 463              		.loc 2 229 0
+ 464              		.cfi_startproc
+ 465              		@ args = 0, pretend = 0, frame = 0
+ 466              		@ frame_needed = 0, uses_anonymous_args = 0
+ 467              		@ link register save eliminated.
+ 468              	.LBB15:
+ 230:abb/twl3025.c **** 	/* The phone will restart if the power butten has not been released.
+ 231:abb/twl3025.c **** 	 * This can be useful for development. */
+ 232:abb/twl3025.c **** 	unsigned long flags;
+ 233:abb/twl3025.c **** 	local_firq_save(flags);
+ 469              		.loc 2 233 0
+ 470              	@ 233 "abb/twl3025.c" 1
+ 471 0000 00300FE1 		mrs	r3, cpsr		@ local_firq_save
+ 472 0004 C02083E3 		orr	r2, r3, #0xC0
+ 473 0008 02F021E1 		msr	cpsr_c, r2
+ 474              	@ 0 "" 2
+ 475              	.LBE15:
+ 234:abb/twl3025.c **** 	twl3025_reg_write(VRPCDEV, 0x01);
+ 476              		.loc 2 234 0
+ 477 000c 1E00A0E3 		mov	r0, #30
+ 478 0010 0110A0E3 		mov	r1, #1
+ 235:abb/twl3025.c **** }
+ 479              		.loc 2 235 0
+ 234:abb/twl3025.c **** 	twl3025_reg_write(VRPCDEV, 0x01);
+ 480              		.loc 2 234 0
+ 481 0014 FEFFFFEA 		b	twl3025_reg_write
+ 482              		.cfi_endproc
+ 483              	.LFE19:
+ 485              		.section	.text.twl3025_clk13m,"ax",%progbits
+ 486              		.align	2
+ 487              		.global	twl3025_clk13m
+ 489              	twl3025_clk13m:
+ 490              	.LFB20:
+ 236:abb/twl3025.c **** 
+ 237:abb/twl3025.c **** void twl3025_clk13m(int enable)
+ 238:abb/twl3025.c **** {
+ 491              		.loc 2 238 0
+ 492              		.cfi_startproc
+ 493              		@ args = 0, pretend = 0, frame = 0
+ 494              		@ frame_needed = 0, uses_anonymous_args = 0
+ 495              	.LVL24:
+ 239:abb/twl3025.c **** 	if (enable) {
+ 496              		.loc 2 239 0
+ 497 0000 000050E3 		cmp	r0, #0
+ 238:abb/twl3025.c **** {
+ 498              		.loc 2 238 0
+ 499 0004 04E02DE5 		str	lr, [sp, #-4]!
+ 500              	.LCFI6:
+ 501              		.cfi_def_cfa_offset 4
+ 240:abb/twl3025.c **** 		twl3025_reg_write(TOGBR2, TOGBR2_ACTS);
+ 241:abb/twl3025.c **** 		twl3025_wait_ibic_access();
+ 242:abb/twl3025.c **** 		/* for whatever reason we need to do this twice */
+ 243:abb/twl3025.c **** 		twl3025_reg_write(TOGBR2, TOGBR2_ACTS);
+ 244:abb/twl3025.c **** 		twl3025_wait_ibic_access();
+ 245:abb/twl3025.c **** 	} else {
+ 246:abb/twl3025.c **** 		twl3025_reg_write(TOGBR2, TOGBR2_ACTR);
+ 502              		.loc 2 246 0
+ 503 0008 0500A003 		moveq	r0, #5
+ 504              	.LVL25:
+ 505 000c 0410A003 		moveq	r1, #4
+ 239:abb/twl3025.c **** 	if (enable) {
+ 506              		.loc 2 239 0
+ 507 0010 0500000A 		beq	.L48
+ 508              		.cfi_offset 14, -4
+ 240:abb/twl3025.c **** 		twl3025_reg_write(TOGBR2, TOGBR2_ACTS);
+ 509              		.loc 2 240 0
+ 510 0014 0500A0E3 		mov	r0, #5
+ 511 0018 0810A0E3 		mov	r1, #8
+ 512 001c FEFFFFEB 		bl	twl3025_reg_write
+ 241:abb/twl3025.c **** 		twl3025_wait_ibic_access();
+ 513              		.loc 2 241 0
+ 514 0020 FEFFFFEB 		bl	twl3025_wait_ibic_access
+ 243:abb/twl3025.c **** 		twl3025_reg_write(TOGBR2, TOGBR2_ACTS);
+ 515              		.loc 2 243 0
+ 516 0024 0500A0E3 		mov	r0, #5
+ 517 0028 0810A0E3 		mov	r1, #8
+ 518              	.L48:
+ 519              		.loc 2 246 0
+ 520 002c FEFFFFEB 		bl	twl3025_reg_write
+ 247:abb/twl3025.c **** 		twl3025_wait_ibic_access();
+ 248:abb/twl3025.c **** 	}
+ 249:abb/twl3025.c **** }
+ 521              		.loc 2 249 0
+ 522 0030 04E09DE4 		ldr	lr, [sp], #4
+ 247:abb/twl3025.c **** 		twl3025_wait_ibic_access();
+ 523              		.loc 2 247 0
+ 524 0034 FEFFFFEA 		b	twl3025_wait_ibic_access
+ 525              		.cfi_endproc
+ 526              	.LFE20:
+ 528              		.section	.text.twl3025_downlink,"ax",%progbits
+ 529              		.align	2
+ 530              		.global	twl3025_downlink
+ 532              	twl3025_downlink:
+ 533              	.LFB21:
+ 250:abb/twl3025.c **** 
+ 251:abb/twl3025.c **** #define	TSP_DELAY	6	/* 13* Tclk6M5 = ~ 3 GSM Qbits + 3 TPU instructions */
+ 252:abb/twl3025.c **** #define BDLON_TO_BDLCAL	6
+ 253:abb/twl3025.c **** #define BDLCAL_DURATION	66
+ 254:abb/twl3025.c **** #define BDLON_TO_BDLENA	7
+ 255:abb/twl3025.c **** #define BULON_TO_BULENA	16
+ 256:abb/twl3025.c **** #define BULON_TO_BULCAL	17
+ 257:abb/twl3025.c **** #define BULCAL_DURATION	143	/* really that long? */
+ 258:abb/twl3025.c **** 
+ 259:abb/twl3025.c **** /* bdl_ena - TSP_DELAY - BDLCAL_DURATION - TSP_DELAY - BDLON_TO_BDLCAL - TSP_DELAY */
+ 260:abb/twl3025.c **** #define DOWNLINK_DELAY	(3 * TSP_DELAY + BDLCAL_DURATION + BDLON_TO_BDLCAL)
+ 261:abb/twl3025.c **** 
+ 262:abb/twl3025.c **** /* Enqueue a series of TSP commands in the TPU to (de)activate the downlink path */
+ 263:abb/twl3025.c **** void twl3025_downlink(int on, int16_t at)
+ 264:abb/twl3025.c **** {
+ 534              		.loc 2 264 0
+ 535              		.cfi_startproc
+ 536              		@ args = 0, pretend = 0, frame = 0
+ 537              		@ frame_needed = 0, uses_anonymous_args = 0
+ 538              	.LVL26:
+ 539 0000 70402DE9 		stmfd	sp!, {r4, r5, r6, lr}
+ 540              	.LCFI7:
+ 541              		.cfi_def_cfa_offset 16
+ 542              		.loc 2 264 0
+ 543 0004 0158A0E1 		mov	r5, r1, asl #16
+ 544              		.cfi_offset 14, -4
+ 545              		.cfi_offset 6, -8
+ 546              		.cfi_offset 5, -12
+ 547              		.cfi_offset 4, -16
+ 265:abb/twl3025.c **** 	int16_t bdl_ena = at - TSP_DELAY - 6;
+ 548              		.loc 2 265 0
+ 549 0008 035745E2 		sub	r5, r5, #786432
+ 550 000c 2558A0E1 		mov	r5, r5, lsr #16
+ 266:abb/twl3025.c **** 
+ 267:abb/twl3025.c **** 	if (on) {
+ 551              		.loc 2 267 0
+ 552 0010 006050E2 		subs	r6, r0, #0
+ 265:abb/twl3025.c **** 	int16_t bdl_ena = at - TSP_DELAY - 6;
+ 553              		.loc 2 265 0
+ 554 0014 0540A0E1 		mov	r4, r5
+ 555              	.LVL27:
+ 556 0018 0518A0E1 		mov	r1, r5, asl #16
+ 557              	.LVL28:
+ 558              		.loc 2 267 0
+ 559 001c 1500000A 		beq	.L50
+ 268:abb/twl3025.c **** 		if (bdl_ena < 0)
+ 560              		.loc 2 268 0
+ 561 0020 4118B0E1 		movs	r1, r1, asr #16
+ 269:abb/twl3025.c **** 			printf("BDLENA time negative (%d)\n", bdl_ena);
+ 562              		.loc 2 269 0
+ 563 0024 68009F45 		ldrmi	r0, .L53
+ 564              	.LVL29:
+ 565 0028 FEFFFF4B 		blmi	printf
+ 566              	.L51:
+ 270:abb/twl3025.c **** 		/* calibration should be done just before BDLENA */
+ 271:abb/twl3025.c **** 		tpu_enq_at(bdl_ena - DOWNLINK_DELAY);
+ 567              		.loc 2 271 0
+ 568 002c 5A5045E2 		sub	r5, r5, #90
+ 569              	.LVL30:
+ 570 0030 0508A0E1 		mov	r0, r5, asl #16
+ 571 0034 4008A0E1 		mov	r0, r0, asr #16
+ 572 0038 FEFFFFEB 		bl	tpu_enq_at
+ 272:abb/twl3025.c **** 		/* bdl_ena - TSP_DELAY - BDLCAL_DURATION - TSP_DELAY - BDLON_TO_BDLCAL - TSP_DELAY */
+ 273:abb/twl3025.c **** 		twl3025_tsp_write(BDLON);
+ 573              		.loc 2 273 0
+ 574 003c 1000A0E3 		mov	r0, #16
+ 575 0040 FEFFFFEB 		bl	twl3025_tsp_write
+ 274:abb/twl3025.c **** 		/* bdl_ena - TSP_DELAY - BDLCAL_DURATION - TSP_DELAY - BDLON_TO_BDLCAL */
+ 275:abb/twl3025.c **** 		tpu_enq_wait(BDLON_TO_BDLCAL - TSP_DELAY);
+ 576              		.loc 2 275 0
+ 577 0044 0000A0E3 		mov	r0, #0
+ 578 0048 FEFFFFEB 		bl	tpu_enq_wait
+ 276:abb/twl3025.c **** 		/* bdl_ena - TSP_DELAY - BDLCAL_DURATION - TSP_DELAY */
+ 277:abb/twl3025.c **** 		twl3025_tsp_write(BDLON | BDLCAL);
+ 579              		.loc 2 277 0
+ 580 004c 1800A0E3 		mov	r0, #24
+ 581 0050 FEFFFFEB 		bl	twl3025_tsp_write
+ 278:abb/twl3025.c **** 		/* bdl_ena - TSP_DELAY - BDLCAL_DURATION */
+ 279:abb/twl3025.c **** 		tpu_enq_wait(BDLCAL_DURATION - TSP_DELAY);
+ 582              		.loc 2 279 0
+ 583 0054 3C00A0E3 		mov	r0, #60
+ 584 0058 FEFFFFEB 		bl	tpu_enq_wait
+ 280:abb/twl3025.c **** 		/* bdl_ena - TSP_DELAY */
+ 281:abb/twl3025.c **** 		twl3025_tsp_write(BDLON);
+ 585              		.loc 2 281 0
+ 586 005c 1000A0E3 		mov	r0, #16
+ 587 0060 FEFFFFEB 		bl	twl3025_tsp_write
+ 282:abb/twl3025.c **** 		//tpu_enq_wait(BDLCAL_TO_BDLENA)	this is only 3.7us == 4 qbits, i.e. less than the TSP_DELAY
+ 283:abb/twl3025.c **** 		tpu_enq_at(bdl_ena);
+ 588              		.loc 2 283 0
+ 589 0064 0408A0E1 		mov	r0, r4, asl #16
+ 590 0068 4008A0E1 		mov	r0, r0, asr #16
+ 591 006c FEFFFFEB 		bl	tpu_enq_at
+ 284:abb/twl3025.c **** 		twl3025_tsp_write(BDLON | BDLENA);
+ 592              		.loc 2 284 0
+ 593 0070 1400A0E3 		mov	r0, #20
+ 594 0074 040000EA 		b	.L52
+ 595              	.L50:
+ 285:abb/twl3025.c **** 	} else {
+ 286:abb/twl3025.c **** 		tpu_enq_at(bdl_ena);
+ 596              		.loc 2 286 0
+ 597 0078 4108A0E1 		mov	r0, r1, asr #16
+ 598 007c FEFFFFEB 		bl	tpu_enq_at
+ 287:abb/twl3025.c **** 		twl3025_tsp_write(BDLON);
+ 599              		.loc 2 287 0
+ 600 0080 1000A0E3 		mov	r0, #16
+ 601 0084 FEFFFFEB 		bl	twl3025_tsp_write
+ 288:abb/twl3025.c **** 		//tpu_enq_wait(nBDLENA_TO_nBDLON)	this is only 3.7us == 4 qbits, i.e. less than the TSP_DELAY
+ 289:abb/twl3025.c **** 		twl3025_tsp_write(0);
+ 602              		.loc 2 289 0
+ 603 0088 0600A0E1 		mov	r0, r6
+ 604              	.L52:
+ 290:abb/twl3025.c **** 	}
+ 291:abb/twl3025.c **** }
+ 605              		.loc 2 291 0
+ 606 008c 7040BDE8 		ldmfd	sp!, {r4, r5, r6, lr}
+ 289:abb/twl3025.c **** 		twl3025_tsp_write(0);
+ 607              		.loc 2 289 0
+ 608 0090 FEFFFFEA 		b	twl3025_tsp_write
+ 609              	.L54:
+ 610              		.align	2
+ 611              	.L53:
+ 612 0094 0D000000 		.word	.LC1
+ 613              		.cfi_endproc
+ 614              	.LFE21:
+ 616              		.section	.text.twl3025_uplink,"ax",%progbits
+ 617              		.align	2
+ 618              		.global	twl3025_uplink
+ 620              	twl3025_uplink:
+ 621              	.LFB22:
+ 292:abb/twl3025.c **** 
+ 293:abb/twl3025.c **** /* bdl_ena - 35 - TSP_DELAY - BULCAL_DURATION - TSP_DELAY - BULON_TO_BULCAL - TSP_DELAY */
+ 294:abb/twl3025.c **** #define UPLINK_DELAY (3 * TSP_DELAY + BULCAL_DURATION + BULON_TO_BULCAL + 35)
+ 295:abb/twl3025.c **** 
+ 296:abb/twl3025.c **** void twl3025_uplink(int on, int16_t at)
+ 297:abb/twl3025.c **** {
+ 622              		.loc 2 297 0
+ 623              		.cfi_startproc
+ 624              		@ args = 0, pretend = 0, frame = 0
+ 625              		@ frame_needed = 0, uses_anonymous_args = 0
+ 626              	.LVL31:
+ 627 0000 70402DE9 		stmfd	sp!, {r4, r5, r6, lr}
+ 628              	.LCFI8:
+ 629              		.cfi_def_cfa_offset 16
+ 630              		.loc 2 297 0
+ 631 0004 0158A0E1 		mov	r5, r1, asl #16
+ 632              		.cfi_offset 14, -4
+ 633              		.cfi_offset 6, -8
+ 634              		.cfi_offset 5, -12
+ 635              		.cfi_offset 4, -16
+ 298:abb/twl3025.c **** 	int16_t bul_ena = at - TSP_DELAY - 6;
+ 636              		.loc 2 298 0
+ 637 0008 035745E2 		sub	r5, r5, #786432
+ 638 000c 2558A0E1 		mov	r5, r5, lsr #16
+ 299:abb/twl3025.c **** 
+ 300:abb/twl3025.c **** 	if (bul_ena < 0)
+ 639              		.loc 2 300 0
+ 640 0010 0518A0E1 		mov	r1, r5, asl #16
+ 641              	.LVL32:
+ 642 0014 4118B0E1 		movs	r1, r1, asr #16
+ 297:abb/twl3025.c **** {
+ 643              		.loc 2 297 0
+ 644 0018 0040A0E1 		mov	r4, r0
+ 298:abb/twl3025.c **** 	int16_t bul_ena = at - TSP_DELAY - 6;
+ 645              		.loc 2 298 0
+ 646 001c 0560A0E1 		mov	r6, r5
+ 647              	.LVL33:
+ 648              		.loc 2 300 0
+ 301:abb/twl3025.c **** 		printf("BULENA time negative (%d)\n", bul_ena);
+ 649              		.loc 2 301 0
+ 650 0020 80009F45 		ldrmi	r0, .L59
+ 651              	.LVL34:
+ 652 0024 FEFFFF4B 		blmi	printf
+ 653              	.L56:
+ 302:abb/twl3025.c **** 	if (on) {
+ 654              		.loc 2 302 0
+ 655 0028 000054E3 		cmp	r4, #0
+ 656 002c 0668A0E1 		mov	r6, r6, asl #16
+ 657 0030 1300000A 		beq	.L57
+ 303:abb/twl3025.c **** 		/* calibration should  be done just before BULENA */
+ 304:abb/twl3025.c **** 		tpu_enq_at(bul_ena - UPLINK_DELAY);
+ 658              		.loc 2 304 0
+ 659 0034 D55045E2 		sub	r5, r5, #213
+ 660              	.LVL35:
+ 661 0038 0508A0E1 		mov	r0, r5, asl #16
+ 662 003c 4008A0E1 		mov	r0, r0, asr #16
+ 663 0040 FEFFFFEB 		bl	tpu_enq_at
+ 305:abb/twl3025.c **** 		/* bdl_ena - 35 - TSP_DELAY - BULCAL_DURATION - TSP_DELAY - BULON_TO_BULCAL - TSP_DELAY */
+ 306:abb/twl3025.c **** 		twl3025_tsp_write(BULON);
+ 664              		.loc 2 306 0
+ 665 0044 8000A0E3 		mov	r0, #128
+ 666 0048 FEFFFFEB 		bl	twl3025_tsp_write
+ 307:abb/twl3025.c **** 		/* bdl_ena - 35 - TSP_DELAY - BULCAL_DURATION - TSP_DELAY - BULON_TO_BULCAL */
+ 308:abb/twl3025.c **** 		tpu_enq_wait(BULON_TO_BULCAL - TSP_DELAY);
+ 667              		.loc 2 308 0
+ 668 004c 0B00A0E3 		mov	r0, #11
+ 669 0050 FEFFFFEB 		bl	tpu_enq_wait
+ 309:abb/twl3025.c **** 		/* bdl_ena - 35 - TSP_DELAY - BULCAL_DURATION - TSP_DELAY */
+ 310:abb/twl3025.c **** 		twl3025_tsp_write(BULON | BULCAL);
+ 670              		.loc 2 310 0
+ 671 0054 C000A0E3 		mov	r0, #192
+ 672 0058 FEFFFFEB 		bl	twl3025_tsp_write
+ 311:abb/twl3025.c **** 		/* bdl_ena - 35 - TSP_DELAY - BULCAL_DURATION */
+ 312:abb/twl3025.c **** 		tpu_enq_wait(BULCAL_DURATION - TSP_DELAY);
+ 673              		.loc 2 312 0
+ 674 005c 8900A0E3 		mov	r0, #137
+ 675 0060 FEFFFFEB 		bl	tpu_enq_wait
+ 313:abb/twl3025.c **** 		/* bdl_ena - 35 - TSP_DELAY */
+ 314:abb/twl3025.c **** 		twl3025_tsp_write(BULON);
+ 676              		.loc 2 314 0
+ 677 0064 8000A0E3 		mov	r0, #128
+ 678 0068 FEFFFFEB 		bl	twl3025_tsp_write
+ 315:abb/twl3025.c **** 		/* bdl_ena - 35 */
+ 316:abb/twl3025.c **** 		tpu_enq_wait(35);	/* minimum time required to bring the ramp up (really needed?) */
+ 679              		.loc 2 316 0
+ 680 006c 2300A0E3 		mov	r0, #35
+ 681 0070 FEFFFFEB 		bl	tpu_enq_wait
+ 317:abb/twl3025.c **** 		tpu_enq_at(bul_ena);
+ 682              		.loc 2 317 0
+ 683 0074 4608A0E1 		mov	r0, r6, asr #16
+ 684 0078 FEFFFFEB 		bl	tpu_enq_at
+ 318:abb/twl3025.c **** 		twl3025_tsp_write(BULON | BULENA);
+ 685              		.loc 2 318 0
+ 686 007c A000A0E3 		mov	r0, #160
+ 687 0080 060000EA 		b	.L58
+ 688              	.LVL36:
+ 689              	.L57:
+ 319:abb/twl3025.c **** 	} else {
+ 320:abb/twl3025.c **** 		tpu_enq_at(bul_ena);
+ 690              		.loc 2 320 0
+ 691 0084 4608A0E1 		mov	r0, r6, asr #16
+ 692 0088 FEFFFFEB 		bl	tpu_enq_at
+ 321:abb/twl3025.c **** 		twl3025_tsp_write(BULON);
+ 693              		.loc 2 321 0
+ 694 008c 8000A0E3 		mov	r0, #128
+ 695 0090 FEFFFFEB 		bl	twl3025_tsp_write
+ 322:abb/twl3025.c **** 		tpu_enq_wait(35);	/* minimum time required to bring the ramp down (needed!) */
+ 696              		.loc 2 322 0
+ 697 0094 2300A0E3 		mov	r0, #35
+ 698 0098 FEFFFFEB 		bl	tpu_enq_wait
+ 323:abb/twl3025.c **** 		twl3025_tsp_write(0);
+ 699              		.loc 2 323 0
+ 700 009c 0400A0E1 		mov	r0, r4
+ 701              	.LVL37:
+ 702              	.L58:
+ 324:abb/twl3025.c **** 	}
+ 325:abb/twl3025.c **** }
+ 703              		.loc 2 325 0
+ 704 00a0 7040BDE8 		ldmfd	sp!, {r4, r5, r6, lr}
+ 323:abb/twl3025.c **** 		twl3025_tsp_write(0);
+ 705              		.loc 2 323 0
+ 706 00a4 FEFFFFEA 		b	twl3025_tsp_write
+ 707              	.L60:
+ 708              		.align	2
+ 709              	.L59:
+ 710 00a8 28000000 		.word	.LC2
+ 711              		.cfi_endproc
+ 712              	.LFE22:
+ 714              		.section	.text.twl3025_afc_set,"ax",%progbits
+ 715              		.align	2
+ 716              		.global	twl3025_afc_set
+ 718              	twl3025_afc_set:
+ 719              	.LFB23:
+ 326:abb/twl3025.c **** 
+ 327:abb/twl3025.c **** void twl3025_afc_set(int16_t val)
+ 328:abb/twl3025.c **** {
+ 720              		.loc 2 328 0
+ 721              		.cfi_startproc
+ 722              		@ args = 0, pretend = 0, frame = 0
+ 723              		@ frame_needed = 0, uses_anonymous_args = 0
+ 724              	.LVL38:
+ 725 0000 0008A0E1 		mov	r0, r0, asl #16
+ 726              	.LVL39:
+ 727 0004 10402DE9 		stmfd	sp!, {r4, lr}
+ 728              	.LCFI9:
+ 729              		.cfi_def_cfa_offset 8
+ 730              		.loc 2 328 0
+ 731 0008 4048A0E1 		mov	r4, r0, asr #16
+ 732              		.cfi_offset 14, -4
+ 733              		.cfi_offset 4, -8
+ 329:abb/twl3025.c **** 	printf("twl3025_afc_set(%d)\n", val);
+ 734              		.loc 2 329 0
+ 735 000c 0410A0E1 		mov	r1, r4
+ 736 0010 40009FE5 		ldr	r0, .L65
+ 737 0014 FEFFFFEB 		bl	printf
+ 330:abb/twl3025.c **** 
+ 331:abb/twl3025.c **** 	if (val > 4095)
+ 738              		.loc 2 331 0
+ 739 0018 3C309FE5 		ldr	r3, .L65+4
+ 740 001c 030054E1 		cmp	r4, r3
+ 332:abb/twl3025.c **** 		val = 4095;
+ 741              		.loc 2 332 0
+ 742 0020 0340A0C1 		movgt	r4, r3
+ 331:abb/twl3025.c **** 	if (val > 4095)
+ 743              		.loc 2 331 0
+ 744 0024 020000CA 		bgt	.L62
+ 333:abb/twl3025.c **** 	else if (val <= -4096)
+ 334:abb/twl3025.c **** 		val = -4096;
+ 745              		.loc 2 334 0
+ 746 0028 30309FE5 		ldr	r3, .L65+8
+ 747 002c 030054E1 		cmp	r4, r3
+ 748 0030 0340A0B1 		movlt	r4, r3
+ 749              	.L62:
+ 750              	.LVL40:
+ 335:abb/twl3025.c **** 
+ 336:abb/twl3025.c **** 	/* FIXME: we currently write from the USP rather than BSP */
+ 337:abb/twl3025.c **** 	twl3025_reg_write(AUXAFC2, val >> 10);
+ 751              		.loc 2 337 0
+ 752 0034 0413A0E1 		mov	r1, r4, asl #6
+ 753 0038 0800A0E3 		mov	r0, #8
+ 754 003c 2118A0E1 		mov	r1, r1, lsr #16
+ 755 0040 FEFFFFEB 		bl	twl3025_reg_write
+ 338:abb/twl3025.c **** 	twl3025_reg_write(AUXAFC1, val & 0x3ff);
+ 756              		.loc 2 338 0
+ 757 0044 041BA0E1 		mov	r1, r4, asl #22
+ 758 0048 0700A0E3 		mov	r0, #7
+ 759 004c 211BA0E1 		mov	r1, r1, lsr #22
+ 339:abb/twl3025.c **** }
+ 760              		.loc 2 339 0
+ 761 0050 1040BDE8 		ldmfd	sp!, {r4, lr}
+ 338:abb/twl3025.c **** 	twl3025_reg_write(AUXAFC1, val & 0x3ff);
+ 762              		.loc 2 338 0
+ 763 0054 FEFFFFEA 		b	twl3025_reg_write
+ 764              	.L66:
+ 765              		.align	2
+ 766              	.L65:
+ 767 0058 43000000 		.word	.LC3
+ 768 005c FF0F0000 		.word	4095
+ 769 0060 00F0FFFF 		.word	-4096
+ 770              		.cfi_endproc
+ 771              	.LFE23:
+ 773              		.section	.text.twl3025_afc_get,"ax",%progbits
+ 774              		.align	2
+ 775              		.global	twl3025_afc_get
+ 777              	twl3025_afc_get:
+ 778              	.LFB24:
+ 340:abb/twl3025.c **** 
+ 341:abb/twl3025.c **** int16_t twl3025_afc_get(void)
+ 342:abb/twl3025.c **** {
+ 779              		.loc 2 342 0
+ 780              		.cfi_startproc
+ 781              		@ args = 0, pretend = 0, frame = 0
+ 782              		@ frame_needed = 0, uses_anonymous_args = 0
+ 783 0000 10402DE9 		stmfd	sp!, {r4, lr}
+ 784              	.LCFI10:
+ 785              		.cfi_def_cfa_offset 8
+ 343:abb/twl3025.c **** 	int16_t val;
+ 344:abb/twl3025.c **** 
+ 345:abb/twl3025.c **** 	val = (twl3025_reg_read(AUXAFC2) & 0x7);
+ 786              		.loc 2 345 0
+ 787 0004 0800A0E3 		mov	r0, #8
+ 788              		.cfi_offset 14, -4
+ 789              		.cfi_offset 4, -8
+ 790 0008 FEFFFFEB 		bl	twl3025_reg_read
+ 791              	.LVL41:
+ 346:abb/twl3025.c **** 	val = val << 10;
+ 792              		.loc 2 346 0
+ 793 000c 070000E2 		and	r0, r0, #7
+ 794              	.LVL42:
+ 795 0010 0045A0E1 		mov	r4, r0, asl #10
+ 796              	.LVL43:
+ 347:abb/twl3025.c **** 	val = val | (twl3025_reg_read(AUXAFC1) & 0x3ff);
+ 797              		.loc 2 347 0
+ 798 0014 0700A0E3 		mov	r0, #7
+ 799 0018 FEFFFFEB 		bl	twl3025_reg_read
+ 800 001c 000BA0E1 		mov	r0, r0, asl #22
+ 801 0020 204B84E1 		orr	r4, r4, r0, lsr #22
+ 802              	.LVL44:
+ 348:abb/twl3025.c **** 
+ 349:abb/twl3025.c **** 	if (val > 4095)
+ 803              		.loc 2 349 0
+ 804 0024 010A54E3 		cmp	r4, #4096
+ 350:abb/twl3025.c **** 		val = -(8192 - val);
+ 805              		.loc 2 350 0
+ 806 0028 024A44A2 		subge	r4, r4, #8192
+ 807              	.LVL45:
+ 808 002c 0448A0A1 		movge	r4, r4, asl #16
+ 809 0030 2448A0A1 		movge	r4, r4, lsr #16
+ 810              	.LVL46:
+ 811 0034 0448A0E1 		mov	r4, r4, asl #16
+ 812              	.LVL47:
+ 351:abb/twl3025.c **** 	return val;
+ 352:abb/twl3025.c **** }
+ 813              		.loc 2 352 0
+ 814 0038 4408A0E1 		mov	r0, r4, asr #16
+ 815 003c 1080BDE8 		ldmfd	sp!, {r4, pc}
+ 816              		.cfi_endproc
+ 817              	.LFE24:
+ 819              		.section	.text.twl3025_unit_enable,"ax",%progbits
+ 820              		.align	2
+ 821              		.global	twl3025_unit_enable
+ 823              	twl3025_unit_enable:
+ 824              	.LFB25:
+ 353:abb/twl3025.c **** 
+ 354:abb/twl3025.c **** void twl3025_unit_enable(enum twl3025_unit unit, int on)
+ 355:abb/twl3025.c **** {
+ 825              		.loc 2 355 0
+ 826              		.cfi_startproc
+ 827              		@ args = 0, pretend = 0, frame = 0
+ 828              		@ frame_needed = 0, uses_anonymous_args = 0
+ 829              		@ link register save eliminated.
+ 830              	.LVL48:
+ 356:abb/twl3025.c **** 	uint16_t togbr1 = 0;
+ 357:abb/twl3025.c **** 
+ 358:abb/twl3025.c **** 	switch (unit) {
+ 831              		.loc 2 358 0
+ 832 0000 040050E3 		cmp	r0, #4
+ 833 0004 00F19F97 		ldrls	pc, [pc, r0, asl #2]
+ 834 0008 180000EA 		b	.L77
+ 835              	.L76:
+ 836 000c 20000000 		.word	.L71
+ 837 0010 30000000 		.word	.L72
+ 838 0014 40000000 		.word	.L73
+ 839 0018 50000000 		.word	.L74
+ 840 001c 60000000 		.word	.L75
+ 841              	.L71:
+ 359:abb/twl3025.c **** 	case TWL3025_UNIT_AFC:
+ 360:abb/twl3025.c **** 		if (on)
+ 361:abb/twl3025.c **** 			togbr1 = (1 << 7);
+ 842              		.loc 2 361 0
+ 843 0020 000051E3 		cmp	r1, #0
+ 844 0024 4010A003 		moveq	r1, #64
+ 845              	.LVL49:
+ 846 0028 8010A013 		movne	r1, #128
+ 847 002c 100000EA 		b	.L70
+ 848              	.LVL50:
+ 849              	.L72:
+ 362:abb/twl3025.c **** 		else
+ 363:abb/twl3025.c **** 			togbr1 = (1 << 6);
+ 364:abb/twl3025.c **** 		break;
+ 365:abb/twl3025.c **** 	case TWL3025_UNIT_MAD:
+ 366:abb/twl3025.c **** 		if (on)
+ 367:abb/twl3025.c **** 			togbr1 = (1 << 9);
+ 850              		.loc 2 367 0
+ 851 0030 000051E3 		cmp	r1, #0
+ 852 0034 011CA003 		moveq	r1, #256
+ 853              	.LVL51:
+ 854 0038 021CA013 		movne	r1, #512
+ 855 003c 0C0000EA 		b	.L70
+ 856              	.LVL52:
+ 857              	.L73:
+ 368:abb/twl3025.c **** 		else
+ 369:abb/twl3025.c **** 			togbr1 = (1 << 8);
+ 370:abb/twl3025.c **** 		break;
+ 371:abb/twl3025.c **** 	case TWL3025_UNIT_ADA:
+ 372:abb/twl3025.c **** 		if (on)
+ 373:abb/twl3025.c **** 			togbr1 = (1 << 5);
+ 858              		.loc 2 373 0
+ 859 0040 000051E3 		cmp	r1, #0
+ 860 0044 1010A003 		moveq	r1, #16
+ 861              	.LVL53:
+ 862 0048 2010A013 		movne	r1, #32
+ 863 004c 080000EA 		b	.L70
+ 864              	.LVL54:
+ 865              	.L74:
+ 374:abb/twl3025.c **** 		else
+ 375:abb/twl3025.c **** 			togbr1 = (1 << 4);
+ 376:abb/twl3025.c **** 		break;
+ 377:abb/twl3025.c **** 	case TWL3025_UNIT_VDL:
+ 378:abb/twl3025.c **** 		if (on)
+ 379:abb/twl3025.c **** 			togbr1 = (1 << 3);
+ 866              		.loc 2 379 0
+ 867 0050 000051E3 		cmp	r1, #0
+ 868 0054 0410A003 		moveq	r1, #4
+ 869              	.LVL55:
+ 870 0058 0810A013 		movne	r1, #8
+ 871 005c 040000EA 		b	.L70
+ 872              	.LVL56:
+ 873              	.L75:
+ 380:abb/twl3025.c **** 		else
+ 381:abb/twl3025.c **** 			togbr1 = (1 << 2);
+ 382:abb/twl3025.c **** 		break;
+ 383:abb/twl3025.c **** 	case TWL3025_UNIT_VUL:
+ 384:abb/twl3025.c **** 		if (on)
+ 385:abb/twl3025.c **** 			togbr1 = (1 << 1);
+ 874              		.loc 2 385 0
+ 875 0060 000051E3 		cmp	r1, #0
+ 876 0064 0110A003 		moveq	r1, #1
+ 877              	.LVL57:
+ 878 0068 0210A013 		movne	r1, #2
+ 879 006c 000000EA 		b	.L70
+ 880              	.LVL58:
+ 881              	.L77:
+ 356:abb/twl3025.c **** 	uint16_t togbr1 = 0;
+ 882              		.loc 2 356 0
+ 883 0070 0010A0E3 		mov	r1, #0
+ 884              	.LVL59:
+ 885              	.L70:
+ 386:abb/twl3025.c **** 		else
+ 387:abb/twl3025.c **** 			togbr1 = (1 << 0);
+ 388:abb/twl3025.c **** 		break;
+ 389:abb/twl3025.c **** 	}
+ 390:abb/twl3025.c **** 	twl3025_reg_write(TOGBR1, togbr1);
+ 886              		.loc 2 390 0
+ 887 0074 0400A0E3 		mov	r0, #4
+ 888              	.LVL60:
+ 391:abb/twl3025.c **** }
+ 889              		.loc 2 391 0
+ 390:abb/twl3025.c **** 	twl3025_reg_write(TOGBR1, togbr1);
+ 890              		.loc 2 390 0
+ 891 0078 FEFFFFEA 		b	twl3025_reg_write
+ 892              		.cfi_endproc
+ 893              	.LFE25:
+ 895              		.section	.text.twl3025_init,"ax",%progbits
+ 896              		.align	2
+ 897              		.global	twl3025_init
+ 899              	twl3025_init:
+ 900              	.LFB12:
+ 129:abb/twl3025.c **** {
+ 901              		.loc 2 129 0
+ 902              		.cfi_startproc
+ 903              		@ args = 0, pretend = 0, frame = 0
+ 904              		@ frame_needed = 0, uses_anonymous_args = 0
+ 905 0000 30402DE9 		stmfd	sp!, {r4, r5, lr}
+ 906              	.LCFI11:
+ 907              		.cfi_def_cfa_offset 12
+ 130:abb/twl3025.c **** 	spi_init();
+ 908              		.loc 2 130 0
+ 909              		.cfi_offset 14, -4
+ 910              		.cfi_offset 5, -8
+ 911              		.cfi_offset 4, -12
+ 912 0004 FEFFFFEB 		bl	spi_init
+ 131:abb/twl3025.c **** 	twl3025_switch_page(0);
+ 913              		.loc 2 131 0
+ 914 0008 0000A0E3 		mov	r0, #0
+ 915 000c FEFFFFEB 		bl	twl3025_switch_page
+ 132:abb/twl3025.c **** 	twl3025_clk13m(1);
+ 916              		.loc 2 132 0
+ 917 0010 0100A0E3 		mov	r0, #1
+ 918 0014 FEFFFFEB 		bl	twl3025_clk13m
+ 133:abb/twl3025.c **** 	twl3025_reg_write(AFCCTLADD, 0x01);	/* AFCCK(1:0) must not be zero! */
+ 919              		.loc 2 133 0
+ 920 0018 9500A0E3 		mov	r0, #149
+ 921 001c 0110A0E3 		mov	r1, #1
+ 922 0020 FEFFFFEB 		bl	twl3025_reg_write
+ 134:abb/twl3025.c **** 	twl3025_unit_enable(TWL3025_UNIT_AFC, 1);
+ 923              		.loc 2 134 0
+ 924 0024 0000A0E3 		mov	r0, #0
+ 925 0028 0110A0E3 		mov	r1, #1
+ 926 002c FEFFFFEB 		bl	twl3025_unit_enable
+ 137:abb/twl3025.c **** 	irq_register_handler(IRQ_EXTERNAL, &twl3025_irq);
+ 927              		.loc 2 137 0
+ 928 0030 5C509FE5 		ldr	r5, .L84
+ 135:abb/twl3025.c **** 	twl3025_state.pwon = PWON_IDLE;
+ 929              		.loc 2 135 0
+ 930 0034 5C309FE5 		ldr	r3, .L84+4
+ 931 0038 0040A0E3 		mov	r4, #0
+ 932 003c 044083E5 		str	r4, [r3, #4]
+ 137:abb/twl3025.c **** 	irq_register_handler(IRQ_EXTERNAL, &twl3025_irq);
+ 933              		.loc 2 137 0
+ 934 0040 0510A0E1 		mov	r1, r5
+ 935 0044 0C00A0E3 		mov	r0, #12
+ 936 0048 FEFFFFEB 		bl	irq_register_handler
+ 138:abb/twl3025.c **** 	irq_config(IRQ_EXTERNAL, 0, 0, 0);
+ 937              		.loc 2 138 0
+ 938 004c 0420A0E1 		mov	r2, r4
+ 939 0050 0430A0E1 		mov	r3, r4
+ 940 0054 0410A0E1 		mov	r1, r4
+ 941 0058 0C00A0E3 		mov	r0, #12
+ 942 005c FEFFFFEB 		bl	irq_config
+ 139:abb/twl3025.c **** 	irq_enable(IRQ_EXTERNAL);
+ 943              		.loc 2 139 0
+ 944 0060 0C00A0E3 		mov	r0, #12
+ 945 0064 FEFFFFEB 		bl	irq_enable
+ 141:abb/twl3025.c **** 	irq_register_handler(IRQ_EXTERNAL_FIQ, &twl3025_irq);
+ 946              		.loc 2 141 0
+ 947 0068 0510A0E1 		mov	r1, r5
+ 948 006c 1100A0E3 		mov	r0, #17
+ 949 0070 FEFFFFEB 		bl	irq_register_handler
+ 142:abb/twl3025.c **** 	irq_config(IRQ_EXTERNAL_FIQ, 1, 0, 0);
+ 950              		.loc 2 142 0
+ 951 0074 1100A0E3 		mov	r0, #17
+ 952 0078 0110A0E3 		mov	r1, #1
+ 953 007c 0420A0E1 		mov	r2, r4
+ 954 0080 0430A0E1 		mov	r3, r4
+ 955 0084 FEFFFFEB 		bl	irq_config
+ 143:abb/twl3025.c **** 	irq_enable(IRQ_EXTERNAL_FIQ);
+ 956              		.loc 2 143 0
+ 957 0088 1100A0E3 		mov	r0, #17
+ 144:abb/twl3025.c **** }
+ 958              		.loc 2 144 0
+ 959 008c 3040BDE8 		ldmfd	sp!, {r4, r5, lr}
+ 143:abb/twl3025.c **** 	irq_enable(IRQ_EXTERNAL_FIQ);
+ 960              		.loc 2 143 0
+ 961 0090 FEFFFFEA 		b	irq_enable
+ 962              	.L85:
+ 963              		.align	2
+ 964              	.L84:
+ 965 0094 00000000 		.word	twl3025_irq
+ 966 0098 00000000 		.word	.LANCHOR0
+ 967              		.cfi_endproc
+ 968              	.LFE12:
+ 970              		.section	.text.twl3025_afcout_get,"ax",%progbits
+ 971              		.align	2
+ 972              		.global	twl3025_afcout_get
+ 974              	twl3025_afcout_get:
+ 975              	.LFB26:
+ 392:abb/twl3025.c **** 
+ 393:abb/twl3025.c **** uint8_t twl3025_afcout_get(void)
+ 394:abb/twl3025.c **** {
+ 976              		.loc 2 394 0
+ 977              		.cfi_startproc
+ 978              		@ args = 0, pretend = 0, frame = 0
+ 979              		@ frame_needed = 0, uses_anonymous_args = 0
+ 980 0000 04E02DE5 		str	lr, [sp, #-4]!
+ 981              	.LCFI12:
+ 982              		.cfi_def_cfa_offset 4
+ 395:abb/twl3025.c **** 	return twl3025_reg_read(AFCOUT) & 0xff;
+ 983              		.loc 2 395 0
+ 984 0004 9600A0E3 		mov	r0, #150
+ 985              		.cfi_offset 14, -4
+ 986 0008 FEFFFFEB 		bl	twl3025_reg_read
+ 987 000c FF0000E2 		and	r0, r0, #255
+ 396:abb/twl3025.c **** }
+ 988              		.loc 2 396 0
+ 989 0010 04F09DE4 		ldr	pc, [sp], #4
+ 990              		.cfi_endproc
+ 991              	.LFE26:
+ 993              		.section	.text.twl3025_afcout_set,"ax",%progbits
+ 994              		.align	2
+ 995              		.global	twl3025_afcout_set
+ 997              	twl3025_afcout_set:
+ 998              	.LFB27:
+ 397:abb/twl3025.c **** 
+ 398:abb/twl3025.c **** void twl3025_afcout_set(uint8_t val)
+ 399:abb/twl3025.c **** {
+ 999              		.loc 2 399 0
+ 1000              		.cfi_startproc
+ 1001              		@ args = 0, pretend = 0, frame = 0
+ 1002              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1003              	.LVL61:
+ 1004 0000 10402DE9 		stmfd	sp!, {r4, lr}
+ 1005              	.LCFI13:
+ 1006              		.cfi_def_cfa_offset 8
+ 400:abb/twl3025.c **** 	twl3025_reg_write(AFCCTLADD, 0x05);
+ 1007              		.loc 2 400 0
+ 1008 0004 0510A0E3 		mov	r1, #5
+ 399:abb/twl3025.c **** {
+ 1009              		.loc 2 399 0
+ 1010 0008 FF4000E2 		and	r4, r0, #255
+ 1011              		.cfi_offset 14, -4
+ 1012              		.cfi_offset 4, -8
+ 1013              		.loc 2 400 0
+ 1014 000c 9500A0E3 		mov	r0, #149
+ 1015              	.LVL62:
+ 1016 0010 FEFFFFEB 		bl	twl3025_reg_write
+ 401:abb/twl3025.c **** 	twl3025_reg_write(AFCOUT, val);
+ 1017              		.loc 2 401 0
+ 1018 0014 9600A0E3 		mov	r0, #150
+ 1019 0018 0410A0E1 		mov	r1, r4
+ 402:abb/twl3025.c **** }
+ 1020              		.loc 2 402 0
+ 1021 001c 1040BDE8 		ldmfd	sp!, {r4, lr}
+ 401:abb/twl3025.c **** 	twl3025_reg_write(AFCOUT, val);
+ 1022              		.loc 2 401 0
+ 1023 0020 FEFFFFEA 		b	twl3025_reg_write
+ 1024              		.cfi_endproc
+ 1025              	.LFE27:
+ 1027              		.global	twl3025_default_ramp
+ 1028              		.section	.rodata
+ 1029              		.align	2
+ 1032              	twl3025_default_ramp:
+ 1033 0000 0000     		.short	0
+ 1034 0002 6001     		.short	352
+ 1035 0004 E003     		.short	992
+ 1036 0006 E003     		.short	992
+ 1037 0008 E003     		.short	992
+ 1038 000a 0003     		.short	768
+ 1039 000c 0000     		.short	0
+ 1040 000e 0000     		.short	0
+ 1041 0010 0900     		.short	9
+ 1042 0012 1200     		.short	18
+ 1043 0014 1900     		.short	25
+ 1044 0016 1F00     		.short	31
+ 1045 0018 1E00     		.short	30
+ 1046 001a 0F00     		.short	15
+ 1047 001c 0000     		.short	0
+ 1048 001e 0000     		.short	0
+ 1049              		.section	.rodata.str1.1,"aMS",%progbits,1
+ 1050              	.LC0:
+ 1051 0000 0A42524F 		.ascii	"\012BROWNOUT!1!\000"
+ 1051      574E4F55 
+ 1051      54213121 
+ 1051      00
+ 1052              	.LC1:
+ 1053 000d 42444C45 		.ascii	"BDLENA time negative (%d)\012\000"
+ 1053      4E412074 
+ 1053      696D6520 
+ 1053      6E656761 
+ 1053      74697665 
+ 1054              	.LC2:
+ 1055 0028 42554C45 		.ascii	"BULENA time negative (%d)\012\000"
+ 1055      4E412074 
+ 1055      696D6520 
+ 1055      6E656761 
+ 1055      74697665 
+ 1056              	.LC3:
+ 1057 0043 74776C33 		.ascii	"twl3025_afc_set(%d)\012\000"
+ 1057      3032355F 
+ 1057      6166635F 
+ 1057      73657428 
+ 1057      2564290A 
+ 1058              		.bss
+ 1059              		.align	2
+ 1060              		.set	.LANCHOR0,. + 0
+ 1063              	twl3025_state:
+ 1064 0000 00000000 		.space	8
+ 1064      00000000 
+ 1065              		.text
+ 1066              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 twl3025.c
+     /tmp/ccTrB37a.s:12     .text.tpu_enq_at:0000000000000000 $a
+     /tmp/ccTrB37a.s:14     .text.tpu_enq_at:0000000000000000 tpu_enq_at
+     /tmp/ccTrB37a.s:53     .text.tpu_enq_at:0000000000000030 $d
+     /tmp/ccTrB37a.s:58     .text.tpu_enq_wait:0000000000000000 $a
+     /tmp/ccTrB37a.s:60     .text.tpu_enq_wait:0000000000000000 tpu_enq_wait
+     /tmp/ccTrB37a.s:79     .text.tpu_enq_wait:0000000000000010 $d
+     /tmp/ccTrB37a.s:84     .text.twl3025_wait_ibic_access:0000000000000000 $a
+     /tmp/ccTrB37a.s:86     .text.twl3025_wait_ibic_access:0000000000000000 twl3025_wait_ibic_access
+     /tmp/ccTrB37a.s:103    .text.twl3025_reg_write:0000000000000000 $a
+     /tmp/ccTrB37a.s:106    .text.twl3025_reg_write:0000000000000000 twl3025_reg_write
+     /tmp/ccTrB37a.s:165    .text.twl3025_switch_page:0000000000000000 twl3025_switch_page
+     /tmp/ccTrB37a.s:158    .text.twl3025_reg_write:0000000000000054 $d
+     /tmp/ccTrB37a.s:163    .text.twl3025_switch_page:0000000000000000 $a
+     /tmp/ccTrB37a.s:195    .text.twl3025_switch_page:0000000000000028 $d
+     /tmp/ccTrB37a.s:200    .text.twl3025_tsp_write:0000000000000000 $a
+     /tmp/ccTrB37a.s:203    .text.twl3025_tsp_write:0000000000000000 twl3025_tsp_write
+     /tmp/ccTrB37a.s:224    .text.twl3025_reg_read:0000000000000000 $a
+     /tmp/ccTrB37a.s:227    .text.twl3025_reg_read:0000000000000000 twl3025_reg_read
+     /tmp/ccTrB37a.s:288    .text.twl3025_reg_read:0000000000000070 $d
+     /tmp/ccTrB37a.s:293    .text.twl3025_get_pwon:0000000000000000 $a
+     /tmp/ccTrB37a.s:296    .text.twl3025_get_pwon:0000000000000000 twl3025_get_pwon
+     /tmp/ccTrB37a.s:340    .text.twl3025_get_pwon:0000000000000054 $d
+     /tmp/ccTrB37a.s:345    .text.twl3025_power_off:0000000000000000 $a
+     /tmp/ccTrB37a.s:348    .text.twl3025_power_off:0000000000000000 twl3025_power_off
+     /tmp/ccTrB37a.s:383    .text.twl3025_irq:0000000000000000 $a
+     /tmp/ccTrB37a.s:385    .text.twl3025_irq:0000000000000000 twl3025_irq
+     /tmp/ccTrB37a.s:452    .text.twl3025_irq:0000000000000060 $d
+     /tmp/ccTrB37a.s:458    .text.twl3025_power_off_now:0000000000000000 $a
+     /tmp/ccTrB37a.s:461    .text.twl3025_power_off_now:0000000000000000 twl3025_power_off_now
+     /tmp/ccTrB37a.s:486    .text.twl3025_clk13m:0000000000000000 $a
+     /tmp/ccTrB37a.s:489    .text.twl3025_clk13m:0000000000000000 twl3025_clk13m
+     /tmp/ccTrB37a.s:529    .text.twl3025_downlink:0000000000000000 $a
+     /tmp/ccTrB37a.s:532    .text.twl3025_downlink:0000000000000000 twl3025_downlink
+     /tmp/ccTrB37a.s:612    .text.twl3025_downlink:0000000000000094 $d
+     /tmp/ccTrB37a.s:617    .text.twl3025_uplink:0000000000000000 $a
+     /tmp/ccTrB37a.s:620    .text.twl3025_uplink:0000000000000000 twl3025_uplink
+     /tmp/ccTrB37a.s:710    .text.twl3025_uplink:00000000000000a8 $d
+     /tmp/ccTrB37a.s:715    .text.twl3025_afc_set:0000000000000000 $a
+     /tmp/ccTrB37a.s:718    .text.twl3025_afc_set:0000000000000000 twl3025_afc_set
+     /tmp/ccTrB37a.s:767    .text.twl3025_afc_set:0000000000000058 $d
+     /tmp/ccTrB37a.s:774    .text.twl3025_afc_get:0000000000000000 $a
+     /tmp/ccTrB37a.s:777    .text.twl3025_afc_get:0000000000000000 twl3025_afc_get
+     /tmp/ccTrB37a.s:820    .text.twl3025_unit_enable:0000000000000000 $a
+     /tmp/ccTrB37a.s:823    .text.twl3025_unit_enable:0000000000000000 twl3025_unit_enable
+     /tmp/ccTrB37a.s:836    .text.twl3025_unit_enable:000000000000000c $d
+     /tmp/ccTrB37a.s:843    .text.twl3025_unit_enable:0000000000000020 $a
+     /tmp/ccTrB37a.s:896    .text.twl3025_init:0000000000000000 $a
+     /tmp/ccTrB37a.s:899    .text.twl3025_init:0000000000000000 twl3025_init
+     /tmp/ccTrB37a.s:965    .text.twl3025_init:0000000000000094 $d
+     /tmp/ccTrB37a.s:971    .text.twl3025_afcout_get:0000000000000000 $a
+     /tmp/ccTrB37a.s:974    .text.twl3025_afcout_get:0000000000000000 twl3025_afcout_get
+     /tmp/ccTrB37a.s:994    .text.twl3025_afcout_set:0000000000000000 $a
+     /tmp/ccTrB37a.s:997    .text.twl3025_afcout_set:0000000000000000 twl3025_afcout_set
+     /tmp/ccTrB37a.s:1032   .rodata:0000000000000000 twl3025_default_ramp
+     /tmp/ccTrB37a.s:1029   .rodata:0000000000000000 $d
+     /tmp/ccTrB37a.s:1059   .bss:0000000000000000 $d
+     /tmp/ccTrB37a.s:1063   .bss:0000000000000000 twl3025_state
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+tpu_enqueue
+delay_ms
+spi_xfer
+tsp_write
+puts
+printf
+spi_init
+irq_register_handler
+irq_config
+irq_enable

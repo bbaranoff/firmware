@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  25493	    400	  24008	  49901	   c2ed	board/compal_e86/loader.compalram.elf
+  26501	    404	  23808	  50713	   c619	board/compal_e86/loader.compalram.elf

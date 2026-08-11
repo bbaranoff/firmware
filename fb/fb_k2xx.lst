@@ -1,0 +1,693 @@
+   1              		.file	"fb_k2xx.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.fb_k2xx_flush,"ax",%progbits
+  12              		.align	2
+  14              	fb_k2xx_flush:
+  15              	.LFB17:
+  16              		.file 1 "fb/fb_k2xx.c"
+   1:fb/fb_k2xx.c  **** /* Framebuffer implementation for SE K200i/K220i -
+   2:fb/fb_k2xx.c  ****  * combined driver for Core Logic CL761ST and S6B33B1X derivative */
+   3:fb/fb_k2xx.c  **** 
+   4:fb/fb_k2xx.c  **** /* (C) 2022 by Steve Markgraf <steve@steve-m.de>
+   5:fb/fb_k2xx.c  ****  *
+   6:fb/fb_k2xx.c  ****  * All Rights Reserved
+   7:fb/fb_k2xx.c  ****  *
+   8:fb/fb_k2xx.c  ****  * This program is free software; you can redistribute it and/or modify
+   9:fb/fb_k2xx.c  ****  * it under the terms of the GNU General Public License as published by
+  10:fb/fb_k2xx.c  ****  * the Free Software Foundation; either version 2 of the License, or
+  11:fb/fb_k2xx.c  ****  * (at your option) any later version.
+  12:fb/fb_k2xx.c  ****  *
+  13:fb/fb_k2xx.c  ****  * This program is distributed in the hope that it will be useful,
+  14:fb/fb_k2xx.c  ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  15:fb/fb_k2xx.c  ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  16:fb/fb_k2xx.c  ****  * GNU General Public License for more details.
+  17:fb/fb_k2xx.c  ****  *
+  18:fb/fb_k2xx.c  ****  */
+  19:fb/fb_k2xx.c  **** 
+  20:fb/fb_k2xx.c  **** #include <fb/framebuffer.h>
+  21:fb/fb_k2xx.c  **** #include <fb/fb_rgb332.h>
+  22:fb/fb_k2xx.c  **** 
+  23:fb/fb_k2xx.c  **** #include <stdint.h>
+  24:fb/fb_k2xx.c  **** #include <stdio.h>
+  25:fb/fb_k2xx.c  **** #include <delay.h>
+  26:fb/fb_k2xx.c  **** #include <memory.h>
+  27:fb/fb_k2xx.c  **** 
+  28:fb/fb_k2xx.c  **** #define K2XX_WIDTH		128
+  29:fb/fb_k2xx.c  **** #define K2XX_HEIGHT		128
+  30:fb/fb_k2xx.c  **** 
+  31:fb/fb_k2xx.c  **** #define ARMIO_LATCH_OUT		0xfffe4802
+  32:fb/fb_k2xx.c  **** #define CS3_ADDR		0x02000000
+  33:fb/fb_k2xx.c  **** 
+  34:fb/fb_k2xx.c  **** #define DISPLAY_CMD_ADDR	(CS3_ADDR + 0)
+  35:fb/fb_k2xx.c  **** #define DISPLAY_DATA_ADDR	(CS3_ADDR + 2)
+  36:fb/fb_k2xx.c  **** #define CL761_INDEX_ADDR	(CS3_ADDR + 4)
+  37:fb/fb_k2xx.c  **** #define CL761_DATA_ADDR		(CS3_ADDR + 6)
+  38:fb/fb_k2xx.c  **** 
+  39:fb/fb_k2xx.c  **** #define CL761_CLK		(1 << 4)
+  40:fb/fb_k2xx.c  **** #define CL761_RESET		(1 << 9)
+  41:fb/fb_k2xx.c  **** #define K2XX_ENABLE_BACKLIGHT	(1 << 3)
+  42:fb/fb_k2xx.c  **** 
+  43:fb/fb_k2xx.c  **** static uint8_t fb_k2xx_mem[K2XX_WIDTH * K2XX_HEIGHT];
+  44:fb/fb_k2xx.c  **** 
+  45:fb/fb_k2xx.c  **** static const uint8_t k2xx_initdata[] = {
+  46:fb/fb_k2xx.c  **** 	0x2c,	/* CMD:  Standby Mode off */
+  47:fb/fb_k2xx.c  **** 	0x02,	/* CMD:  Oscillation Mode Set */
+  48:fb/fb_k2xx.c  **** 	0x01,	/* DATA: oscillator on */
+  49:fb/fb_k2xx.c  **** 	0x26,	/* CMD:  DCDC and AMP ON/OFF set */
+  50:fb/fb_k2xx.c  **** 	0x01,	/* DATA: Booster 1 on */
+  51:fb/fb_k2xx.c  **** 	0x26,	/* CMD:  DCDC and AMP ON/OFF set */
+  52:fb/fb_k2xx.c  **** 	0x09,	/* DATA: Booster 1 on, OP-AMP on */
+  53:fb/fb_k2xx.c  **** 	0x26,	/* CMD:  DCDC and AMP ON/OFF set */
+  54:fb/fb_k2xx.c  **** 	0x0b,	/* DATA: Booster 1 + 2 on, OP-AMP on */
+  55:fb/fb_k2xx.c  **** 	0x26,	/* CMD:  DCDC and AMP ON/OFF set */
+  56:fb/fb_k2xx.c  **** 	0x0f,	/* DATA: Booster 1 + 2 + 3 on, OP-AMP on */
+  57:fb/fb_k2xx.c  **** 	0x10,	/* CMD:  Driver output mode set */
+  58:fb/fb_k2xx.c  **** 	0x00,	/* DATA: Display duty: 1/66 */
+  59:fb/fb_k2xx.c  **** 	0x20,	/* CMD:  DC-DC Select */
+  60:fb/fb_k2xx.c  **** 	0x01,	/* DATA: step up x1.5 */
+  61:fb/fb_k2xx.c  **** 	0x24,	/* CMD:  DCDC Clock Division Set */
+  62:fb/fb_k2xx.c  **** 	0x08,	/* DATA: fPCK = fOSC/32 */
+  63:fb/fb_k2xx.c  **** 	0x28,	/* CMD:  Temperature Compensation set */
+  64:fb/fb_k2xx.c  **** 	0x02,	/* DATA: slope -0.10%/degC */
+  65:fb/fb_k2xx.c  **** 	0x2a,	/* CMD:  Contrast Control */
+  66:fb/fb_k2xx.c  **** 	0x1d,	/* DATA: Constrast Level 29 */
+  67:fb/fb_k2xx.c  **** 	0x30,	/* CMD:  Addressing mode set */
+  68:fb/fb_k2xx.c  **** 	0x53,	/* DATA: 256 color mode (orignal FW uses 0x13, 65k colors) */
+  69:fb/fb_k2xx.c  **** 	0x32,	/* CMD:  ROW vector mode set */
+  70:fb/fb_k2xx.c  **** 	0x0e,	/* DATA: every subframe */
+  71:fb/fb_k2xx.c  **** 	0x34,	/* CMD:  N-block inversion set */
+  72:fb/fb_k2xx.c  **** 	0x8d,	/* DATA: inversion on, every 1 block and every 2 frames */
+  73:fb/fb_k2xx.c  **** 	0x36,	/* CMD:  unknown */
+  74:fb/fb_k2xx.c  **** 	0x00,	/* DATA: unknown */
+  75:fb/fb_k2xx.c  **** 	0x40,	/* CMD:  Entry mode set */
+  76:fb/fb_k2xx.c  **** 	0x80,	/* DATA: Y address counter mode */
+  77:fb/fb_k2xx.c  **** 	0x45,	/* CMD:  RAM Skip Area Set */
+  78:fb/fb_k2xx.c  **** 	0x00,	/* DATA: No Skip */
+  79:fb/fb_k2xx.c  **** 	0x53,	/* CMD:  Specified Display Pattern Set */
+  80:fb/fb_k2xx.c  **** 	0x00,	/* DATA: Normal display */
+  81:fb/fb_k2xx.c  **** 	0x55,	/* CMD:  Partial Display Mode Set */
+  82:fb/fb_k2xx.c  **** 	0x00,	/* DATA: Partial display OFF */
+  83:fb/fb_k2xx.c  **** 	0x51,	/* CMD:  Display on */
+  84:fb/fb_k2xx.c  **** };
+  85:fb/fb_k2xx.c  **** 
+  86:fb/fb_k2xx.c  **** uint16_t cl761_read_reg(uint16_t reg)
+  87:fb/fb_k2xx.c  **** {
+  88:fb/fb_k2xx.c  **** 	writew(reg, CL761_INDEX_ADDR);
+  89:fb/fb_k2xx.c  **** 	return readw(CL761_INDEX_ADDR);
+  90:fb/fb_k2xx.c  **** }
+  91:fb/fb_k2xx.c  **** 
+  92:fb/fb_k2xx.c  **** void cl761_write_reg(uint8_t reg, uint16_t data)
+  93:fb/fb_k2xx.c  **** {
+  94:fb/fb_k2xx.c  **** 	writew(reg, CL761_INDEX_ADDR);
+  95:fb/fb_k2xx.c  **** 	writew(data, CL761_DATA_ADDR);
+  96:fb/fb_k2xx.c  **** }
+  97:fb/fb_k2xx.c  **** 
+  98:fb/fb_k2xx.c  **** static void fb_k2xx_init(void)
+  99:fb/fb_k2xx.c  **** {
+ 100:fb/fb_k2xx.c  **** 	unsigned int i;
+ 101:fb/fb_k2xx.c  **** 	uint16_t reg;
+ 102:fb/fb_k2xx.c  **** 
+ 103:fb/fb_k2xx.c  **** 	printf("%s: initializing LCD.\n", __FUNCTION__);
+ 104:fb/fb_k2xx.c  **** 
+ 105:fb/fb_k2xx.c  **** 	reg = readw(ARMIO_LATCH_OUT);
+ 106:fb/fb_k2xx.c  **** 	reg &= ~(CL761_RESET | (1 << 1));
+ 107:fb/fb_k2xx.c  **** 	reg |= CL761_CLK;
+ 108:fb/fb_k2xx.c  **** 	writew(reg, ARMIO_LATCH_OUT);
+ 109:fb/fb_k2xx.c  **** 	delay_ms(10);
+ 110:fb/fb_k2xx.c  **** 	reg |= CL761_RESET;
+ 111:fb/fb_k2xx.c  **** 	writew(reg, ARMIO_LATCH_OUT);
+ 112:fb/fb_k2xx.c  **** 
+ 113:fb/fb_k2xx.c  **** 	/* we need to perform a dummy register read for the
+ 114:fb/fb_k2xx.c  **** 	 * CL761 to pass through the chip select to the display */
+ 115:fb/fb_k2xx.c  **** 	cl761_read_reg(0x2e);
+ 116:fb/fb_k2xx.c  **** 	delay_ms(1);
+ 117:fb/fb_k2xx.c  **** 
+ 118:fb/fb_k2xx.c  **** 	reg &= ~CL761_CLK;
+ 119:fb/fb_k2xx.c  **** 	reg |= (1 << 1) | K2XX_ENABLE_BACKLIGHT;
+ 120:fb/fb_k2xx.c  **** 	writew(reg, ARMIO_LATCH_OUT);
+ 121:fb/fb_k2xx.c  **** 
+ 122:fb/fb_k2xx.c  **** 	for (i = 0; i < sizeof(k2xx_initdata); i++)
+ 123:fb/fb_k2xx.c  **** 		writew(k2xx_initdata[i], DISPLAY_CMD_ADDR);
+ 124:fb/fb_k2xx.c  **** }
+ 125:fb/fb_k2xx.c  **** 
+ 126:fb/fb_k2xx.c  **** static void fb_k2xx_flush(void)
+ 127:fb/fb_k2xx.c  **** {
+  17              		.loc 1 127 0
+  18              		.cfi_startproc
+  19              		@ args = 0, pretend = 0, frame = 8
+  20              		@ frame_needed = 0, uses_anonymous_args = 0
+ 128:fb/fb_k2xx.c  **** 	unsigned int i;
+ 129:fb/fb_k2xx.c  **** 	int x, y;
+ 130:fb/fb_k2xx.c  **** 	uint8_t *p;
+ 131:fb/fb_k2xx.c  **** 	uint8_t prepare_disp_write_cmds[] = {
+ 132:fb/fb_k2xx.c  **** 		0x43,			 /*  set column address */
+ 133:fb/fb_k2xx.c  **** 		fb_rgb332->damage_x1,
+  21              		.loc 1 133 0
+  22 0000 08319FE5 		ldr	r3, .L10
+ 127:fb/fb_k2xx.c  **** {
+  23              		.loc 1 127 0
+  24 0004 F3402DE9 		stmfd	sp!, {r0, r1, r4, r5, r6, r7, lr}
+  25              	.LCFI0:
+  26              		.cfi_def_cfa_offset 28
+  27              		.loc 1 133 0
+  28 0008 003093E5 		ldr	r3, [r3, #0]
+ 134:fb/fb_k2xx.c  **** 		fb_rgb332->damage_x2 - 1,
+  29              		.loc 1 134 0
+  30 000c B800D3E1 		ldrh	r0, [r3, #8]
+  31              		.cfi_offset 14, -4
+  32              		.cfi_offset 7, -8
+  33              		.cfi_offset 6, -12
+  34              		.cfi_offset 5, -16
+  35              		.cfi_offset 4, -20
+  36              		.cfi_offset 1, -24
+  37              		.cfi_offset 0, -28
+ 131:fb/fb_k2xx.c  **** 	uint8_t prepare_disp_write_cmds[] = {
+  38              		.loc 1 131 0
+  39 0010 4340A0E3 		mov	r4, #67
+ 133:fb/fb_k2xx.c  **** 		fb_rgb332->damage_x1,
+  40              		.loc 1 133 0
+  41 0014 B4C0D3E1 		ldrh	ip, [r3, #4]
+ 135:fb/fb_k2xx.c  **** 		0x42,			 /*  set page address (Y) */
+ 136:fb/fb_k2xx.c  **** 		fb_rgb332->damage_y1,
+ 137:fb/fb_k2xx.c  **** 		fb_rgb332->damage_y2 - 1,
+  42              		.loc 1 137 0
+  43 0018 BA20D3E1 		ldrh	r2, [r3, #10]
+ 131:fb/fb_k2xx.c  **** 	uint8_t prepare_disp_write_cmds[] = {
+  44              		.loc 1 131 0
+  45 001c 0040CDE5 		strb	r4, [sp, #0]
+  46 0020 014040E2 		sub	r4, r0, #1
+ 136:fb/fb_k2xx.c  **** 		fb_rgb332->damage_y1,
+  47              		.loc 1 136 0
+  48 0024 B610D3E1 		ldrh	r1, [r3, #6]
+ 131:fb/fb_k2xx.c  **** 	uint8_t prepare_disp_write_cmds[] = {
+  49              		.loc 1 131 0
+  50 0028 0240CDE5 		strb	r4, [sp, #2]
+  51 002c 4240A0E3 		mov	r4, #66
+  52 0030 0340CDE5 		strb	r4, [sp, #3]
+ 138:fb/fb_k2xx.c  **** 	};
+ 139:fb/fb_k2xx.c  **** 
+ 140:fb/fb_k2xx.c  **** 	/* If everything's clean, just return */
+ 141:fb/fb_k2xx.c  **** 	if (fb_rgb332->damage_x1 == fb_rgb332->damage_x2 ||
+  53              		.loc 1 141 0
+  54 0034 00005CE1 		cmp	ip, r0
+ 131:fb/fb_k2xx.c  **** 	uint8_t prepare_disp_write_cmds[] = {
+  55              		.loc 1 131 0
+  56 0038 014042E2 		sub	r4, r2, #1
+  57 003c 01C0CDE5 		strb	ip, [sp, #1]
+  58 0040 0410CDE5 		strb	r1, [sp, #4]
+  59 0044 0540CDE5 		strb	r4, [sp, #5]
+  60              		.loc 1 141 0
+  61 0048 0100000A 		beq	.L2
+  62              		.loc 1 141 0 is_stmt 0 discriminator 1
+  63 004c 020051E1 		cmp	r1, r2
+  64 0050 0400001A 		bne	.L3
+  65              	.L2:
+ 142:fb/fb_k2xx.c  **** 		fb_rgb332->damage_y1 == fb_rgb332->damage_y2) {
+ 143:fb/fb_k2xx.c  **** 			printf("%s: no damage\n", __FUNCTION__);
+  66              		.loc 1 143 0 is_stmt 1
+  67 0054 B8009FE5 		ldr	r0, .L10+4
+  68 0058 B8109FE5 		ldr	r1, .L10+8
+ 144:fb/fb_k2xx.c  **** 			return;
+ 145:fb/fb_k2xx.c  **** 	}
+ 146:fb/fb_k2xx.c  **** 
+ 147:fb/fb_k2xx.c  **** 	for (i = 0; i < sizeof(prepare_disp_write_cmds); i++)
+ 148:fb/fb_k2xx.c  **** 		writew(prepare_disp_write_cmds[i], DISPLAY_CMD_ADDR);
+ 149:fb/fb_k2xx.c  **** 
+ 150:fb/fb_k2xx.c  **** 	for (y = fb_rgb332->damage_y1; y < fb_rgb332->damage_y2; y++) {
+ 151:fb/fb_k2xx.c  **** 		p = & fb_rgb332->mem[y * framebuffer->width]; // start of line
+ 152:fb/fb_k2xx.c  **** 		p += fb_rgb332->damage_x1; // start of damage area
+ 153:fb/fb_k2xx.c  **** 
+ 154:fb/fb_k2xx.c  **** 		for (x = fb_rgb332->damage_x1; x < fb_rgb332->damage_x2; x++) {
+ 155:fb/fb_k2xx.c  **** 				/* For whatever reason, the 256 color mode of this
+ 156:fb/fb_k2xx.c  **** 				 * display uses 'RBG323' */
+ 157:fb/fb_k2xx.c  **** 				uint8_t d = *p++;
+ 158:fb/fb_k2xx.c  **** 				d = (d & 0xe0) | ((d & 0x1c) >> 2) | ((d & 0x03) << 3);
+ 159:fb/fb_k2xx.c  **** 
+ 160:fb/fb_k2xx.c  **** 				/* We need to transfer the data twice in the 256 color mode.
+ 161:fb/fb_k2xx.c  **** 				 * Interestingly, the red and green information is taken
+ 162:fb/fb_k2xx.c  **** 				 * from the first byte written, and the blue information
+ 163:fb/fb_k2xx.c  **** 				 * from the second byte written. */
+ 164:fb/fb_k2xx.c  **** 				writew(d, DISPLAY_DATA_ADDR);
+ 165:fb/fb_k2xx.c  **** 				writew(d, DISPLAY_DATA_ADDR);
+ 166:fb/fb_k2xx.c  **** 		}
+ 167:fb/fb_k2xx.c  **** 	}
+ 168:fb/fb_k2xx.c  **** 
+ 169:fb/fb_k2xx.c  **** 	fb_rgb332->damage_x1 = fb_rgb332->damage_x2 = 0;
+ 170:fb/fb_k2xx.c  **** 	fb_rgb332->damage_y1 = fb_rgb332->damage_y2 = 0;
+ 171:fb/fb_k2xx.c  **** }
+  69              		.loc 1 171 0
+  70 005c 08D08DE2 		add	sp, sp, #8
+  71 0060 F040BDE8 		ldmfd	sp!, {r4, r5, r6, r7, lr}
+ 143:fb/fb_k2xx.c  **** 			printf("%s: no damage\n", __FUNCTION__);
+  72              		.loc 1 143 0
+  73 0064 FEFFFFEA 		b	printf
+  74              	.L3:
+  75 0068 01204DE2 		sub	r2, sp, #1
+ 126:fb/fb_k2xx.c  **** static void fb_k2xx_flush(void)
+  76              		.loc 1 126 0
+  77 006c 05008DE2 		add	r0, sp, #5
+ 148:fb/fb_k2xx.c  **** 		writew(prepare_disp_write_cmds[i], DISPLAY_CMD_ADDR);
+  78              		.loc 1 148 0
+  79 0070 0214A0E3 		mov	r1, #33554432
+  80              	.L4:
+ 148:fb/fb_k2xx.c  **** 		writew(prepare_disp_write_cmds[i], DISPLAY_CMD_ADDR);
+  81              		.loc 1 148 0 is_stmt 0 discriminator 2
+  82 0074 01C0F2E5 		ldrb	ip, [r2, #1]!	@ zero_extendqisi2
+ 147:fb/fb_k2xx.c  **** 	for (i = 0; i < sizeof(prepare_disp_write_cmds); i++)
+  83              		.loc 1 147 0 is_stmt 1 discriminator 2
+  84 0078 000052E1 		cmp	r2, r0
+ 148:fb/fb_k2xx.c  **** 		writew(prepare_disp_write_cmds[i], DISPLAY_CMD_ADDR);
+  85              		.loc 1 148 0 discriminator 2
+  86 007c B0C0C1E1 		strh	ip, [r1, #0]	@ movhi
+ 147:fb/fb_k2xx.c  **** 	for (i = 0; i < sizeof(prepare_disp_write_cmds); i++)
+  87              		.loc 1 147 0 discriminator 2
+  88 0080 FBFFFF1A 		bne	.L4
+ 151:fb/fb_k2xx.c  **** 		p = & fb_rgb332->mem[y * framebuffer->width]; // start of line
+  89              		.loc 1 151 0
+  90 0084 84109FE5 		ldr	r1, .L10
+ 150:fb/fb_k2xx.c  **** 	for (y = fb_rgb332->damage_y1; y < fb_rgb332->damage_y2; y++) {
+  91              		.loc 1 150 0
+  92 0088 B620D3E1 		ldrh	r2, [r3, #6]
+  93              	.LVL0:
+ 151:fb/fb_k2xx.c  **** 		p = & fb_rgb332->mem[y * framebuffer->width]; // start of line
+  94              		.loc 1 151 0
+  95 008c 045091E5 		ldr	r5, [r1, #4]
+  96              	.LBB4:
+ 164:fb/fb_k2xx.c  **** 				writew(d, DISPLAY_DATA_ADDR);
+  97              		.loc 1 164 0
+  98 0090 02C4A0E3 		mov	ip, #33554432
+  99              	.LBE4:
+ 150:fb/fb_k2xx.c  **** 	for (y = fb_rgb332->damage_y1; y < fb_rgb332->damage_y2; y++) {
+ 100              		.loc 1 150 0
+ 101 0094 130000EA 		b	.L5
+ 102              	.L8:
+ 151:fb/fb_k2xx.c  **** 		p = & fb_rgb332->mem[y * framebuffer->width]; // start of line
+ 103              		.loc 1 151 0
+ 104 0098 001093E5 		ldr	r1, [r3, #0]
+ 105 009c B442D5E1 		ldrh	r4, [r5, #36]
+ 106 00a0 921424E0 		mla	r4, r2, r4, r1
+ 107              	.LVL1:
+ 152:fb/fb_k2xx.c  **** 		p += fb_rgb332->damage_x1; // start of damage area
+ 108              		.loc 1 152 0
+ 109 00a4 B410D3E1 		ldrh	r1, [r3, #4]
+ 110 00a8 014084E0 		add	r4, r4, r1
+ 111              	.LVL2:
+ 154:fb/fb_k2xx.c  **** 		for (x = fb_rgb332->damage_x1; x < fb_rgb332->damage_x2; x++) {
+ 112              		.loc 1 154 0
+ 113 00ac 090000EA 		b	.L6
+ 114              	.L7:
+ 115              	.LBB5:
+ 157:fb/fb_k2xx.c  **** 				uint8_t d = *p++;
+ 116              		.loc 1 157 0 discriminator 2
+ 117 00b0 0100D4E4 		ldrb	r0, [r4], #1	@ zero_extendqisi2
+ 118              	.LVL3:
+ 158:fb/fb_k2xx.c  **** 				d = (d & 0xe0) | ((d & 0x1c) >> 2) | ((d & 0x03) << 3);
+ 119              		.loc 1 158 0 discriminator 2
+ 120 00b4 036000E2 		and	r6, r0, #3
+ 121 00b8 1C7000E2 		and	r7, r0, #28
+ 122 00bc 8661A0E1 		mov	r6, r6, asl #3
+ 123 00c0 276186E1 		orr	r6, r6, r7, lsr #2
+ 124 00c4 1F00C0E3 		bic	r0, r0, #31
+ 125              	.LVL4:
+ 164:fb/fb_k2xx.c  **** 				writew(d, DISPLAY_DATA_ADDR);
+ 126              		.loc 1 164 0 discriminator 2
+ 127 00c8 000086E1 		orr	r0, r6, r0
+ 128              	.LVL5:
+ 129 00cc B200CCE1 		strh	r0, [ip, #2]	@ movhi
+ 165:fb/fb_k2xx.c  **** 				writew(d, DISPLAY_DATA_ADDR);
+ 130              		.loc 1 165 0 discriminator 2
+ 131 00d0 B200CCE1 		strh	r0, [ip, #2]	@ movhi
+ 132              	.LBE5:
+ 154:fb/fb_k2xx.c  **** 		for (x = fb_rgb332->damage_x1; x < fb_rgb332->damage_x2; x++) {
+ 133              		.loc 1 154 0 discriminator 2
+ 134 00d4 011081E2 		add	r1, r1, #1
+ 135              	.LVL6:
+ 136              	.L6:
+ 154:fb/fb_k2xx.c  **** 		for (x = fb_rgb332->damage_x1; x < fb_rgb332->damage_x2; x++) {
+ 137              		.loc 1 154 0 is_stmt 0 discriminator 1
+ 138 00d8 B800D3E1 		ldrh	r0, [r3, #8]
+ 139 00dc 000051E1 		cmp	r1, r0
+ 140 00e0 F2FFFFBA 		blt	.L7
+ 150:fb/fb_k2xx.c  **** 	for (y = fb_rgb332->damage_y1; y < fb_rgb332->damage_y2; y++) {
+ 141              		.loc 1 150 0 is_stmt 1
+ 142 00e4 012082E2 		add	r2, r2, #1
+ 143              	.LVL7:
+ 144              	.L5:
+ 150:fb/fb_k2xx.c  **** 	for (y = fb_rgb332->damage_y1; y < fb_rgb332->damage_y2; y++) {
+ 145              		.loc 1 150 0 is_stmt 0 discriminator 1
+ 146 00e8 BA10D3E1 		ldrh	r1, [r3, #10]
+ 147 00ec 010052E1 		cmp	r2, r1
+ 148 00f0 E8FFFFBA 		blt	.L8
+ 169:fb/fb_k2xx.c  **** 	fb_rgb332->damage_x1 = fb_rgb332->damage_x2 = 0;
+ 149              		.loc 1 169 0 is_stmt 1
+ 150 00f4 0020A0E3 		mov	r2, #0	@ movhi
+ 151              	.LVL8:
+ 152 00f8 B820C3E1 		strh	r2, [r3, #8]	@ movhi
+ 153 00fc B420C3E1 		strh	r2, [r3, #4]	@ movhi
+ 170:fb/fb_k2xx.c  **** 	fb_rgb332->damage_y1 = fb_rgb332->damage_y2 = 0;
+ 154              		.loc 1 170 0
+ 155 0100 BA20C3E1 		strh	r2, [r3, #10]	@ movhi
+ 156 0104 B620C3E1 		strh	r2, [r3, #6]	@ movhi
+ 157              		.loc 1 171 0
+ 158 0108 08D08DE2 		add	sp, sp, #8
+ 159 010c F080BDE8 		ldmfd	sp!, {r4, r5, r6, r7, pc}
+ 160              	.L11:
+ 161              		.align	2
+ 162              	.L10:
+ 163 0110 00000000 		.word	.LANCHOR0
+ 164 0114 00000000 		.word	.LC0
+ 165 0118 00000000 		.word	.LANCHOR1
+ 166              		.cfi_endproc
+ 167              	.LFE17:
+ 169              		.section	.text.fb_k2xx_init,"ax",%progbits
+ 170              		.align	2
+ 172              	fb_k2xx_init:
+ 173              	.LFB16:
+  99:fb/fb_k2xx.c  **** {
+ 174              		.loc 1 99 0
+ 175              		.cfi_startproc
+ 176              		@ args = 0, pretend = 0, frame = 0
+ 177              		@ frame_needed = 0, uses_anonymous_args = 0
+ 178 0000 70402DE9 		stmfd	sp!, {r4, r5, r6, lr}
+ 179              	.LCFI1:
+ 180              		.cfi_def_cfa_offset 16
+ 105:fb/fb_k2xx.c  **** 	reg = readw(ARMIO_LATCH_OUT);
+ 181              		.loc 1 105 0
+ 182 0004 6C409FE5 		ldr	r4, .L15
+ 183              		.cfi_offset 14, -4
+ 184              		.cfi_offset 6, -8
+ 185              		.cfi_offset 5, -12
+ 186              		.cfi_offset 4, -16
+ 103:fb/fb_k2xx.c  **** 	printf("%s: initializing LCD.\n", __FUNCTION__);
+ 187              		.loc 1 103 0
+ 188 0008 6C109FE5 		ldr	r1, .L15+4
+ 189 000c 6C009FE5 		ldr	r0, .L15+8
+ 190 0010 FEFFFFEB 		bl	printf
+ 106:fb/fb_k2xx.c  **** 	reg &= ~(CL761_RESET | (1 << 1));
+ 191              		.loc 1 106 0
+ 192 0014 68609FE5 		ldr	r6, .L15+12
+ 105:fb/fb_k2xx.c  **** 	reg = readw(ARMIO_LATCH_OUT);
+ 193              		.loc 1 105 0
+ 194 0018 BD3F54E1 		ldrh	r3, [r4, #-253]
+ 195              	.LVL9:
+ 106:fb/fb_k2xx.c  **** 	reg &= ~(CL761_RESET | (1 << 1));
+ 196              		.loc 1 106 0
+ 197 001c 066003E0 		and	r6, r3, r6
+ 198              	.LVL10:
+ 107:fb/fb_k2xx.c  **** 	reg |= CL761_CLK;
+ 199              		.loc 1 107 0
+ 200 0020 106086E3 		orr	r6, r6, #16
+ 201              	.LVL11:
+ 108:fb/fb_k2xx.c  **** 	writew(reg, ARMIO_LATCH_OUT);
+ 202              		.loc 1 108 0
+ 203 0024 BD6F44E1 		strh	r6, [r4, #-253]	@ movhi
+ 109:fb/fb_k2xx.c  **** 	delay_ms(10);
+ 204              		.loc 1 109 0
+ 205 0028 0A00A0E3 		mov	r0, #10
+ 206 002c FEFFFFEB 		bl	delay_ms
+ 110:fb/fb_k2xx.c  **** 	reg |= CL761_RESET;
+ 207              		.loc 1 110 0
+ 208 0030 026C86E3 		orr	r6, r6, #512
+ 209              	.LVL12:
+ 210              	.LBB6:
+ 211              	.LBB8:
+  88:fb/fb_k2xx.c  **** 	writew(reg, CL761_INDEX_ADDR);
+ 212              		.loc 1 88 0
+ 213 0034 0254A0E3 		mov	r5, #33554432
+ 214 0038 2E30A0E3 		mov	r3, #46	@ movhi
+ 215              	.LBE8:
+ 216              	.LBE6:
+ 111:fb/fb_k2xx.c  **** 	writew(reg, ARMIO_LATCH_OUT);
+ 217              		.loc 1 111 0
+ 218 003c BD6F44E1 		strh	r6, [r4, #-253]	@ movhi
+ 219              	.LVL13:
+ 220              	.LBB10:
+ 221              	.LBB7:
+  88:fb/fb_k2xx.c  **** 	writew(reg, CL761_INDEX_ADDR);
+ 222              		.loc 1 88 0
+ 223 0040 B430C5E1 		strh	r3, [r5, #4]	@ movhi
+ 224              	.LBE7:
+ 225              	.LBE10:
+ 116:fb/fb_k2xx.c  **** 	delay_ms(1);
+ 226              		.loc 1 116 0
+ 227 0044 0100A0E3 		mov	r0, #1
+ 118:fb/fb_k2xx.c  **** 	reg &= ~CL761_CLK;
+ 228              		.loc 1 118 0
+ 229 0048 1060C6E3 		bic	r6, r6, #16
+ 230              	.LVL14:
+ 231              	.LBB11:
+ 232              	.LBB9:
+  89:fb/fb_k2xx.c  **** 	return readw(CL761_INDEX_ADDR);
+ 233              		.loc 1 89 0
+ 234 004c B430D5E1 		ldrh	r3, [r5, #4]
+ 235              	.LBE9:
+ 236              	.LBE11:
+ 119:fb/fb_k2xx.c  **** 	reg |= (1 << 1) | K2XX_ENABLE_BACKLIGHT;
+ 237              		.loc 1 119 0
+ 238 0050 0A6086E3 		orr	r6, r6, #10
+ 116:fb/fb_k2xx.c  **** 	delay_ms(1);
+ 239              		.loc 1 116 0
+ 240 0054 FEFFFFEB 		bl	delay_ms
+ 241              	.LVL15:
+ 120:fb/fb_k2xx.c  **** 	writew(reg, ARMIO_LATCH_OUT);
+ 242              		.loc 1 120 0
+ 243 0058 28309FE5 		ldr	r3, .L15+16
+ 244 005c BD6F44E1 		strh	r6, [r4, #-253]	@ movhi
+ 245              	.LVL16:
+  98:fb/fb_k2xx.c  **** static void fb_k2xx_init(void)
+ 246              		.loc 1 98 0
+ 247 0060 262083E2 		add	r2, r3, #38
+ 248              	.LVL17:
+ 249              	.L13:
+ 123:fb/fb_k2xx.c  **** 		writew(k2xx_initdata[i], DISPLAY_CMD_ADDR);
+ 250              		.loc 1 123 0 discriminator 2
+ 251 0064 0110F3E5 		ldrb	r1, [r3, #1]!	@ zero_extendqisi2
+ 122:fb/fb_k2xx.c  **** 	for (i = 0; i < sizeof(k2xx_initdata); i++)
+ 252              		.loc 1 122 0 discriminator 2
+ 253 0068 020053E1 		cmp	r3, r2
+ 123:fb/fb_k2xx.c  **** 		writew(k2xx_initdata[i], DISPLAY_CMD_ADDR);
+ 254              		.loc 1 123 0 discriminator 2
+ 255 006c B010C5E1 		strh	r1, [r5, #0]	@ movhi
+ 122:fb/fb_k2xx.c  **** 	for (i = 0; i < sizeof(k2xx_initdata); i++)
+ 256              		.loc 1 122 0 discriminator 2
+ 257 0070 FBFFFF1A 		bne	.L13
+ 124:fb/fb_k2xx.c  **** }
+ 258              		.loc 1 124 0
+ 259 0074 7080BDE8 		ldmfd	sp!, {r4, r5, r6, pc}
+ 260              	.L16:
+ 261              		.align	2
+ 262              	.L15:
+ 263 0078 FF48FEFF 		.word	-112385
+ 264 007c 10000000 		.word	.LANCHOR1+16
+ 265 0080 0F000000 		.word	.LC1
+ 266 0084 FDFD0000 		.word	65021
+ 267 0088 1F000000 		.word	.LANCHOR1+31
+ 268              		.cfi_endproc
+ 269              	.LFE16:
+ 271              		.section	.text.cl761_read_reg,"ax",%progbits
+ 272              		.align	2
+ 273              		.global	cl761_read_reg
+ 275              	cl761_read_reg:
+ 276              	.LFB14:
+  87:fb/fb_k2xx.c  **** {
+ 277              		.loc 1 87 0
+ 278              		.cfi_startproc
+ 279              		@ args = 0, pretend = 0, frame = 0
+ 280              		@ frame_needed = 0, uses_anonymous_args = 0
+ 281              		@ link register save eliminated.
+ 282              	.LVL18:
+  87:fb/fb_k2xx.c  **** {
+ 283              		.loc 1 87 0
+ 284 0000 0008A0E1 		mov	r0, r0, asl #16
+ 285              	.LVL19:
+  88:fb/fb_k2xx.c  **** 	writew(reg, CL761_INDEX_ADDR);
+ 286              		.loc 1 88 0
+ 287 0004 0234A0E3 		mov	r3, #33554432
+  87:fb/fb_k2xx.c  **** {
+ 288              		.loc 1 87 0
+ 289 0008 2008A0E1 		mov	r0, r0, lsr #16
+  88:fb/fb_k2xx.c  **** 	writew(reg, CL761_INDEX_ADDR);
+ 290              		.loc 1 88 0
+ 291 000c B400C3E1 		strh	r0, [r3, #4]	@ movhi
+  89:fb/fb_k2xx.c  **** 	return readw(CL761_INDEX_ADDR);
+ 292              		.loc 1 89 0
+ 293 0010 B400D3E1 		ldrh	r0, [r3, #4]
+  90:fb/fb_k2xx.c  **** }
+ 294              		.loc 1 90 0
+ 295 0014 1EFF2FE1 		bx	lr
+ 296              		.cfi_endproc
+ 297              	.LFE14:
+ 299              		.section	.text.cl761_write_reg,"ax",%progbits
+ 300              		.align	2
+ 301              		.global	cl761_write_reg
+ 303              	cl761_write_reg:
+ 304              	.LFB15:
+  93:fb/fb_k2xx.c  **** {
+ 305              		.loc 1 93 0
+ 306              		.cfi_startproc
+ 307              		@ args = 0, pretend = 0, frame = 0
+ 308              		@ frame_needed = 0, uses_anonymous_args = 0
+ 309              		@ link register save eliminated.
+ 310              	.LVL20:
+  93:fb/fb_k2xx.c  **** {
+ 311              		.loc 1 93 0
+ 312 0000 0118A0E1 		mov	r1, r1, asl #16
+ 313              	.LVL21:
+  94:fb/fb_k2xx.c  **** 	writew(reg, CL761_INDEX_ADDR);
+ 314              		.loc 1 94 0
+ 315 0004 0234A0E3 		mov	r3, #33554432
+  93:fb/fb_k2xx.c  **** {
+ 316              		.loc 1 93 0
+ 317 0008 FF0000E2 		and	r0, r0, #255
+ 318              	.LVL22:
+ 319 000c 2118A0E1 		mov	r1, r1, lsr #16
+  94:fb/fb_k2xx.c  **** 	writew(reg, CL761_INDEX_ADDR);
+ 320              		.loc 1 94 0
+ 321 0010 B400C3E1 		strh	r0, [r3, #4]	@ movhi
+  95:fb/fb_k2xx.c  **** 	writew(data, CL761_DATA_ADDR);
+ 322              		.loc 1 95 0
+ 323 0014 B610C3E1 		strh	r1, [r3, #6]	@ movhi
+  96:fb/fb_k2xx.c  **** }
+ 324              		.loc 1 96 0
+ 325 0018 1EFF2FE1 		bx	lr
+ 326              		.cfi_endproc
+ 327              	.LFE15:
+ 329              		.global	framebuffer
+ 330              		.global	fb_rgb332
+ 331              		.section	.rodata
+ 332              		.align	2
+ 333              		.set	.LANCHOR1,. + 0
+ 336              	__FUNCTION__.1674:
+ 337 0000 66625F6B 		.ascii	"fb_k2xx_flush\000"
+ 337      3278785F 
+ 337      666C7573 
+ 337      6800
+ 338 000e 0000     		.space	2
+ 341              	__FUNCTION__.1662:
+ 342 0010 66625F6B 		.ascii	"fb_k2xx_init\000"
+ 342      3278785F 
+ 342      696E6974 
+ 342      00
+ 343 001d 000000   		.space	3
+ 346              	k2xx_initdata:
+ 347 0020 2C       		.byte	44
+ 348 0021 02       		.byte	2
+ 349 0022 01       		.byte	1
+ 350 0023 26       		.byte	38
+ 351 0024 01       		.byte	1
+ 352 0025 26       		.byte	38
+ 353 0026 09       		.byte	9
+ 354 0027 26       		.byte	38
+ 355 0028 0B       		.byte	11
+ 356 0029 26       		.byte	38
+ 357 002a 0F       		.byte	15
+ 358 002b 10       		.byte	16
+ 359 002c 00       		.byte	0
+ 360 002d 20       		.byte	32
+ 361 002e 01       		.byte	1
+ 362 002f 24       		.byte	36
+ 363 0030 08       		.byte	8
+ 364 0031 28       		.byte	40
+ 365 0032 02       		.byte	2
+ 366 0033 2A       		.byte	42
+ 367 0034 1D       		.byte	29
+ 368 0035 30       		.byte	48
+ 369 0036 53       		.byte	83
+ 370 0037 32       		.byte	50
+ 371 0038 0E       		.byte	14
+ 372 0039 34       		.byte	52
+ 373 003a 8D       		.byte	-115
+ 374 003b 36       		.byte	54
+ 375 003c 00       		.byte	0
+ 376 003d 40       		.byte	64
+ 377 003e 80       		.byte	-128
+ 378 003f 45       		.byte	69
+ 379 0040 00       		.byte	0
+ 380 0041 53       		.byte	83
+ 381 0042 00       		.byte	0
+ 382 0043 55       		.byte	85
+ 383 0044 00       		.byte	0
+ 384 0045 51       		.byte	81
+ 385 0046 0000     		.section	.rodata.str1.1,"aMS",%progbits,1
+ 386              	.LC0:
+ 387 0000 25733A20 		.ascii	"%s: no damage\012\000"
+ 387      6E6F2064 
+ 387      616D6167 
+ 387      650A00
+ 388              	.LC1:
+ 389 000f 25733A20 		.ascii	"%s: initializing LCD.\012\000"
+ 389      696E6974 
+ 389      69616C69 
+ 389      7A696E67 
+ 389      204C4344 
+ 390              		.data
+ 391              		.align	2
+ 392              		.set	.LANCHOR0,. + 0
+ 395              	fb_rgb332:
+ 396 0000 40000000 		.word	fb_k2xx_rgb332
+ 399              	framebuffer:
+ 400 0004 08000000 		.word	fb_k2xx_framebuffer
+ 403              	fb_k2xx_framebuffer:
+ 404 0008 6B327878 		.ascii	"k2xx\000"
+ 404      00
+ 405 000d 000000   		.space	3
+ 406 0010 00000000 		.word	fb_k2xx_init
+ 407 0014 00000000 		.word	fb_rgb332_clear
+ 408 0018 00000000 		.space	4
+ 409 001c 00000000 		.word	fb_rgb332_boxto
+ 410 0020 00000000 		.word	fb_rgb332_lineto
+ 411 0024 00000000 		.word	fb_rgb332_putstr
+ 412 0028 00000000 		.word	fb_k2xx_flush
+ 413 002c 8000     		.short	128
+ 414 002e 8000     		.short	128
+ 415 0030 00000000 		.space	16
+ 415      00000000 
+ 415      00000000 
+ 415      00000000 
+ 418              	fb_k2xx_rgb332:
+ 419 0040 00000000 		.word	fb_k2xx_mem
+ 420 0044 00000000 		.space	8
+ 420      00000000 
+ 421              		.bss
+ 422              		.align	2
+ 425              	fb_k2xx_mem:
+ 426 0000 00000000 		.space	16384
+ 426      00000000 
+ 426      00000000 
+ 426      00000000 
+ 426      00000000 
+ 427              		.text
+ 428              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 fb_k2xx.c
+     /tmp/ccV8qtV1.s:12     .text.fb_k2xx_flush:0000000000000000 $a
+     /tmp/ccV8qtV1.s:14     .text.fb_k2xx_flush:0000000000000000 fb_k2xx_flush
+     /tmp/ccV8qtV1.s:163    .text.fb_k2xx_flush:0000000000000110 $d
+     /tmp/ccV8qtV1.s:170    .text.fb_k2xx_init:0000000000000000 $a
+     /tmp/ccV8qtV1.s:172    .text.fb_k2xx_init:0000000000000000 fb_k2xx_init
+     /tmp/ccV8qtV1.s:263    .text.fb_k2xx_init:0000000000000078 $d
+     /tmp/ccV8qtV1.s:272    .text.cl761_read_reg:0000000000000000 $a
+     /tmp/ccV8qtV1.s:275    .text.cl761_read_reg:0000000000000000 cl761_read_reg
+     /tmp/ccV8qtV1.s:300    .text.cl761_write_reg:0000000000000000 $a
+     /tmp/ccV8qtV1.s:303    .text.cl761_write_reg:0000000000000000 cl761_write_reg
+     /tmp/ccV8qtV1.s:399    .data:0000000000000004 framebuffer
+     /tmp/ccV8qtV1.s:395    .data:0000000000000000 fb_rgb332
+     /tmp/ccV8qtV1.s:332    .rodata:0000000000000000 $d
+     /tmp/ccV8qtV1.s:336    .rodata:0000000000000000 __FUNCTION__.1674
+     /tmp/ccV8qtV1.s:341    .rodata:0000000000000010 __FUNCTION__.1662
+     /tmp/ccV8qtV1.s:346    .rodata:0000000000000020 k2xx_initdata
+     /tmp/ccV8qtV1.s:391    .data:0000000000000000 $d
+     /tmp/ccV8qtV1.s:418    .data:0000000000000040 fb_k2xx_rgb332
+     /tmp/ccV8qtV1.s:403    .data:0000000000000008 fb_k2xx_framebuffer
+     /tmp/ccV8qtV1.s:425    .bss:0000000000000000 fb_k2xx_mem
+     /tmp/ccV8qtV1.s:422    .bss:0000000000000000 $d
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+printf
+delay_ms
+fb_rgb332_clear
+fb_rgb332_boxto
+fb_rgb332_lineto
+fb_rgb332_putstr

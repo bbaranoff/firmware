@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  83560	   2536	  27259	 113355	  1bacb	board/compal_e88/rssi.e88flash.elf
+  80931	   4256	  25295	 110482	  1af92	board/compal_e88/rssi.e88flash.elf

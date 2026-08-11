@@ -1,0 +1,360 @@
+   1              		.file	"rffe_k2xx.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.rffe_mode,"ax",%progbits
+  12              		.align	2
+  13              		.global	rffe_mode
+  15              	rffe_mode:
+  16              	.LFB3:
+  17              		.file 1 "board/se_k2xx/rffe_k2xx.c"
+   1:board/se_k2xx/rffe_k2xx.c **** /* RF frontend driver for Sony Ericsson K200i/K220i */
+   2:board/se_k2xx/rffe_k2xx.c **** 
+   3:board/se_k2xx/rffe_k2xx.c **** /* (C) 2022 by Steve Markgraf <steve@steve-m.de>
+   4:board/se_k2xx/rffe_k2xx.c ****  *
+   5:board/se_k2xx/rffe_k2xx.c ****  * All Rights Reserved
+   6:board/se_k2xx/rffe_k2xx.c ****  *
+   7:board/se_k2xx/rffe_k2xx.c ****  * This program is free software; you can redistribute it and/or modify
+   8:board/se_k2xx/rffe_k2xx.c ****  * it under the terms of the GNU General Public License as published by
+   9:board/se_k2xx/rffe_k2xx.c ****  * the Free Software Foundation; either version 2 of the License, or
+  10:board/se_k2xx/rffe_k2xx.c ****  * (at your option) any later version.
+  11:board/se_k2xx/rffe_k2xx.c ****  *
+  12:board/se_k2xx/rffe_k2xx.c ****  * This program is distributed in the hope that it will be useful,
+  13:board/se_k2xx/rffe_k2xx.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  14:board/se_k2xx/rffe_k2xx.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  15:board/se_k2xx/rffe_k2xx.c ****  * GNU General Public License for more details.
+  16:board/se_k2xx/rffe_k2xx.c ****  *
+  17:board/se_k2xx/rffe_k2xx.c ****  * You should have received a copy of the GNU General Public License
+  18:board/se_k2xx/rffe_k2xx.c ****  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  19:board/se_k2xx/rffe_k2xx.c ****  *
+  20:board/se_k2xx/rffe_k2xx.c ****  */
+  21:board/se_k2xx/rffe_k2xx.c **** 
+  22:board/se_k2xx/rffe_k2xx.c **** #include <stdint.h>
+  23:board/se_k2xx/rffe_k2xx.c **** #include <stdio.h>
+  24:board/se_k2xx/rffe_k2xx.c **** 
+  25:board/se_k2xx/rffe_k2xx.c **** #include <debug.h>
+  26:board/se_k2xx/rffe_k2xx.c **** #include <memory.h>
+  27:board/se_k2xx/rffe_k2xx.c **** #include <rffe.h>
+  28:board/se_k2xx/rffe_k2xx.c **** #include <calypso/tsp.h>
+  29:board/se_k2xx/rffe_k2xx.c **** #include <rf/trf6151.h>
+  30:board/se_k2xx/rffe_k2xx.c **** 
+  31:board/se_k2xx/rffe_k2xx.c **** /* This is a value that has been measured on the C123 by Harald: 71dBm,
+  32:board/se_k2xx/rffe_k2xx.c ****    it is the difference between the input level at the antenna and what
+  33:board/se_k2xx/rffe_k2xx.c ****    the DSP reports, subtracted by the total gain of the TRF6151 */
+  34:board/se_k2xx/rffe_k2xx.c **** #define SYSTEM_INHERENT_GAIN	71
+  35:board/se_k2xx/rffe_k2xx.c **** 
+  36:board/se_k2xx/rffe_k2xx.c **** /* describe how the RF frontend is wired on the SE K200i/K220i */
+  37:board/se_k2xx/rffe_k2xx.c **** #define		RITA_RESET	TSPACT(0)	/* Reset of the Rita TRF6151, correct for K200i */
+  38:board/se_k2xx/rffe_k2xx.c **** #define		PA_ENABLE	TSPACT(9)	/* Enable the Power Amplifier */
+  39:board/se_k2xx/rffe_k2xx.c **** #define		DCS_TXEN	TSPACT(3)	/* DCS (as opposed to GSM) Transmit */
+  40:board/se_k2xx/rffe_k2xx.c **** 
+  41:board/se_k2xx/rffe_k2xx.c **** #define		ASM_VC1		TSPACT(1)	/* GSM1800 TX at antenna switch, inverted */
+  42:board/se_k2xx/rffe_k2xx.c **** #define		ASM_VC2		TSPACT(2)	/* GSM900 TX at antenna switch, inverted */
+  43:board/se_k2xx/rffe_k2xx.c **** 
+  44:board/se_k2xx/rffe_k2xx.c **** #define		IOTA_STROBE	TSPEN(1)	/* Strobe for the Iota TSP */
+  45:board/se_k2xx/rffe_k2xx.c **** #define		RITA_STROBE	TSPEN(2)	/* Strobe for the Rita TSP */
+  46:board/se_k2xx/rffe_k2xx.c **** 
+  47:board/se_k2xx/rffe_k2xx.c **** /* switch RF Frontend Mode */
+  48:board/se_k2xx/rffe_k2xx.c **** void rffe_mode(enum gsm_band band, int tx)
+  49:board/se_k2xx/rffe_k2xx.c **** {
+  18              		.loc 1 49 0
+  19              		.cfi_startproc
+  20              		@ args = 0, pretend = 0, frame = 0
+  21              		@ frame_needed = 0, uses_anonymous_args = 0
+  22              	.LVL0:
+  23 0000 04E02DE5 		str	lr, [sp, #-4]!
+  24              	.LCFI0:
+  25              		.cfi_def_cfa_offset 4
+  50:board/se_k2xx/rffe_k2xx.c **** 	uint16_t tspact = tsp_act_state();
+  26              		.loc 1 50 0
+  27              		.cfi_offset 14, -4
+  28 0004 FEFFFFEB 		bl	tsp_act_state
+  29              	.LVL1:
+  51:board/se_k2xx/rffe_k2xx.c **** 
+  52:board/se_k2xx/rffe_k2xx.c **** 	/* First we mask off all bits from the state cache */
+  53:board/se_k2xx/rffe_k2xx.c **** 	tspact &= ~(PA_ENABLE | DCS_TXEN);
+  30              		.loc 1 53 0
+  31 0008 0C309FE5 		ldr	r3, .L2
+  32 000c 033000E0 		and	r3, r0, r3
+  33              	.LVL2:
+  54:board/se_k2xx/rffe_k2xx.c **** 	tspact |= ASM_VC1 | ASM_VC2;
+  55:board/se_k2xx/rffe_k2xx.c **** 
+  56:board/se_k2xx/rffe_k2xx.c **** #ifdef CONFIG_TX_ENABLE
+  57:board/se_k2xx/rffe_k2xx.c **** 	/* Then we selectively set the bits on, if required */
+  58:board/se_k2xx/rffe_k2xx.c **** 	if (tx) {
+  59:board/se_k2xx/rffe_k2xx.c **** 		if ((band == GSM_BAND_1800) || band == (GSM_BAND_1900)) {
+  60:board/se_k2xx/rffe_k2xx.c **** 			tspact |= DCS_TXEN;
+  61:board/se_k2xx/rffe_k2xx.c **** 			tspact &= ~ASM_VC1;
+  62:board/se_k2xx/rffe_k2xx.c **** 		} else
+  63:board/se_k2xx/rffe_k2xx.c **** 			tspact &= ~ASM_VC2;
+  64:board/se_k2xx/rffe_k2xx.c **** 
+  65:board/se_k2xx/rffe_k2xx.c **** 		tspact |= PA_ENABLE;
+  66:board/se_k2xx/rffe_k2xx.c **** 	}
+  67:board/se_k2xx/rffe_k2xx.c **** #endif /* TRANSMIT_SUPPORT */
+  68:board/se_k2xx/rffe_k2xx.c **** 
+  69:board/se_k2xx/rffe_k2xx.c **** 	tsp_act_update(tspact);
+  34              		.loc 1 69 0
+  35 0010 060083E3 		orr	r0, r3, #6
+  70:board/se_k2xx/rffe_k2xx.c **** }
+  36              		.loc 1 70 0
+  37 0014 04E09DE4 		ldr	lr, [sp], #4
+  69:board/se_k2xx/rffe_k2xx.c **** 	tsp_act_update(tspact);
+  38              		.loc 1 69 0
+  39 0018 FEFFFFEA 		b	tsp_act_update
+  40              	.LVL3:
+  41              	.L3:
+  42              		.align	2
+  43              	.L2:
+  44 001c F7FD0000 		.word	65015
+  45              		.cfi_endproc
+  46              	.LFE3:
+  48              		.section	.text.rffe_get_rx_ports,"ax",%progbits
+  49              		.align	2
+  50              		.global	rffe_get_rx_ports
+  52              	rffe_get_rx_ports:
+  53              	.LFB4:
+  71:board/se_k2xx/rffe_k2xx.c **** 
+  72:board/se_k2xx/rffe_k2xx.c **** uint32_t rffe_get_rx_ports(void)
+  73:board/se_k2xx/rffe_k2xx.c **** {
+  54              		.loc 1 73 0
+  55              		.cfi_startproc
+  56              		@ args = 0, pretend = 0, frame = 0
+  57              		@ frame_needed = 0, uses_anonymous_args = 0
+  58              		@ link register save eliminated.
+  74:board/se_k2xx/rffe_k2xx.c **** 	return (1 << PORT_LO) | (1 << PORT_DCS1800) | (1 << PORT_PCS1900);
+  75:board/se_k2xx/rffe_k2xx.c **** }
+  59              		.loc 1 75 0
+  60 0000 3100A0E3 		mov	r0, #49
+  61 0004 1EFF2FE1 		bx	lr
+  62              		.cfi_endproc
+  63              	.LFE4:
+  65              		.section	.text.rffe_get_tx_ports,"ax",%progbits
+  66              		.align	2
+  67              		.global	rffe_get_tx_ports
+  69              	rffe_get_tx_ports:
+  70              	.LFB5:
+  76:board/se_k2xx/rffe_k2xx.c **** 
+  77:board/se_k2xx/rffe_k2xx.c **** uint32_t rffe_get_tx_ports(void)
+  78:board/se_k2xx/rffe_k2xx.c **** {
+  71              		.loc 1 78 0
+  72              		.cfi_startproc
+  73              		@ args = 0, pretend = 0, frame = 0
+  74              		@ frame_needed = 0, uses_anonymous_args = 0
+  75              		@ link register save eliminated.
+  79:board/se_k2xx/rffe_k2xx.c **** 	return (1 << PORT_LO) | (1 << PORT_HI);
+  80:board/se_k2xx/rffe_k2xx.c **** }
+  76              		.loc 1 80 0
+  77 0000 0300A0E3 		mov	r0, #3
+  78 0004 1EFF2FE1 		bx	lr
+  79              		.cfi_endproc
+  80              	.LFE5:
+  82              		.section	.text.rffe_iq_swapped,"ax",%progbits
+  83              		.align	2
+  84              		.global	rffe_iq_swapped
+  86              	rffe_iq_swapped:
+  87              	.LFB6:
+  81:board/se_k2xx/rffe_k2xx.c **** 
+  82:board/se_k2xx/rffe_k2xx.c **** /* Returns need for IQ swap */
+  83:board/se_k2xx/rffe_k2xx.c **** int rffe_iq_swapped(uint16_t band_arfcn, int tx)
+  84:board/se_k2xx/rffe_k2xx.c **** {
+  88              		.loc 1 84 0
+  89              		.cfi_startproc
+  90              		@ args = 0, pretend = 0, frame = 0
+  91              		@ frame_needed = 0, uses_anonymous_args = 0
+  92              		@ link register save eliminated.
+  93              	.LVL4:
+  94              		.loc 1 84 0
+  95 0000 0008A0E1 		mov	r0, r0, asl #16
+  96              	.LVL5:
+  85:board/se_k2xx/rffe_k2xx.c **** 	return trf6151_iq_swapped(band_arfcn, tx);
+  97              		.loc 1 85 0
+  98 0004 2008A0E1 		mov	r0, r0, lsr #16
+  86:board/se_k2xx/rffe_k2xx.c **** }
+  99              		.loc 1 86 0
+  85:board/se_k2xx/rffe_k2xx.c **** 	return trf6151_iq_swapped(band_arfcn, tx);
+ 100              		.loc 1 85 0
+ 101 0008 FEFFFFEA 		b	trf6151_iq_swapped
+ 102              		.cfi_endproc
+ 103              	.LFE6:
+ 105              		.section	.text.rffe_init,"ax",%progbits
+ 106              		.align	2
+ 107              		.global	rffe_init
+ 109              	rffe_init:
+ 110              	.LFB7:
+  87:board/se_k2xx/rffe_k2xx.c **** 
+  88:board/se_k2xx/rffe_k2xx.c **** #define MCU_SW_TRACE	0xfffef00e
+  89:board/se_k2xx/rffe_k2xx.c **** #define ARM_CONF_REG	0xfffef006
+  90:board/se_k2xx/rffe_k2xx.c **** #define ASIC_CONF_REG	0xfffef008
+  91:board/se_k2xx/rffe_k2xx.c **** 
+  92:board/se_k2xx/rffe_k2xx.c **** void rffe_init(void)
+  93:board/se_k2xx/rffe_k2xx.c **** {
+ 111              		.loc 1 93 0
+ 112              		.cfi_startproc
+ 113              		@ args = 0, pretend = 0, frame = 0
+ 114              		@ frame_needed = 0, uses_anonymous_args = 0
+  94:board/se_k2xx/rffe_k2xx.c **** 	/* Configure the TSPEN which is connected to the TWL3025 */
+  95:board/se_k2xx/rffe_k2xx.c **** 	tsp_setup(IOTA_STROBE, 1, 0, 0);
+ 115              		.loc 1 95 0
+ 116 0000 0100A0E3 		mov	r0, #1
+ 117 0004 0020A0E3 		mov	r2, #0
+ 118 0008 0010A0E1 		mov	r1, r0
+  93:board/se_k2xx/rffe_k2xx.c **** {
+ 119              		.loc 1 93 0
+ 120 000c 04E02DE5 		str	lr, [sp, #-4]!
+ 121              	.LCFI1:
+ 122              		.cfi_def_cfa_offset 4
+ 123              		.loc 1 95 0
+ 124 0010 0230A0E1 		mov	r3, r2
+ 125              		.cfi_offset 14, -4
+ 126 0014 FEFFFFEB 		bl	tsp_setup
+  96:board/se_k2xx/rffe_k2xx.c **** 
+  97:board/se_k2xx/rffe_k2xx.c **** 	trf6151_init(RITA_STROBE, RITA_RESET);
+ 127              		.loc 1 97 0
+ 128 0018 0200A0E3 		mov	r0, #2
+ 129 001c 0110A0E3 		mov	r1, #1
+  98:board/se_k2xx/rffe_k2xx.c **** }
+ 130              		.loc 1 98 0
+ 131 0020 04E09DE4 		ldr	lr, [sp], #4
+  97:board/se_k2xx/rffe_k2xx.c **** 	trf6151_init(RITA_STROBE, RITA_RESET);
+ 132              		.loc 1 97 0
+ 133 0024 FEFFFFEA 		b	trf6151_init
+ 134              		.cfi_endproc
+ 135              	.LFE7:
+ 137              		.section	.text.rffe_get_gain,"ax",%progbits
+ 138              		.align	2
+ 139              		.global	rffe_get_gain
+ 141              	rffe_get_gain:
+ 142              	.LFB8:
+  99:board/se_k2xx/rffe_k2xx.c **** 
+ 100:board/se_k2xx/rffe_k2xx.c **** uint8_t rffe_get_gain(void)
+ 101:board/se_k2xx/rffe_k2xx.c **** {
+ 143              		.loc 1 101 0
+ 144              		.cfi_startproc
+ 145              		@ args = 0, pretend = 0, frame = 0
+ 146              		@ frame_needed = 0, uses_anonymous_args = 0
+ 147              		@ link register save eliminated.
+ 102:board/se_k2xx/rffe_k2xx.c **** 	return trf6151_get_gain();
+ 103:board/se_k2xx/rffe_k2xx.c **** }
+ 148              		.loc 1 103 0
+ 102:board/se_k2xx/rffe_k2xx.c **** 	return trf6151_get_gain();
+ 149              		.loc 1 102 0
+ 150 0000 FEFFFFEA 		b	trf6151_get_gain
+ 151              		.cfi_endproc
+ 152              	.LFE8:
+ 154              		.section	.text.rffe_set_gain,"ax",%progbits
+ 155              		.align	2
+ 156              		.global	rffe_set_gain
+ 158              	rffe_set_gain:
+ 159              	.LFB9:
+ 104:board/se_k2xx/rffe_k2xx.c **** 
+ 105:board/se_k2xx/rffe_k2xx.c **** void rffe_set_gain(uint8_t dbm)
+ 106:board/se_k2xx/rffe_k2xx.c **** {
+ 160              		.loc 1 106 0
+ 161              		.cfi_startproc
+ 162              		@ args = 0, pretend = 0, frame = 0
+ 163              		@ frame_needed = 0, uses_anonymous_args = 0
+ 164              		@ link register save eliminated.
+ 165              	.LVL6:
+ 166              		.loc 1 106 0
+ 167 0000 FF0000E2 		and	r0, r0, #255
+ 168              	.LVL7:
+ 107:board/se_k2xx/rffe_k2xx.c **** 	trf6151_set_gain(dbm);
+ 108:board/se_k2xx/rffe_k2xx.c **** }
+ 169              		.loc 1 108 0
+ 107:board/se_k2xx/rffe_k2xx.c **** 	trf6151_set_gain(dbm);
+ 170              		.loc 1 107 0
+ 171 0004 FEFFFFEA 		b	trf6151_set_gain
+ 172              		.cfi_endproc
+ 173              	.LFE9:
+ 175              		.section	.text.rffe_compute_gain,"ax",%progbits
+ 176              		.align	2
+ 177              		.global	rffe_compute_gain
+ 179              	rffe_compute_gain:
+ 180              	.LFB10:
+ 109:board/se_k2xx/rffe_k2xx.c **** 
+ 110:board/se_k2xx/rffe_k2xx.c **** const uint8_t system_inherent_gain = SYSTEM_INHERENT_GAIN;
+ 111:board/se_k2xx/rffe_k2xx.c **** 
+ 112:board/se_k2xx/rffe_k2xx.c **** /* Given the expected input level of exp_inp dBm/8 and the target of target_bb
+ 113:board/se_k2xx/rffe_k2xx.c ****  * dBm8, configure the RF Frontend with the respective gain */
+ 114:board/se_k2xx/rffe_k2xx.c **** void rffe_compute_gain(int16_t exp_inp, int16_t target_bb)
+ 115:board/se_k2xx/rffe_k2xx.c **** {
+ 181              		.loc 1 115 0
+ 182              		.cfi_startproc
+ 183              		@ args = 0, pretend = 0, frame = 0
+ 184              		@ frame_needed = 0, uses_anonymous_args = 0
+ 185              		@ link register save eliminated.
+ 186              	.LVL8:
+ 187              		.loc 1 115 0
+ 188 0000 0008A0E1 		mov	r0, r0, asl #16
+ 189              	.LVL9:
+ 190 0004 0118A0E1 		mov	r1, r1, asl #16
+ 191              	.LVL10:
+ 116:board/se_k2xx/rffe_k2xx.c **** 	trf6151_compute_gain(exp_inp, target_bb);
+ 192              		.loc 1 116 0
+ 193 0008 4008A0E1 		mov	r0, r0, asr #16
+ 194 000c 4118A0E1 		mov	r1, r1, asr #16
+ 117:board/se_k2xx/rffe_k2xx.c **** }
+ 195              		.loc 1 117 0
+ 116:board/se_k2xx/rffe_k2xx.c **** 	trf6151_compute_gain(exp_inp, target_bb);
+ 196              		.loc 1 116 0
+ 197 0010 FEFFFFEA 		b	trf6151_compute_gain
+ 198              		.cfi_endproc
+ 199              	.LFE10:
+ 201              		.section	.text.rffe_rx_win_ctrl,"ax",%progbits
+ 202              		.align	2
+ 203              		.global	rffe_rx_win_ctrl
+ 205              	rffe_rx_win_ctrl:
+ 206              	.LFB11:
+ 118:board/se_k2xx/rffe_k2xx.c **** 
+ 119:board/se_k2xx/rffe_k2xx.c **** void rffe_rx_win_ctrl(int16_t exp_inp, int16_t target_bb)
+ 120:board/se_k2xx/rffe_k2xx.c **** {
+ 207              		.loc 1 120 0
+ 208              		.cfi_startproc
+ 209              		@ args = 0, pretend = 0, frame = 0
+ 210              		@ frame_needed = 0, uses_anonymous_args = 0
+ 211              		@ link register save eliminated.
+ 212              	.LVL11:
+ 121:board/se_k2xx/rffe_k2xx.c **** 	/* FIXME */
+ 122:board/se_k2xx/rffe_k2xx.c **** }
+ 213              		.loc 1 122 0
+ 214 0000 1EFF2FE1 		bx	lr
+ 215              		.cfi_endproc
+ 216              	.LFE11:
+ 218              		.global	system_inherent_gain
+ 219              		.section	.rodata
+ 222              	system_inherent_gain:
+ 223 0000 47       		.byte	71
+ 224              		.text
+ 225              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 rffe_k2xx.c
+     /tmp/ccvBC4bD.s:12     .text.rffe_mode:0000000000000000 $a
+     /tmp/ccvBC4bD.s:15     .text.rffe_mode:0000000000000000 rffe_mode
+     /tmp/ccvBC4bD.s:44     .text.rffe_mode:000000000000001c $d
+     /tmp/ccvBC4bD.s:49     .text.rffe_get_rx_ports:0000000000000000 $a
+     /tmp/ccvBC4bD.s:52     .text.rffe_get_rx_ports:0000000000000000 rffe_get_rx_ports
+     /tmp/ccvBC4bD.s:66     .text.rffe_get_tx_ports:0000000000000000 $a
+     /tmp/ccvBC4bD.s:69     .text.rffe_get_tx_ports:0000000000000000 rffe_get_tx_ports
+     /tmp/ccvBC4bD.s:83     .text.rffe_iq_swapped:0000000000000000 $a
+     /tmp/ccvBC4bD.s:86     .text.rffe_iq_swapped:0000000000000000 rffe_iq_swapped
+     /tmp/ccvBC4bD.s:106    .text.rffe_init:0000000000000000 $a
+     /tmp/ccvBC4bD.s:109    .text.rffe_init:0000000000000000 rffe_init
+     /tmp/ccvBC4bD.s:138    .text.rffe_get_gain:0000000000000000 $a
+     /tmp/ccvBC4bD.s:141    .text.rffe_get_gain:0000000000000000 rffe_get_gain
+     /tmp/ccvBC4bD.s:155    .text.rffe_set_gain:0000000000000000 $a
+     /tmp/ccvBC4bD.s:158    .text.rffe_set_gain:0000000000000000 rffe_set_gain
+     /tmp/ccvBC4bD.s:176    .text.rffe_compute_gain:0000000000000000 $a
+     /tmp/ccvBC4bD.s:179    .text.rffe_compute_gain:0000000000000000 rffe_compute_gain
+     /tmp/ccvBC4bD.s:202    .text.rffe_rx_win_ctrl:0000000000000000 $a
+     /tmp/ccvBC4bD.s:205    .text.rffe_rx_win_ctrl:0000000000000000 rffe_rx_win_ctrl
+     /tmp/ccvBC4bD.s:222    .rodata:0000000000000000 system_inherent_gain
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+tsp_act_state
+tsp_act_update
+trf6151_iq_swapped
+tsp_setup
+trf6151_init
+trf6151_get_gain
+trf6151_set_gain
+trf6151_compute_gain

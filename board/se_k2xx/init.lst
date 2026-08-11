@@ -1,0 +1,474 @@
+   1              		.file	"init.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.board_init,"ax",%progbits
+  12              		.align	2
+  13              		.global	board_init
+  15              	board_init:
+  16              	.LFB54:
+  17              		.file 1 "board/se_k2xx/init.c"
+   1:board/se_k2xx/init.c **** /* Initialization for the Sony Ericsson K200i/K220i */
+   2:board/se_k2xx/init.c **** 
+   3:board/se_k2xx/init.c **** /* (C) 2010 by Harald Welte <laforge@gnumonks.org>
+   4:board/se_k2xx/init.c ****  * (C) 2010-22 by Steve Markgraf <steve@steve-m.de>
+   5:board/se_k2xx/init.c ****  *
+   6:board/se_k2xx/init.c ****  * All Rights Reserved
+   7:board/se_k2xx/init.c ****  *
+   8:board/se_k2xx/init.c ****  * This program is free software; you can redistribute it and/or modify
+   9:board/se_k2xx/init.c ****  * it under the terms of the GNU General Public License as published by
+  10:board/se_k2xx/init.c ****  * the Free Software Foundation; either version 2 of the License, or
+  11:board/se_k2xx/init.c ****  * (at your option) any later version.
+  12:board/se_k2xx/init.c ****  *
+  13:board/se_k2xx/init.c ****  * This program is distributed in the hope that it will be useful,
+  14:board/se_k2xx/init.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  15:board/se_k2xx/init.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  16:board/se_k2xx/init.c ****  * GNU General Public License for more details.
+  17:board/se_k2xx/init.c ****  *
+  18:board/se_k2xx/init.c ****  */
+  19:board/se_k2xx/init.c **** 
+  20:board/se_k2xx/init.c **** #include <stdint.h>
+  21:board/se_k2xx/init.c **** #include <stdio.h>
+  22:board/se_k2xx/init.c **** 
+  23:board/se_k2xx/init.c **** #include <debug.h>
+  24:board/se_k2xx/init.c **** #include <ctors.h>
+  25:board/se_k2xx/init.c **** #include <memory.h>
+  26:board/se_k2xx/init.c **** #include <board.h>
+  27:board/se_k2xx/init.c **** #include <keypad.h>
+  28:board/se_k2xx/init.c **** #include <console.h>
+  29:board/se_k2xx/init.c **** #include <flash/cfi_flash.h>
+  30:board/se_k2xx/init.c **** #include <tiffs.h>
+  31:board/se_k2xx/init.c **** 
+  32:board/se_k2xx/init.c **** #include <calypso/irq.h>
+  33:board/se_k2xx/init.c **** #include <calypso/clock.h>
+  34:board/se_k2xx/init.c **** #include <calypso/dma.h>
+  35:board/se_k2xx/init.c **** #include <calypso/rtc.h>
+  36:board/se_k2xx/init.c **** #include <calypso/timer.h>
+  37:board/se_k2xx/init.c **** #include <uart.h>
+  38:board/se_k2xx/init.c **** #include <calypso/backlight.h>
+  39:board/se_k2xx/init.c **** 
+  40:board/se_k2xx/init.c **** #include <comm/sercomm.h>
+  41:board/se_k2xx/init.c **** #include <comm/timer.h>
+  42:board/se_k2xx/init.c **** 
+  43:board/se_k2xx/init.c **** #include <abb/twl3025.h>
+  44:board/se_k2xx/init.c **** #include <rf/trf6151.h>
+  45:board/se_k2xx/init.c **** 
+  46:board/se_k2xx/init.c **** #include <fb/framebuffer.h>
+  47:board/se_k2xx/init.c **** #include "keymap.h"
+  48:board/se_k2xx/init.c **** 
+  49:board/se_k2xx/init.c **** #define ASIC_CONF_REG	0xfffef008
+  50:board/se_k2xx/init.c **** #define ARMIO_LATCH_OUT	0xfffe4802
+  51:board/se_k2xx/init.c **** #define IO_CNTL_REG	0xfffe4804
+  52:board/se_k2xx/init.c **** #define IO_CONF_REG	0xfffef00a
+  53:board/se_k2xx/init.c **** 
+  54:board/se_k2xx/init.c **** static void board_io_init(void)
+  55:board/se_k2xx/init.c **** {
+  56:board/se_k2xx/init.c **** 	uint16_t reg;
+  57:board/se_k2xx/init.c **** 
+  58:board/se_k2xx/init.c **** 	reg = readw(ASIC_CONF_REG);
+  59:board/se_k2xx/init.c **** 	/* Set LPG and PWL pin mux */
+  60:board/se_k2xx/init.c **** 	reg |= (1 << 6) | (1 << 4);
+  61:board/se_k2xx/init.c **** 	/* TWL3025: Set SPI+RIF RX clock to rising edge */
+  62:board/se_k2xx/init.c **** 	reg |= (1 << 13) | (1 << 14);
+  63:board/se_k2xx/init.c **** 	writew(reg, ASIC_CONF_REG);
+  64:board/se_k2xx/init.c **** 
+  65:board/se_k2xx/init.c **** 	writew(0xc060, IO_CNTL_REG);
+  66:board/se_k2xx/init.c **** 	writew(0x03fd, IO_CONF_REG);
+  67:board/se_k2xx/init.c **** 
+  68:board/se_k2xx/init.c **** 	/* set default IO state */
+  69:board/se_k2xx/init.c **** 	writew(0x1f83, ARMIO_LATCH_OUT);
+  70:board/se_k2xx/init.c **** }
+  71:board/se_k2xx/init.c **** 
+  72:board/se_k2xx/init.c **** void board_init(int with_irq)
+  73:board/se_k2xx/init.c **** {
+  18              		.loc 1 73 0
+  19              		.cfi_startproc
+  20              		@ args = 0, pretend = 0, frame = 0
+  21              		@ frame_needed = 0, uses_anonymous_args = 0
+  22              	.LVL0:
+  23 0000 17402DE9 		stmfd	sp!, {r0, r1, r2, r4, lr}
+  24              	.LCFI0:
+  25              		.cfi_def_cfa_offset 20
+  74:board/se_k2xx/init.c **** 	/* Configure the memory interface */
+  75:board/se_k2xx/init.c **** 	calypso_mem_cfg(CALYPSO_nCS0, 4, CALYPSO_MEM_16bit, 1);
+  26              		.loc 1 75 0
+  27 0004 0120A0E3 		mov	r2, #1
+  28              		.cfi_offset 14, -4
+  29              		.cfi_offset 4, -8
+  30              		.cfi_offset 2, -12
+  31              		.cfi_offset 1, -16
+  32              		.cfi_offset 0, -20
+  73:board/se_k2xx/init.c **** {
+  33              		.loc 1 73 0
+  34 0008 0040A0E1 		mov	r4, r0
+  35              		.loc 1 75 0
+  36 000c 0230A0E1 		mov	r3, r2
+  37 0010 0000A0E3 		mov	r0, #0
+  38              	.LVL1:
+  39 0014 0410A0E3 		mov	r1, #4
+  40 0018 FEFFFFEB 		bl	calypso_mem_cfg
+  76:board/se_k2xx/init.c **** 	calypso_mem_cfg(CALYPSO_nCS1, 5, CALYPSO_MEM_16bit, 1);
+  41              		.loc 1 76 0
+  42 001c 0120A0E3 		mov	r2, #1
+  43 0020 0230A0E1 		mov	r3, r2
+  44 0024 0200A0E3 		mov	r0, #2
+  45 0028 0510A0E3 		mov	r1, #5
+  46 002c FEFFFFEB 		bl	calypso_mem_cfg
+  77:board/se_k2xx/init.c **** 	calypso_mem_cfg(CALYPSO_nCS2, 4, CALYPSO_MEM_16bit, 1);
+  47              		.loc 1 77 0
+  48 0030 0400A0E3 		mov	r0, #4
+  49 0034 0120A0E3 		mov	r2, #1
+  50 0038 0010A0E1 		mov	r1, r0
+  51 003c 0230A0E1 		mov	r3, r2
+  52 0040 FEFFFFEB 		bl	calypso_mem_cfg
+  78:board/se_k2xx/init.c **** 	calypso_mem_cfg(CALYPSO_nCS3, 5, CALYPSO_MEM_16bit, 1);
+  53              		.loc 1 78 0
+  54 0044 0120A0E3 		mov	r2, #1
+  55 0048 0230A0E1 		mov	r3, r2
+  56 004c 0600A0E3 		mov	r0, #6
+  57 0050 0510A0E3 		mov	r1, #5
+  58 0054 FEFFFFEB 		bl	calypso_mem_cfg
+  79:board/se_k2xx/init.c **** 	calypso_mem_cfg(CALYPSO_CS4, 5, CALYPSO_MEM_8bit, 1); /* TODO: add one dummy cycle */
+  59              		.loc 1 79 0
+  60 0058 0A00A0E3 		mov	r0, #10
+  61 005c 0510A0E3 		mov	r1, #5
+  62 0060 0020A0E3 		mov	r2, #0
+  63 0064 0130A0E3 		mov	r3, #1
+  64 0068 FEFFFFEB 		bl	calypso_mem_cfg
+  80:board/se_k2xx/init.c **** 	calypso_mem_cfg(CALYPSO_nCS6, 0, CALYPSO_MEM_32bit, 1);
+  65              		.loc 1 80 0
+  66 006c 0C00A0E3 		mov	r0, #12
+  67 0070 0010A0E3 		mov	r1, #0
+  68 0074 0220A0E3 		mov	r2, #2
+  69 0078 0130A0E3 		mov	r3, #1
+  70 007c FEFFFFEB 		bl	calypso_mem_cfg
+  81:board/se_k2xx/init.c **** 	calypso_mem_cfg(CALYPSO_nCS7, 0, CALYPSO_MEM_32bit, 0);
+  71              		.loc 1 81 0
+  72 0080 0010A0E3 		mov	r1, #0
+  73 0084 0130A0E1 		mov	r3, r1
+  74 0088 0800A0E3 		mov	r0, #8
+  75 008c 0220A0E3 		mov	r2, #2
+  76 0090 FEFFFFEB 		bl	calypso_mem_cfg
+  82:board/se_k2xx/init.c **** 
+  83:board/se_k2xx/init.c **** 	/* Set VTCXO_DIV2 = 1, configure PLL for 104 MHz and give ARM half of that */
+  84:board/se_k2xx/init.c **** 	calypso_clock_set(2, CALYPSO_PLL13_104_MHZ, ARM_MCLK_DIV_2);
+  77              		.loc 1 84 0
+  78 0094 0200A0E3 		mov	r0, #2
+  79 0098 0020A0E1 		mov	r2, r0
+  80 009c 021BA0E3 		mov	r1, #2048
+  81 00a0 FEFFFFEB 		bl	calypso_clock_set
+  85:board/se_k2xx/init.c **** 
+  86:board/se_k2xx/init.c **** 	/* Configure the RHEA bridge with some sane default values */
+  87:board/se_k2xx/init.c **** 	calypso_rhea_cfg(0, 0, 0xff, 0, 1, 0, 0);
+  82              		.loc 1 87 0
+  83 00a4 0000A0E3 		mov	r0, #0
+  84 00a8 0130A0E3 		mov	r3, #1
+  85 00ac 0010A0E1 		mov	r1, r0
+  86 00b0 00308DE5 		str	r3, [sp, #0]
+  87 00b4 FF20A0E3 		mov	r2, #255
+  88 00b8 0030A0E1 		mov	r3, r0
+  89 00bc 04008DE5 		str	r0, [sp, #4]
+  90 00c0 08008DE5 		str	r0, [sp, #8]
+  91 00c4 FEFFFFEB 		bl	calypso_rhea_cfg
+  92              	.LBB6:
+  93              	.LBB7:
+  58:board/se_k2xx/init.c **** 	reg = readw(ASIC_CONF_REG);
+  94              		.loc 1 58 0
+  95 00c8 F8309FE5 		ldr	r3, .L4
+  96 00cc B72F53E1 		ldrh	r2, [r3, #-247]
+  97              	.LVL2:
+  62:board/se_k2xx/init.c **** 	reg |= (1 << 13) | (1 << 14);
+  98              		.loc 1 62 0
+  99 00d0 062A82E3 		orr	r2, r2, #24576
+ 100              	.LVL3:
+ 101 00d4 502082E3 		orr	r2, r2, #80
+ 102              	.LVL4:
+  63:board/se_k2xx/init.c **** 	writew(reg, ASIC_CONF_REG);
+ 103              		.loc 1 63 0
+ 104 00d8 B72F43E1 		strh	r2, [r3, #-247]	@ movhi
+  65:board/se_k2xx/init.c **** 	writew(0xc060, IO_CNTL_REG);
+ 105              		.loc 1 65 0
+ 106 00dc E8109FE5 		ldr	r1, .L4+4
+ 107 00e0 E8209FE5 		ldr	r2, .L4+8
+ 108              	.LVL5:
+ 109 00e4 BB1F42E1 		strh	r1, [r2, #-251]	@ movhi
+  66:board/se_k2xx/init.c **** 	writew(0x03fd, IO_CONF_REG);
+ 110              		.loc 1 66 0
+ 111 00e8 E4109FE5 		ldr	r1, .L4+12
+ 112 00ec B51F43E1 		strh	r1, [r3, #-245]	@ movhi
+  69:board/se_k2xx/init.c **** 	writew(0x1f83, ARMIO_LATCH_OUT);
+ 113              		.loc 1 69 0
+ 114 00f0 E0309FE5 		ldr	r3, .L4+16
+ 115              	.LBE7:
+ 116              	.LBE6:
+  88:board/se_k2xx/init.c **** 
+  89:board/se_k2xx/init.c **** 	/* Initialize board-specific GPIO */
+  90:board/se_k2xx/init.c **** 	board_io_init();
+  91:board/se_k2xx/init.c **** 
+  92:board/se_k2xx/init.c **** 	/* Enable bootrom mapping to route exception vectors to RAM */
+  93:board/se_k2xx/init.c **** 	calypso_bootrom(with_irq);
+ 117              		.loc 1 93 0
+ 118 00f4 0400A0E1 		mov	r0, r4
+ 119              	.LBB9:
+ 120              	.LBB8:
+  69:board/se_k2xx/init.c **** 	writew(0x1f83, ARMIO_LATCH_OUT);
+ 121              		.loc 1 69 0
+ 122 00f8 BD3F42E1 		strh	r3, [r2, #-253]	@ movhi
+ 123              	.LBE8:
+ 124              	.LBE9:
+ 125              		.loc 1 93 0
+ 126 00fc FEFFFFEB 		bl	calypso_bootrom
+  94:board/se_k2xx/init.c **** 	calypso_exceptions_install();
+ 127              		.loc 1 94 0
+ 128 0100 FEFFFFEB 		bl	calypso_exceptions_install
+  95:board/se_k2xx/init.c **** 
+  96:board/se_k2xx/init.c **** 	/* Initialize interrupt controller */
+  97:board/se_k2xx/init.c **** 	if (with_irq)
+ 129              		.loc 1 97 0
+ 130 0104 000054E3 		cmp	r4, #0
+  98:board/se_k2xx/init.c **** 		irq_init();
+ 131              		.loc 1 98 0
+ 132 0108 FEFFFF1B 		blne	irq_init
+ 133              	.L2:
+  99:board/se_k2xx/init.c **** 
+ 100:board/se_k2xx/init.c **** 	sercomm_bind_uart(UART_MODEM);
+ 134              		.loc 1 100 0
+ 135 010c 0100A0E3 		mov	r0, #1
+ 136 0110 FEFFFFEB 		bl	sercomm_bind_uart
+ 101:board/se_k2xx/init.c **** 	cons_bind_uart(UART_IRDA);
+ 102:board/se_k2xx/init.c **** 
+ 103:board/se_k2xx/init.c **** 	/* initialize MODEM UART to be used for sercomm */
+ 104:board/se_k2xx/init.c **** 	uart_init(UART_MODEM, with_irq);
+ 137              		.loc 1 104 0
+ 138 0114 FF4004E2 		and	r4, r4, #255
+ 139              	.LVL6:
+ 101:board/se_k2xx/init.c **** 	cons_bind_uart(UART_IRDA);
+ 140              		.loc 1 101 0
+ 141 0118 0000A0E3 		mov	r0, #0
+ 142 011c FEFFFFEB 		bl	cons_bind_uart
+ 143              		.loc 1 104 0
+ 144 0120 0100A0E3 		mov	r0, #1
+ 145 0124 0410A0E1 		mov	r1, r4
+ 146 0128 FEFFFFEB 		bl	uart_init
+ 105:board/se_k2xx/init.c **** 	uart_baudrate(UART_MODEM, UART_115200);
+ 147              		.loc 1 105 0
+ 148 012c 0210A0E3 		mov	r1, #2
+ 149 0130 0100A0E3 		mov	r0, #1
+ 150 0134 FEFFFFEB 		bl	uart_baudrate
+ 106:board/se_k2xx/init.c **** 
+ 107:board/se_k2xx/init.c **** 	/* initialize IRDA UART to be used for old-school console code.
+ 108:board/se_k2xx/init.c **** 	 * note: IRDA uart only accessible on C115 and C117 PCB */
+ 109:board/se_k2xx/init.c **** 	uart_init(UART_IRDA, with_irq);
+ 151              		.loc 1 109 0
+ 152 0138 0000A0E3 		mov	r0, #0
+ 153 013c 0410A0E1 		mov	r1, r4
+ 154 0140 FEFFFFEB 		bl	uart_init
+ 110:board/se_k2xx/init.c **** 	uart_baudrate(UART_IRDA, UART_115200);
+ 155              		.loc 1 110 0
+ 156 0144 0210A0E3 		mov	r1, #2
+ 157 0148 0000A0E3 		mov	r0, #0
+ 158 014c FEFFFFEB 		bl	uart_baudrate
+ 111:board/se_k2xx/init.c **** 
+ 112:board/se_k2xx/init.c **** 	/* Initialize hardware timers */
+ 113:board/se_k2xx/init.c **** 	hwtimer_init();
+ 159              		.loc 1 113 0
+ 160 0150 FEFFFFEB 		bl	hwtimer_init
+ 114:board/se_k2xx/init.c **** 
+ 115:board/se_k2xx/init.c **** 	/* Initialize DMA controller */
+ 116:board/se_k2xx/init.c **** 	dma_init();
+ 161              		.loc 1 116 0
+ 162 0154 FEFFFFEB 		bl	dma_init
+ 117:board/se_k2xx/init.c **** 
+ 118:board/se_k2xx/init.c **** 	/* Initialize real time clock */
+ 119:board/se_k2xx/init.c **** 	rtc_init();
+ 163              		.loc 1 119 0
+ 164 0158 FEFFFFEB 		bl	rtc_init
+ 120:board/se_k2xx/init.c **** 
+ 121:board/se_k2xx/init.c **** 	/* Initialize system timers (uses hwtimer 2) */
+ 122:board/se_k2xx/init.c **** 	timer_init();
+ 165              		.loc 1 122 0
+ 166 015c FEFFFFEB 		bl	timer_init
+ 167              	.LBB10:
+ 168              	.LBB11:
+ 169              		.file 2 "include/fb/framebuffer.h"
+   1:include/fb/framebuffer.h **** #ifndef _FB_FRAMEBUFFER_H
+   2:include/fb/framebuffer.h **** #define _FB_FRAMEBUFFER_H
+   3:include/fb/framebuffer.h **** 
+   4:include/fb/framebuffer.h **** #include <fb/font.h>
+   5:include/fb/framebuffer.h **** #include <stdint.h>
+   6:include/fb/framebuffer.h **** 
+   7:include/fb/framebuffer.h **** /* color is encoded as <special><red><green><blue> */
+   8:include/fb/framebuffer.h **** /* if a color is "special", then the RGB components most likely
+   9:include/fb/framebuffer.h ****    don't make sense. Use "special" colours when you have to
+  10:include/fb/framebuffer.h ****    mask out bits with transparency or you have to encode
+  11:include/fb/framebuffer.h ****    colours in a fixed color palette ... */
+  12:include/fb/framebuffer.h **** 
+  13:include/fb/framebuffer.h **** #define FB_COLOR_WHITE		0x00ffffffU
+  14:include/fb/framebuffer.h **** #define FB_COLOR_BLACK		0x00000000U
+  15:include/fb/framebuffer.h **** #define FB_COLOR_TRANSP		0x01ffffffU
+  16:include/fb/framebuffer.h **** 
+  17:include/fb/framebuffer.h **** #define FB_COLOR_RGB(r,g,b) ((((r) & 0xff)<<16)|(((g)&0xff)<<8)|((b)&0xff))
+  18:include/fb/framebuffer.h **** #define FB_COLOR_RED		FB_COLOR_RGB(0xff,0x00,0x00)
+  19:include/fb/framebuffer.h **** #define FB_COLOR_GREEN		FB_COLOR_RGB(0x00,0xff,0x00)
+  20:include/fb/framebuffer.h **** #define FB_COLOR_BLUE		FB_COLOR_RGB(0x00,0x00,0xff)
+  21:include/fb/framebuffer.h **** 
+  22:include/fb/framebuffer.h **** /* encode */
+  23:include/fb/framebuffer.h **** 
+  24:include/fb/framebuffer.h **** /* decode */
+  25:include/fb/framebuffer.h **** #define FB_COLOR_IS_SPECIAL(v)     (!!((v) & 0xff000000U))
+  26:include/fb/framebuffer.h **** #define FB_COLOR_TO_R(v)		(((v)>>16) & 0xff)
+  27:include/fb/framebuffer.h **** #define FB_COLOR_TO_G(v)		(((v)>> 8) & 0xff)
+  28:include/fb/framebuffer.h **** #define FB_COLOR_TO_B(v)		( (v)      & 0xff)
+  29:include/fb/framebuffer.h **** 
+  30:include/fb/framebuffer.h **** struct framebuffer {
+  31:include/fb/framebuffer.h **** 	char name[8];				// keep it short!
+  32:include/fb/framebuffer.h **** 	void (*init)();				// (re)initialize
+  33:include/fb/framebuffer.h **** 	void (*clear)();			// clear display
+  34:include/fb/framebuffer.h **** 	void (*set_p)(uint16_t x,uint16_t y);	// set pixel to fg color
+  35:include/fb/framebuffer.h **** 	void (*boxto)(uint16_t x,uint16_t y);	// draw box to xy
+  36:include/fb/framebuffer.h **** 	void (*lineto)(uint16_t x,uint16_t y);	// draw line to xy
+  37:include/fb/framebuffer.h **** 	int (*putstr)(char *c,int maxwidth);	// put text in current font to fb
+  38:include/fb/framebuffer.h **** 	void (*flush)();			// flush changes
+  39:include/fb/framebuffer.h **** 
+  40:include/fb/framebuffer.h **** 	uint16_t width,height;			// width/height of fb
+  41:include/fb/framebuffer.h **** 	uint16_t cursor_x,cursor_y;		// current cursor
+  42:include/fb/framebuffer.h **** 	uint32_t fg_color,bg_color;		// current fg/bg color
+  43:include/fb/framebuffer.h **** 	enum fb_font_id font;			// current font
+  44:include/fb/framebuffer.h **** };
+  45:include/fb/framebuffer.h **** 
+  46:include/fb/framebuffer.h **** /* there is a single framebuffer, the specific driver defines
+  47:include/fb/framebuffer.h ****    the "framebuffer" symbol */
+  48:include/fb/framebuffer.h **** extern struct framebuffer *framebuffer;
+  49:include/fb/framebuffer.h **** 
+  50:include/fb/framebuffer.h **** static inline void
+  51:include/fb/framebuffer.h **** fb_init(){
+  52:include/fb/framebuffer.h **** 	framebuffer->init();
+ 170              		.loc 2 52 0
+ 171 0160 74309FE5 		ldr	r3, .L4+20
+ 172 0164 003093E5 		ldr	r3, [r3, #0]
+ 173 0168 0FE0A0E1 		mov	lr, pc
+ 174 016c 08F093E5 		ldr	pc, [r3, #8]
+ 175              	.LBE11:
+ 176              	.LBE10:
+ 123:board/se_k2xx/init.c **** 
+ 124:board/se_k2xx/init.c **** 	/* Initialize LCD driver and backlight */
+ 125:board/se_k2xx/init.c **** 	fb_init();
+ 126:board/se_k2xx/init.c **** 	bl_mode_pwl(1);
+ 177              		.loc 1 126 0
+ 178 0170 0100A0E3 		mov	r0, #1
+ 179 0174 FEFFFFEB 		bl	bl_mode_pwl
+ 127:board/se_k2xx/init.c **** 	bl_level(50);
+ 180              		.loc 1 127 0
+ 181 0178 3200A0E3 		mov	r0, #50
+ 182 017c FEFFFFEB 		bl	bl_level
+ 128:board/se_k2xx/init.c **** 
+ 129:board/se_k2xx/init.c **** 	/* Initialize keypad driver */
+ 130:board/se_k2xx/init.c **** 	keypad_init(keymap, with_irq);
+ 183              		.loc 1 130 0
+ 184 0180 58009FE5 		ldr	r0, .L4+24
+ 185 0184 0410A0E1 		mov	r1, r4
+ 186 0188 FEFFFFEB 		bl	keypad_init
+ 131:board/se_k2xx/init.c **** 
+ 132:board/se_k2xx/init.c **** 	/* Initialize ABB driver (uses SPI) */
+ 133:board/se_k2xx/init.c **** 	twl3025_init();
+ 187              		.loc 1 133 0
+ 188 018c FEFFFFEB 		bl	twl3025_init
+ 134:board/se_k2xx/init.c **** 
+ 135:board/se_k2xx/init.c **** 	/* SPANSION flash has 13 sectors of 256 KiB each */
+ 136:board/se_k2xx/init.c **** 	if (tiffs_init(0x01800000, 0x40000, 13) < 0) {
+ 189              		.loc 1 136 0
+ 190 0190 0605A0E3 		mov	r0, #25165824
+ 191 0194 0117A0E3 		mov	r1, #262144
+ 192 0198 0D20A0E3 		mov	r2, #13
+ 193 019c FEFFFFEB 		bl	tiffs_init
+ 194 01a0 000050E3 		cmp	r0, #0
+ 195 01a4 050000AA 		bge	.L1
+ 137:board/se_k2xx/init.c **** 		/* SAMSUNG flash has 52 sectors of 64 KiB each */
+ 138:board/se_k2xx/init.c **** 		tiffs_init(0x01800000, 0x10000, 52);
+ 196              		.loc 1 138 0
+ 197 01a8 0605A0E3 		mov	r0, #25165824
+ 198 01ac 0118A0E3 		mov	r1, #65536
+ 199 01b0 3420A0E3 		mov	r2, #52
+ 139:board/se_k2xx/init.c **** 	}
+ 140:board/se_k2xx/init.c **** }
+ 200              		.loc 1 140 0
+ 201 01b4 0CD08DE2 		add	sp, sp, #12
+ 202 01b8 1040BDE8 		ldmfd	sp!, {r4, lr}
+ 138:board/se_k2xx/init.c **** 		tiffs_init(0x01800000, 0x10000, 52);
+ 203              		.loc 1 138 0
+ 204 01bc FEFFFFEA 		b	tiffs_init
+ 205              	.L1:
+ 206              		.loc 1 140 0
+ 207 01c0 0CD08DE2 		add	sp, sp, #12
+ 208 01c4 1080BDE8 		ldmfd	sp!, {r4, pc}
+ 209              	.L5:
+ 210              		.align	2
+ 211              	.L4:
+ 212 01c8 FFF0FEFF 		.word	-69377
+ 213 01cc 60C0FFFF 		.word	-16288
+ 214 01d0 FF48FEFF 		.word	-112385
+ 215 01d4 FD030000 		.word	1021
+ 216 01d8 831F0000 		.word	8067
+ 217 01dc 00000000 		.word	framebuffer
+ 218 01e0 00000000 		.word	.LANCHOR0
+ 219              		.cfi_endproc
+ 220              	.LFE54:
+ 222              		.section	.rodata
+ 223              		.align	2
+ 224              		.set	.LANCHOR0,. + 0
+ 227              	keymap:
+ 228 0000 09       		.byte	9
+ 229 0001 01       		.byte	1
+ 230 0002 06       		.byte	6
+ 231 0003 0B       		.byte	11
+ 232 0004 02       		.byte	2
+ 233 0005 07       		.byte	7
+ 234 0006 0C       		.byte	12
+ 235 0007 03       		.byte	3
+ 236 0008 08       		.byte	8
+ 237 0009 0D       		.byte	13
+ 238 000a 04       		.byte	4
+ 239 000b 0E       		.byte	14
+ 240 000c 15       		.byte	21
+ 241 000d 00       		.byte	0
+ 242 000e 05       		.byte	5
+ 243 000f 10       		.byte	16
+ 244 0010 0F       		.byte	15
+ 245 0011 11       		.byte	17
+ 246 0012 12       		.byte	18
+ 247 0013 0A       		.byte	10
+ 248 0014 1F       		.byte	31
+ 249 0015 16       		.byte	22
+ 250 0016 17       		.byte	23
+ 251 0017 18       		.byte	24
+ 252              		.text
+ 253              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 init.c
+     /tmp/ccceVG5H.s:12     .text.board_init:0000000000000000 $a
+     /tmp/ccceVG5H.s:15     .text.board_init:0000000000000000 board_init
+     /tmp/ccceVG5H.s:212    .text.board_init:00000000000001c8 $d
+     /tmp/ccceVG5H.s:223    .rodata:0000000000000000 $d
+     /tmp/ccceVG5H.s:227    .rodata:0000000000000000 keymap
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+calypso_mem_cfg
+calypso_clock_set
+calypso_rhea_cfg
+calypso_bootrom
+calypso_exceptions_install
+irq_init
+sercomm_bind_uart
+cons_bind_uart
+uart_init
+uart_baudrate
+hwtimer_init
+dma_init
+rtc_init
+timer_init
+bl_mode_pwl
+bl_level
+keypad_init
+twl3025_init
+tiffs_init
+framebuffer

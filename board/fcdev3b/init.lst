@@ -1,0 +1,362 @@
+   1              		.file	"init.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.board_init,"ax",%progbits
+  12              		.align	2
+  13              		.global	board_init
+  15              	board_init:
+  16              	.LFB41:
+  17              		.file 1 "board/fcdev3b/init.c"
+   1:board/fcdev3b/init.c **** /* Initialization for the FreeCalypso FCDEV3B modem */
+   2:board/fcdev3b/init.c **** 
+   3:board/fcdev3b/init.c **** /* Based on board/gta0x/init.c with the following obnoxious legalese:
+   4:board/fcdev3b/init.c ****  *
+   5:board/fcdev3b/init.c ****  * (C) 2010 by Harald Welte <laforge@gnumonks.org>
+   6:board/fcdev3b/init.c ****  *
+   7:board/fcdev3b/init.c ****  * All Rights Reserved
+   8:board/fcdev3b/init.c ****  *
+   9:board/fcdev3b/init.c ****  * This program is free software; you can redistribute it and/or modify
+  10:board/fcdev3b/init.c ****  * it under the terms of the GNU General Public License as published by
+  11:board/fcdev3b/init.c ****  * the Free Software Foundation; either version 2 of the License, or
+  12:board/fcdev3b/init.c ****  * (at your option) any later version.
+  13:board/fcdev3b/init.c ****  *
+  14:board/fcdev3b/init.c ****  * This program is distributed in the hope that it will be useful,
+  15:board/fcdev3b/init.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  16:board/fcdev3b/init.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  17:board/fcdev3b/init.c ****  * GNU General Public License for more details.
+  18:board/fcdev3b/init.c ****  *
+  19:board/fcdev3b/init.c ****  */
+  20:board/fcdev3b/init.c **** 
+  21:board/fcdev3b/init.c **** #include <stdint.h>
+  22:board/fcdev3b/init.c **** #include <stdio.h>
+  23:board/fcdev3b/init.c **** 
+  24:board/fcdev3b/init.c **** #include <debug.h>
+  25:board/fcdev3b/init.c **** #include <ctors.h>
+  26:board/fcdev3b/init.c **** #include <memory.h>
+  27:board/fcdev3b/init.c **** #include <board.h>
+  28:board/fcdev3b/init.c **** #include <keypad.h>
+  29:board/fcdev3b/init.c **** #include <console.h>
+  30:board/fcdev3b/init.c **** #include <flash/cfi_flash.h>
+  31:board/fcdev3b/init.c **** #include <tiffs.h>
+  32:board/fcdev3b/init.c **** 
+  33:board/fcdev3b/init.c **** #include <calypso/irq.h>
+  34:board/fcdev3b/init.c **** #include <calypso/clock.h>
+  35:board/fcdev3b/init.c **** #include <calypso/dma.h>
+  36:board/fcdev3b/init.c **** #include <calypso/rtc.h>
+  37:board/fcdev3b/init.c **** #include <calypso/timer.h>
+  38:board/fcdev3b/init.c **** #include <uart.h>
+  39:board/fcdev3b/init.c **** 
+  40:board/fcdev3b/init.c **** #include <comm/sercomm.h>
+  41:board/fcdev3b/init.c **** #include <comm/timer.h>
+  42:board/fcdev3b/init.c **** 
+  43:board/fcdev3b/init.c **** #include <abb/twl3025.h>
+  44:board/fcdev3b/init.c **** #include <rf/trf6151.h>
+  45:board/fcdev3b/init.c **** 
+  46:board/fcdev3b/init.c **** #define ARMIO_LATCH_OUT 0xfffe4802
+  47:board/fcdev3b/init.c **** #define IO_CNTL_REG	0xfffe4804
+  48:board/fcdev3b/init.c **** #define ARM_CONF_REG	0xfffef006
+  49:board/fcdev3b/init.c **** #define ASIC_CONF_REG	0xfffef008
+  50:board/fcdev3b/init.c **** #define IO_CONF_REG	0xfffef00a
+  51:board/fcdev3b/init.c **** 
+  52:board/fcdev3b/init.c **** static void board_io_init(void)
+  53:board/fcdev3b/init.c **** {
+  54:board/fcdev3b/init.c **** 	uint16_t reg;
+  55:board/fcdev3b/init.c **** 
+  56:board/fcdev3b/init.c **** 	reg = readw(ASIC_CONF_REG);
+  57:board/fcdev3b/init.c **** 	/* TWL3025: Set SPI+RIF RX clock to rising edge */
+  58:board/fcdev3b/init.c **** 	reg |= (1 << 13) | (1 << 14);
+  59:board/fcdev3b/init.c **** 	writew(reg, ASIC_CONF_REG);
+  60:board/fcdev3b/init.c **** 
+  61:board/fcdev3b/init.c **** 	/*
+  62:board/fcdev3b/init.c **** 	 * Most Calypso peripheral interface signals are unconnected
+  63:board/fcdev3b/init.c **** 	 * on this modem.  We configure them to be GPIOs in IO_CONF_REG,
+  64:board/fcdev3b/init.c **** 	 * then configure them to be outputs in IO_CNTL_REG, then set
+  65:board/fcdev3b/init.c **** 	 * the outputs to 0 in ARMIO_LATCH_OUT.
+  66:board/fcdev3b/init.c **** 	 *
+  67:board/fcdev3b/init.c **** 	 * Differences from Openmoko GTA0x:
+  68:board/fcdev3b/init.c **** 	 *
+  69:board/fcdev3b/init.c **** 	 * GPIO1 output needs to be 1 to enable the loudspeaker amplifier
+  70:board/fcdev3b/init.c **** 	 * GPIO3 needs to be configured as an input
+  71:board/fcdev3b/init.c **** 	 * I/O 9-12 are MCSI rather than GPIOs
+  72:board/fcdev3b/init.c **** 	 */
+  73:board/fcdev3b/init.c **** 	writew(0x0215, IO_CONF_REG);
+  74:board/fcdev3b/init.c **** 	writew(0xDC08, IO_CNTL_REG);
+  75:board/fcdev3b/init.c **** 	writew(0x0002, ARMIO_LATCH_OUT);
+  76:board/fcdev3b/init.c **** 
+  77:board/fcdev3b/init.c **** 	/* configure ADD(22), needed for second half of flash */
+  78:board/fcdev3b/init.c **** 	reg = readw(ARM_CONF_REG);
+  79:board/fcdev3b/init.c **** 	reg |= (1 << 3);
+  80:board/fcdev3b/init.c **** 	writew(reg, ARM_CONF_REG);
+  81:board/fcdev3b/init.c **** }
+  82:board/fcdev3b/init.c **** 
+  83:board/fcdev3b/init.c **** void board_init(int with_irq)
+  84:board/fcdev3b/init.c **** {
+  18              		.loc 1 84 0
+  19              		.cfi_startproc
+  20              		@ args = 0, pretend = 0, frame = 0
+  21              		@ frame_needed = 0, uses_anonymous_args = 0
+  22              	.LVL0:
+  23 0000 17402DE9 		stmfd	sp!, {r0, r1, r2, r4, lr}
+  24              	.LCFI0:
+  25              		.cfi_def_cfa_offset 20
+  85:board/fcdev3b/init.c **** 	/* Configure the memory interface */
+  86:board/fcdev3b/init.c **** 	/* Using the same settings as the official FreeCalypso fw */
+  87:board/fcdev3b/init.c **** 	calypso_mem_cfg(CALYPSO_nCS0, 4, CALYPSO_MEM_16bit, 1);
+  26              		.loc 1 87 0
+  27 0004 0120A0E3 		mov	r2, #1
+  28              		.cfi_offset 14, -4
+  29              		.cfi_offset 4, -8
+  30              		.cfi_offset 2, -12
+  31              		.cfi_offset 1, -16
+  32              		.cfi_offset 0, -20
+  84:board/fcdev3b/init.c **** {
+  33              		.loc 1 84 0
+  34 0008 0040A0E1 		mov	r4, r0
+  35              		.loc 1 87 0
+  36 000c 0230A0E1 		mov	r3, r2
+  37 0010 0000A0E3 		mov	r0, #0
+  38              	.LVL1:
+  39 0014 0410A0E3 		mov	r1, #4
+  40 0018 FEFFFFEB 		bl	calypso_mem_cfg
+  88:board/fcdev3b/init.c **** 	calypso_mem_cfg(CALYPSO_nCS1, 4, CALYPSO_MEM_16bit, 1);
+  41              		.loc 1 88 0
+  42 001c 0120A0E3 		mov	r2, #1
+  43 0020 0230A0E1 		mov	r3, r2
+  44 0024 0200A0E3 		mov	r0, #2
+  45 0028 0410A0E3 		mov	r1, #4
+  46 002c FEFFFFEB 		bl	calypso_mem_cfg
+  89:board/fcdev3b/init.c **** 	calypso_mem_cfg(CALYPSO_nCS2, 4, CALYPSO_MEM_16bit, 1);
+  47              		.loc 1 89 0
+  48 0030 0400A0E3 		mov	r0, #4
+  49 0034 0120A0E3 		mov	r2, #1
+  50 0038 0010A0E1 		mov	r1, r0
+  51 003c 0230A0E1 		mov	r3, r2
+  52 0040 FEFFFFEB 		bl	calypso_mem_cfg
+  90:board/fcdev3b/init.c **** 	calypso_mem_cfg(CALYPSO_nCS3, 4, CALYPSO_MEM_16bit, 1);
+  53              		.loc 1 90 0
+  54 0044 0120A0E3 		mov	r2, #1
+  55 0048 0230A0E1 		mov	r3, r2
+  56 004c 0600A0E3 		mov	r0, #6
+  57 0050 0410A0E3 		mov	r1, #4
+  58 0054 FEFFFFEB 		bl	calypso_mem_cfg
+  91:board/fcdev3b/init.c **** 	calypso_mem_cfg(CALYPSO_CS4, 4, CALYPSO_MEM_16bit, 1);
+  59              		.loc 1 91 0
+  60 0058 0120A0E3 		mov	r2, #1
+  61 005c 0230A0E1 		mov	r3, r2
+  62 0060 0A00A0E3 		mov	r0, #10
+  63 0064 0410A0E3 		mov	r1, #4
+  64 0068 FEFFFFEB 		bl	calypso_mem_cfg
+  92:board/fcdev3b/init.c **** 	calypso_mem_cfg(CALYPSO_nCS6, 0, CALYPSO_MEM_32bit, 1);
+  65              		.loc 1 92 0
+  66 006c 0C00A0E3 		mov	r0, #12
+  67 0070 0010A0E3 		mov	r1, #0
+  68 0074 0220A0E3 		mov	r2, #2
+  69 0078 0130A0E3 		mov	r3, #1
+  70 007c FEFFFFEB 		bl	calypso_mem_cfg
+  93:board/fcdev3b/init.c **** 	calypso_mem_cfg(CALYPSO_nCS7, 0, CALYPSO_MEM_32bit, 0);
+  71              		.loc 1 93 0
+  72 0080 0010A0E3 		mov	r1, #0
+  73 0084 0130A0E1 		mov	r3, r1
+  74 0088 0800A0E3 		mov	r0, #8
+  75 008c 0220A0E3 		mov	r2, #2
+  76 0090 FEFFFFEB 		bl	calypso_mem_cfg
+  94:board/fcdev3b/init.c **** 
+  95:board/fcdev3b/init.c **** 	/* Set VTCXO_DIV2 = 1, configure PLL for 104 MHz and give ARM half of that */
+  96:board/fcdev3b/init.c **** 	calypso_clock_set(2, CALYPSO_PLL13_104_MHZ, ARM_MCLK_DIV_2);
+  77              		.loc 1 96 0
+  78 0094 0200A0E3 		mov	r0, #2
+  79 0098 0020A0E1 		mov	r2, r0
+  80 009c 021BA0E3 		mov	r1, #2048
+  81 00a0 FEFFFFEB 		bl	calypso_clock_set
+  97:board/fcdev3b/init.c **** 
+  98:board/fcdev3b/init.c **** 	/* Configure the RHEA bridge with some sane default values */
+  99:board/fcdev3b/init.c **** 	calypso_rhea_cfg(0, 0, 0xff, 0, 1, 0, 0);
+  82              		.loc 1 99 0
+  83 00a4 0000A0E3 		mov	r0, #0
+  84 00a8 0130A0E3 		mov	r3, #1
+  85 00ac 0010A0E1 		mov	r1, r0
+  86 00b0 00308DE5 		str	r3, [sp, #0]
+  87 00b4 FF20A0E3 		mov	r2, #255
+  88 00b8 0030A0E1 		mov	r3, r0
+  89 00bc 04008DE5 		str	r0, [sp, #4]
+  90 00c0 08008DE5 		str	r0, [sp, #8]
+  91 00c4 FEFFFFEB 		bl	calypso_rhea_cfg
+  92              	.LBB4:
+  93              	.LBB5:
+  56:board/fcdev3b/init.c **** 	reg = readw(ASIC_CONF_REG);
+  94              		.loc 1 56 0
+  95 00c8 B4309FE5 		ldr	r3, .L3
+  96 00cc B72F53E1 		ldrh	r2, [r3, #-247]
+  97              	.LVL2:
+  58:board/fcdev3b/init.c **** 	reg |= (1 << 13) | (1 << 14);
+  98              		.loc 1 58 0
+  99 00d0 062A82E3 		orr	r2, r2, #24576
+ 100              	.LVL3:
+  59:board/fcdev3b/init.c **** 	writew(reg, ASIC_CONF_REG);
+ 101              		.loc 1 59 0
+ 102 00d4 B72F43E1 		strh	r2, [r3, #-247]	@ movhi
+  73:board/fcdev3b/init.c **** 	writew(0x0215, IO_CONF_REG);
+ 103              		.loc 1 73 0
+ 104 00d8 A8209FE5 		ldr	r2, .L3+4
+ 105              	.LVL4:
+  74:board/fcdev3b/init.c **** 	writew(0xDC08, IO_CNTL_REG);
+ 106              		.loc 1 74 0
+ 107 00dc A8109FE5 		ldr	r1, .L3+8
+  73:board/fcdev3b/init.c **** 	writew(0x0215, IO_CONF_REG);
+ 108              		.loc 1 73 0
+ 109 00e0 B52F43E1 		strh	r2, [r3, #-245]	@ movhi
+  74:board/fcdev3b/init.c **** 	writew(0xDC08, IO_CNTL_REG);
+ 110              		.loc 1 74 0
+ 111 00e4 A4209FE5 		ldr	r2, .L3+12
+ 112 00e8 BB1F42E1 		strh	r1, [r2, #-251]	@ movhi
+  75:board/fcdev3b/init.c **** 	writew(0x0002, ARMIO_LATCH_OUT);
+ 113              		.loc 1 75 0
+ 114 00ec 0210A0E3 		mov	r1, #2	@ movhi
+ 115 00f0 BD1F42E1 		strh	r1, [r2, #-253]	@ movhi
+  78:board/fcdev3b/init.c **** 	reg = readw(ARM_CONF_REG);
+ 116              		.loc 1 78 0
+ 117 00f4 B92F53E1 		ldrh	r2, [r3, #-249]
+ 118              	.LVL5:
+  79:board/fcdev3b/init.c **** 	reg |= (1 << 3);
+ 119              		.loc 1 79 0
+ 120 00f8 082082E3 		orr	r2, r2, #8
+ 121              	.LVL6:
+  80:board/fcdev3b/init.c **** 	writew(reg, ARM_CONF_REG);
+ 122              		.loc 1 80 0
+ 123 00fc B92F43E1 		strh	r2, [r3, #-249]	@ movhi
+ 124              	.LBE5:
+ 125              	.LBE4:
+ 100:board/fcdev3b/init.c **** 
+ 101:board/fcdev3b/init.c **** 	/* Initialize board-specific GPIO */
+ 102:board/fcdev3b/init.c **** 	board_io_init();
+ 103:board/fcdev3b/init.c **** 
+ 104:board/fcdev3b/init.c **** 	/* Enable bootrom mapping to route exception vectors to RAM */
+ 105:board/fcdev3b/init.c **** 	calypso_bootrom(with_irq);
+ 126              		.loc 1 105 0
+ 127 0100 0400A0E1 		mov	r0, r4
+ 128 0104 FEFFFFEB 		bl	calypso_bootrom
+ 129              	.LVL7:
+ 106:board/fcdev3b/init.c **** 	calypso_exceptions_install();
+ 130              		.loc 1 106 0
+ 131 0108 FEFFFFEB 		bl	calypso_exceptions_install
+ 107:board/fcdev3b/init.c **** 
+ 108:board/fcdev3b/init.c **** 	/* Initialize interrupt controller */
+ 109:board/fcdev3b/init.c **** 	if (with_irq)
+ 132              		.loc 1 109 0
+ 133 010c 000054E3 		cmp	r4, #0
+ 110:board/fcdev3b/init.c **** 		irq_init();
+ 134              		.loc 1 110 0
+ 135 0110 FEFFFF1B 		blne	irq_init
+ 136              	.L2:
+ 111:board/fcdev3b/init.c **** 
+ 112:board/fcdev3b/init.c **** 	sercomm_bind_uart(UART_MODEM);
+ 137              		.loc 1 112 0
+ 138 0114 0100A0E3 		mov	r0, #1
+ 139 0118 FEFFFFEB 		bl	sercomm_bind_uart
+ 113:board/fcdev3b/init.c **** 	cons_bind_uart(UART_IRDA);
+ 114:board/fcdev3b/init.c **** 
+ 115:board/fcdev3b/init.c **** 	/* initialize MODEM UART to be used for sercomm */
+ 116:board/fcdev3b/init.c **** 	uart_init(UART_MODEM, with_irq);
+ 140              		.loc 1 116 0
+ 141 011c FF4004E2 		and	r4, r4, #255
+ 142              	.LVL8:
+ 113:board/fcdev3b/init.c **** 	cons_bind_uart(UART_IRDA);
+ 143              		.loc 1 113 0
+ 144 0120 0000A0E3 		mov	r0, #0
+ 145 0124 FEFFFFEB 		bl	cons_bind_uart
+ 146              		.loc 1 116 0
+ 147 0128 0410A0E1 		mov	r1, r4
+ 148 012c 0100A0E3 		mov	r0, #1
+ 149 0130 FEFFFFEB 		bl	uart_init
+ 117:board/fcdev3b/init.c **** 	uart_baudrate(UART_MODEM, UART_115200);
+ 150              		.loc 1 117 0
+ 151 0134 0210A0E3 		mov	r1, #2
+ 152 0138 0100A0E3 		mov	r0, #1
+ 153 013c FEFFFFEB 		bl	uart_baudrate
+ 118:board/fcdev3b/init.c **** 
+ 119:board/fcdev3b/init.c **** 	/* Initialize IRDA UART to be used for old-school console code.
+ 120:board/fcdev3b/init.c **** 	 * note: IRDA uart only accessible on C115 and C117 PCB */
+ 121:board/fcdev3b/init.c **** 	uart_init(UART_IRDA, with_irq);
+ 154              		.loc 1 121 0
+ 155 0140 0410A0E1 		mov	r1, r4
+ 156 0144 0000A0E3 		mov	r0, #0
+ 157 0148 FEFFFFEB 		bl	uart_init
+ 122:board/fcdev3b/init.c **** 	uart_baudrate(UART_IRDA, UART_115200);
+ 158              		.loc 1 122 0
+ 159 014c 0210A0E3 		mov	r1, #2
+ 160 0150 0000A0E3 		mov	r0, #0
+ 161 0154 FEFFFFEB 		bl	uart_baudrate
+ 123:board/fcdev3b/init.c **** 
+ 124:board/fcdev3b/init.c **** 	/* Initialize hardware timers */
+ 125:board/fcdev3b/init.c **** 	hwtimer_init();
+ 162              		.loc 1 125 0
+ 163 0158 FEFFFFEB 		bl	hwtimer_init
+ 126:board/fcdev3b/init.c **** 
+ 127:board/fcdev3b/init.c **** 	/* Initialize DMA controller */
+ 128:board/fcdev3b/init.c **** 	dma_init();
+ 164              		.loc 1 128 0
+ 165 015c FEFFFFEB 		bl	dma_init
+ 129:board/fcdev3b/init.c **** 
+ 130:board/fcdev3b/init.c **** 	/* Initialize real time clock */
+ 131:board/fcdev3b/init.c **** 	rtc_init();
+ 166              		.loc 1 131 0
+ 167 0160 FEFFFFEB 		bl	rtc_init
+ 132:board/fcdev3b/init.c **** 
+ 133:board/fcdev3b/init.c **** 	/* Initialize system timers (uses hwtimer 2) */
+ 134:board/fcdev3b/init.c **** 	timer_init();
+ 168              		.loc 1 134 0
+ 169 0164 FEFFFFEB 		bl	timer_init
+ 135:board/fcdev3b/init.c **** 
+ 136:board/fcdev3b/init.c **** 	/* Initialize ABB driver (uses SPI) */
+ 137:board/fcdev3b/init.c **** 	twl3025_init();
+ 170              		.loc 1 137 0
+ 171 0168 FEFFFFEB 		bl	twl3025_init
+ 138:board/fcdev3b/init.c **** 
+ 139:board/fcdev3b/init.c **** 	/* Initialize TIFFS reader (8 sectors of 256 KiB each) */
+ 140:board/fcdev3b/init.c **** 	tiffs_init(0x01800000, 0x40000, 8);
+ 172              		.loc 1 140 0
+ 173 016c 0605A0E3 		mov	r0, #25165824
+ 174 0170 0117A0E3 		mov	r1, #262144
+ 175 0174 0820A0E3 		mov	r2, #8
+ 141:board/fcdev3b/init.c **** }
+ 176              		.loc 1 141 0
+ 177 0178 0CD08DE2 		add	sp, sp, #12
+ 178 017c 1040BDE8 		ldmfd	sp!, {r4, lr}
+ 140:board/fcdev3b/init.c **** 	tiffs_init(0x01800000, 0x40000, 8);
+ 179              		.loc 1 140 0
+ 180 0180 FEFFFFEA 		b	tiffs_init
+ 181              	.L4:
+ 182              		.align	2
+ 183              	.L3:
+ 184 0184 FFF0FEFF 		.word	-69377
+ 185 0188 15020000 		.word	533
+ 186 018c 08DCFFFF 		.word	-9208
+ 187 0190 FF48FEFF 		.word	-112385
+ 188              		.cfi_endproc
+ 189              	.LFE41:
+ 191              		.text
+ 192              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 init.c
+     /tmp/cc5jq5Pi.s:12     .text.board_init:0000000000000000 $a
+     /tmp/cc5jq5Pi.s:15     .text.board_init:0000000000000000 board_init
+     /tmp/cc5jq5Pi.s:184    .text.board_init:0000000000000184 $d
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+calypso_mem_cfg
+calypso_clock_set
+calypso_rhea_cfg
+calypso_bootrom
+calypso_exceptions_install
+irq_init
+sercomm_bind_uart
+cons_bind_uart
+uart_init
+uart_baudrate
+hwtimer_init
+dma_init
+rtc_init
+timer_init
+twl3025_init
+tiffs_init

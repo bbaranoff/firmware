@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  23274	   2248	  33920	  59442	   e832	board/pirelli_dpl10/compal_dsp_dump.highram.elf
+  24150	    900	  33948	  58998	   e676	board/pirelli_dpl10/compal_dsp_dump.highram.elf

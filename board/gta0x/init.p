@@ -17,9 +17,10 @@ board/gta0x/init.o:  board/gta0x/init.c include/stdint.h \
  /root/gnuarm/install/lib/gcc/arm-elf/4.5.2/include/stdarg.h \
  include/comm/sercomm_cons.h include/debug.h include/ctors.h \
  include/memory.h include/board.h include/keypad.h include/console.h \
- include/flash/cfi_flash.h include/calypso/irq.h include/calypso/clock.h \
- include/calypso/dma.h include/calypso/rtc.h include/calypso/timer.h \
- include/uart.h include/calypso/backlight.h include/comm/sercomm.h \
+ include/flash/cfi_flash.h include/tiffs.h include/calypso/irq.h \
+ include/calypso/clock.h include/calypso/dma.h include/calypso/rtc.h \
+ include/calypso/timer.h include/uart.h include/calypso/backlight.h \
+ include/comm/sercomm.h \
  ../../shared/libosmocore/include/osmocom/core/msgb.h \
  ../../shared/libosmocore/include/osmocom/core/linuxlist.h \
  ../../shared/libosmocore/include/osmocom/core/utils.h \

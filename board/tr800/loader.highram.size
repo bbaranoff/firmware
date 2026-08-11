@@ -1,0 +1,2 @@
+   text	   data	    bss	    dec	    hex	filename
+  20757	    372	  17632	  38761	   9769	board/tr800/loader.highram.elf

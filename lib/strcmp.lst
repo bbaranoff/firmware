@@ -1,0 +1,65 @@
+   1              		.file	"strcmp.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.strcmp,"ax",%progbits
+  12              		.align	2
+  13              		.global	strcmp
+  15              	strcmp:
+  16              	.LFB0:
+  17              		.file 1 "lib/strcmp.c"
+   1:lib/strcmp.c  **** /*
+   2:lib/strcmp.c  ****  * Compare strings:  s1>s2: >0  s1==s2: 0  s1<s2: <0
+   3:lib/strcmp.c  ****  */
+   4:lib/strcmp.c  **** 
+   5:lib/strcmp.c  **** int strcmp(const char *s1, const char *s2)
+   6:lib/strcmp.c  **** {
+  18              		.loc 1 6 0
+  19              		.cfi_startproc
+  20              		@ args = 0, pretend = 0, frame = 0
+  21              		@ frame_needed = 0, uses_anonymous_args = 0
+  22              		@ link register save eliminated.
+  23              	.LVL0:
+   7:lib/strcmp.c  **** 	while (*s1 == *s2++)
+  24              		.loc 1 7 0
+  25 0000 0020A0E3 		mov	r2, #0
+  26 0004 020000EA 		b	.L2
+  27              	.LVL1:
+  28              	.L4:
+   8:lib/strcmp.c  **** 		if (*s1++=='\0')
+  29              		.loc 1 8 0
+  30 0008 000053E3 		cmp	r3, #0
+   7:lib/strcmp.c  **** 	while (*s1 == *s2++)
+  31              		.loc 1 7 0
+  32 000c 012082E2 		add	r2, r2, #1
+  33              		.loc 1 8 0
+  34 0010 0500000A 		beq	.L5
+  35              	.L2:
+   7:lib/strcmp.c  **** 	while (*s1 == *s2++)
+  36              		.loc 1 7 0 discriminator 1
+  37 0014 0230D0E7 		ldrb	r3, [r0, r2]	@ zero_extendqisi2
+  38 0018 02C0D1E7 		ldrb	ip, [r1, r2]	@ zero_extendqisi2
+  39 001c 0C0053E1 		cmp	r3, ip
+  40 0020 F8FFFF0A 		beq	.L4
+   9:lib/strcmp.c  **** 			return(0);
+  10:lib/strcmp.c  **** 	return(*s1 - *--s2);
+  41              		.loc 1 10 0
+  42 0024 03006CE0 		rsb	r0, ip, r3
+  43 0028 1EFF2FE1 		bx	lr
+  44              	.L5:
+   9:lib/strcmp.c  **** 			return(0);
+  45              		.loc 1 9 0
+  46 002c 0300A0E1 		mov	r0, r3
+  11:lib/strcmp.c  **** }
+  47              		.loc 1 11 0
+  48 0030 1EFF2FE1 		bx	lr
+  49              		.cfi_endproc
+  50              	.LFE0:
+  52              		.text
+  53              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 strcmp.c
+     /tmp/ccbxln0E.s:12     .text.strcmp:0000000000000000 $a
+     /tmp/ccbxln0E.s:15     .text.strcmp:0000000000000000 strcmp
+                     .debug_frame:0000000000000010 $d
+
+NO UNDEFINED SYMBOLS

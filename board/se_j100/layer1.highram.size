@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  61758	   2400	  34212	  98370	  18042	board/se_j100/layer1.highram.elf
+  58315	   4120	  32280	  94715	  171fb	board/se_j100/layer1.highram.elf

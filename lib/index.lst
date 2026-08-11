@@ -1,0 +1,64 @@
+   1              		.file	"index.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.index,"ax",%progbits
+  12              		.align	2
+  13              		.global	index
+  15              	index:
+  16              	.LFB0:
+  17              		.file 1 "lib/index.c"
+   1:lib/index.c   **** char *
+   2:lib/index.c   **** index(p, ch)
+   3:lib/index.c   **** 	register char *p, ch;
+   4:lib/index.c   **** {
+  18              		.loc 1 4 0
+  19              		.cfi_startproc
+  20              		@ args = 0, pretend = 0, frame = 0
+  21              		@ frame_needed = 0, uses_anonymous_args = 0
+  22              		@ link register save eliminated.
+  23              	.LVL0:
+  24 0000 FF1001E2 		and	r1, r1, #255
+  25              	.LVL1:
+  26              	.L3:
+   5:lib/index.c   **** 	for (;; ++p) {
+   6:lib/index.c   **** 		if (*p == ch)
+  27              		.loc 1 6 0
+  28 0004 0020D0E5 		ldrb	r2, [r0, #0]	@ zero_extendqisi2
+  29 0008 010052E1 		cmp	r2, r1
+   7:lib/index.c   **** 			return(p);
+   8:lib/index.c   **** 		if (!*p)
+   9:lib/index.c   **** 			return((char *)0);
+  30              		.loc 1 9 0
+  31 000c 0030A0E1 		mov	r3, r0
+  32              	.LVL2:
+   6:lib/index.c   **** 		if (*p == ch)
+  33              		.loc 1 6 0
+  34 0010 010080E2 		add	r0, r0, #1
+  35              	.LVL3:
+  36 0014 0200000A 		beq	.L2
+   8:lib/index.c   **** 		if (!*p)
+  37              		.loc 1 8 0
+  38 0018 000052E3 		cmp	r2, #0
+  39 001c F8FFFF1A 		bne	.L3
+  40              		.loc 1 9 0
+  41 0020 0230A0E1 		mov	r3, r2
+  42              	.LVL4:
+  43              	.L2:
+  10:lib/index.c   **** 	}
+  11:lib/index.c   **** 	/* NOTREACHED */
+  12:lib/index.c   **** }
+  44              		.loc 1 12 0
+  45 0024 0300A0E1 		mov	r0, r3
+  46              	.LVL5:
+  47 0028 1EFF2FE1 		bx	lr
+  48              		.cfi_endproc
+  49              	.LFE0:
+  51              		.text
+  52              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 index.c
+     /tmp/ccwHO1Rz.s:12     .text.index:0000000000000000 $a
+     /tmp/ccwHO1Rz.s:15     .text.index:0000000000000000 index
+                     .debug_frame:0000000000000010 $d
+
+NO UNDEFINED SYMBOLS

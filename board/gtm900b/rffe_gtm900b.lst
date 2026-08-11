@@ -1,0 +1,538 @@
+   1              		.file	"rffe_gtm900b.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.rffe_mode,"ax",%progbits
+  12              		.align	2
+  13              		.global	rffe_mode
+  15              	rffe_mode:
+  16              	.LFB5:
+  17              		.file 1 "board/gtm900b/rffe_gtm900b.c"
+   1:board/gtm900b/rffe_gtm900b.c **** /* RF frontend driver for Huawei GTM900-B modems, supporting both
+   2:board/gtm900b/rffe_gtm900b.c ****  * MG01GSMT and MGCxGSMT hardware variants */
+   3:board/gtm900b/rffe_gtm900b.c **** 
+   4:board/gtm900b/rffe_gtm900b.c **** /* (C) 2019 by Steve Markgraf <steve@steve-m.de>
+   5:board/gtm900b/rffe_gtm900b.c ****  *
+   6:board/gtm900b/rffe_gtm900b.c ****  * All Rights Reserved
+   7:board/gtm900b/rffe_gtm900b.c ****  *
+   8:board/gtm900b/rffe_gtm900b.c ****  * This program is free software; you can redistribute it and/or modify
+   9:board/gtm900b/rffe_gtm900b.c ****  * it under the terms of the GNU General Public License as published by
+  10:board/gtm900b/rffe_gtm900b.c ****  * the Free Software Foundation; either version 2 of the License, or
+  11:board/gtm900b/rffe_gtm900b.c ****  * (at your option) any later version.
+  12:board/gtm900b/rffe_gtm900b.c ****  *
+  13:board/gtm900b/rffe_gtm900b.c ****  * This program is distributed in the hope that it will be useful,
+  14:board/gtm900b/rffe_gtm900b.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  15:board/gtm900b/rffe_gtm900b.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  16:board/gtm900b/rffe_gtm900b.c ****  * GNU General Public License for more details.
+  17:board/gtm900b/rffe_gtm900b.c ****  *
+  18:board/gtm900b/rffe_gtm900b.c ****  * You should have received a copy of the GNU General Public License
+  19:board/gtm900b/rffe_gtm900b.c ****  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  20:board/gtm900b/rffe_gtm900b.c ****  *
+  21:board/gtm900b/rffe_gtm900b.c ****  */
+  22:board/gtm900b/rffe_gtm900b.c **** 
+  23:board/gtm900b/rffe_gtm900b.c **** #include <stdint.h>
+  24:board/gtm900b/rffe_gtm900b.c **** #include <stdio.h>
+  25:board/gtm900b/rffe_gtm900b.c **** 
+  26:board/gtm900b/rffe_gtm900b.c **** #include <debug.h>
+  27:board/gtm900b/rffe_gtm900b.c **** #include <memory.h>
+  28:board/gtm900b/rffe_gtm900b.c **** #include <rffe.h>
+  29:board/gtm900b/rffe_gtm900b.c **** #include <calypso/tsp.h>
+  30:board/gtm900b/rffe_gtm900b.c **** #include <rf/trf6151.h>
+  31:board/gtm900b/rffe_gtm900b.c **** #include <flash/cfi_flash.h>
+  32:board/gtm900b/rffe_gtm900b.c **** 
+  33:board/gtm900b/rffe_gtm900b.c **** /* This is a value that has been measured for the GTM900-B: 74dBm,
+  34:board/gtm900b/rffe_gtm900b.c ****    it is the difference between the input level at the antenna and what
+  35:board/gtm900b/rffe_gtm900b.c ****    the DSP reports, subtracted by the total gain of the TRF6151 */
+  36:board/gtm900b/rffe_gtm900b.c **** #define SYSTEM_INHERENT_GAIN	74
+  37:board/gtm900b/rffe_gtm900b.c **** 
+  38:board/gtm900b/rffe_gtm900b.c **** /* describe how the RF frontend is wired on the Huawei GTM900-B */
+  39:board/gtm900b/rffe_gtm900b.c **** #define		IOTA_STROBE	TSPEN(0)	/* Strobe for the Iota TSP */
+  40:board/gtm900b/rffe_gtm900b.c **** #define		RITA_STROBE	TSPEN(2)	/* Strobe for the Rita TSP */
+  41:board/gtm900b/rffe_gtm900b.c **** 
+  42:board/gtm900b/rffe_gtm900b.c **** #define		RITA_RESET	TSPACT(0)	/* Reset of the Rita TRF6151 */
+  43:board/gtm900b/rffe_gtm900b.c **** #define		PA_BAND_SELECT	TSPACT(3)	/* Low: 850/900, High: 1800/1900 */
+  44:board/gtm900b/rffe_gtm900b.c **** #define		PA_TX_ENABLE	TSPACT(9)	/* Enable the Power Amplifier */
+  45:board/gtm900b/rffe_gtm900b.c **** 
+  46:board/gtm900b/rffe_gtm900b.c **** /* MGC2GSMT Ver. BRF specific antenna switch signals, low active */
+  47:board/gtm900b/rffe_gtm900b.c **** #define		ASM_VC1		TSPACT(1)	/* low on GSM900 TX */
+  48:board/gtm900b/rffe_gtm900b.c **** #define		ASM_VC2		TSPACT(2)	/* low on DCS1800 TX */
+  49:board/gtm900b/rffe_gtm900b.c **** 
+  50:board/gtm900b/rffe_gtm900b.c **** /* MG01GSMT Ver. C specific antenna switch signals, low active */
+  51:board/gtm900b/rffe_gtm900b.c **** #define		CXG_CTLA	TSPACT(4)	/* CXG1192UR CTLA input */
+  52:board/gtm900b/rffe_gtm900b.c **** #define		CXG_CTLB	TSPACT(1)	/* CXG1192UR CTLB input */
+  53:board/gtm900b/rffe_gtm900b.c **** #define		CXG_CTLC	TSPACT(2)	/* CXG1192UR CTLC input */
+  54:board/gtm900b/rffe_gtm900b.c **** 
+  55:board/gtm900b/rffe_gtm900b.c **** /*
+  56:board/gtm900b/rffe_gtm900b.c ****  * The Sony CXG1192UR switch is wired as follows on the MG01GSMT Ver. C:
+  57:board/gtm900b/rffe_gtm900b.c ****  *
+  58:board/gtm900b/rffe_gtm900b.c ****  * Rx1: GSM850 RX filter (Epcos B5013)
+  59:board/gtm900b/rffe_gtm900b.c ****  * Rx2: GSM900 RX filter (Epcos B7710)
+  60:board/gtm900b/rffe_gtm900b.c ****  * Rx3: DCS1800 RX filter (Epcos 7714)
+  61:board/gtm900b/rffe_gtm900b.c ****  * Rx4: PCS1900 RX filter (not populated)
+  62:board/gtm900b/rffe_gtm900b.c ****  * Tx1: low band PA output
+  63:board/gtm900b/rffe_gtm900b.c ****  * Tx2: high band PA output
+  64:board/gtm900b/rffe_gtm900b.c ****  */
+  65:board/gtm900b/rffe_gtm900b.c **** 
+  66:board/gtm900b/rffe_gtm900b.c **** extern int gtm900_hw_is_mg01gsmt;	/* set in init.c */
+  67:board/gtm900b/rffe_gtm900b.c **** 
+  68:board/gtm900b/rffe_gtm900b.c **** static inline void rffe_mode_mgc2gsmt(enum gsm_band band, int tx)
+  69:board/gtm900b/rffe_gtm900b.c **** {
+  70:board/gtm900b/rffe_gtm900b.c **** 	uint16_t tspact = tsp_act_state();
+  71:board/gtm900b/rffe_gtm900b.c **** 
+  72:board/gtm900b/rffe_gtm900b.c **** 	/* First we mask off all bits from the state cache */
+  73:board/gtm900b/rffe_gtm900b.c **** 	tspact &= ~(PA_BAND_SELECT | PA_TX_ENABLE);
+  74:board/gtm900b/rffe_gtm900b.c **** 	tspact |=  (ASM_VC1 | ASM_VC2);	/* low-active */
+  75:board/gtm900b/rffe_gtm900b.c **** 
+  76:board/gtm900b/rffe_gtm900b.c **** #ifdef CONFIG_TX_ENABLE
+  77:board/gtm900b/rffe_gtm900b.c **** 	/* Then we selectively set the bits on, if required */
+  78:board/gtm900b/rffe_gtm900b.c **** 	if (tx) {
+  79:board/gtm900b/rffe_gtm900b.c **** 		tspact |= PA_TX_ENABLE;
+  80:board/gtm900b/rffe_gtm900b.c **** 		tspact &= ~CXG_CTLA;
+  81:board/gtm900b/rffe_gtm900b.c **** 
+  82:board/gtm900b/rffe_gtm900b.c **** 		if (band == GSM_BAND_1800 || band == GSM_BAND_1900) {
+  83:board/gtm900b/rffe_gtm900b.c **** 			tspact |= PA_BAND_SELECT;
+  84:board/gtm900b/rffe_gtm900b.c **** 			tspact &= ~ASM_VC2;
+  85:board/gtm900b/rffe_gtm900b.c **** 		} else {
+  86:board/gtm900b/rffe_gtm900b.c **** 			tspact &= ~ASM_VC1;
+  87:board/gtm900b/rffe_gtm900b.c **** 		}
+  88:board/gtm900b/rffe_gtm900b.c **** 	}
+  89:board/gtm900b/rffe_gtm900b.c **** #endif /* TRANSMIT_SUPPORT */
+  90:board/gtm900b/rffe_gtm900b.c **** 
+  91:board/gtm900b/rffe_gtm900b.c **** 	tsp_act_update(tspact);
+  92:board/gtm900b/rffe_gtm900b.c **** }
+  93:board/gtm900b/rffe_gtm900b.c **** 
+  94:board/gtm900b/rffe_gtm900b.c **** static inline void rffe_mode_mg01gsmt(enum gsm_band band, int tx)
+  95:board/gtm900b/rffe_gtm900b.c **** {
+  96:board/gtm900b/rffe_gtm900b.c **** 	uint16_t tspact = tsp_act_state();
+  97:board/gtm900b/rffe_gtm900b.c **** 
+  98:board/gtm900b/rffe_gtm900b.c **** 	/* First we mask off all bits from the state cache */
+  99:board/gtm900b/rffe_gtm900b.c **** 	tspact &= ~(PA_BAND_SELECT | PA_TX_ENABLE);
+ 100:board/gtm900b/rffe_gtm900b.c **** 	tspact |=  (CXG_CTLA | CXG_CTLB | CXG_CTLC);	/* low-active */
+ 101:board/gtm900b/rffe_gtm900b.c **** 
+ 102:board/gtm900b/rffe_gtm900b.c **** 	switch (band) {
+ 103:board/gtm900b/rffe_gtm900b.c **** 	case GSM_BAND_850:
+ 104:board/gtm900b/rffe_gtm900b.c **** 		tspact &= ~CXG_CTLB;		  /* select Ant1 - Rx1 */
+ 105:board/gtm900b/rffe_gtm900b.c **** 		break;
+ 106:board/gtm900b/rffe_gtm900b.c **** 	case GSM_BAND_900:
+ 107:board/gtm900b/rffe_gtm900b.c **** 		tspact &= ~CXG_CTLC;		  /* select Ant1 - Rx2 */
+ 108:board/gtm900b/rffe_gtm900b.c **** 		break;
+ 109:board/gtm900b/rffe_gtm900b.c **** 	case GSM_BAND_1800:			  /* select Ant2 - Rx3 */
+ 110:board/gtm900b/rffe_gtm900b.c **** 		break;
+ 111:board/gtm900b/rffe_gtm900b.c **** 	case GSM_BAND_1900:
+ 112:board/gtm900b/rffe_gtm900b.c **** 		tspact &= ~(CXG_CTLB | CXG_CTLC); /* select Ant2 - Rx4 */
+ 113:board/gtm900b/rffe_gtm900b.c **** 		break;
+ 114:board/gtm900b/rffe_gtm900b.c **** 	default:
+ 115:board/gtm900b/rffe_gtm900b.c **** 		break;
+ 116:board/gtm900b/rffe_gtm900b.c **** 	}
+ 117:board/gtm900b/rffe_gtm900b.c **** 
+ 118:board/gtm900b/rffe_gtm900b.c **** #ifdef CONFIG_TX_ENABLE
+ 119:board/gtm900b/rffe_gtm900b.c **** 	/* Then we selectively set the bits on, if required */
+ 120:board/gtm900b/rffe_gtm900b.c **** 	if (tx) {
+ 121:board/gtm900b/rffe_gtm900b.c **** 		tspact |= PA_TX_ENABLE;
+ 122:board/gtm900b/rffe_gtm900b.c **** 		tspact &= ~CXG_CTLA;
+ 123:board/gtm900b/rffe_gtm900b.c **** 
+ 124:board/gtm900b/rffe_gtm900b.c **** 		if (band == GSM_BAND_1800 || band == GSM_BAND_1900) {
+ 125:board/gtm900b/rffe_gtm900b.c **** 			tspact |= PA_BAND_SELECT;
+ 126:board/gtm900b/rffe_gtm900b.c **** 			tspact &= ~CXG_CTLB;
+ 127:board/gtm900b/rffe_gtm900b.c **** 		}
+ 128:board/gtm900b/rffe_gtm900b.c **** 	}
+ 129:board/gtm900b/rffe_gtm900b.c **** #endif /* TRANSMIT_SUPPORT */
+ 130:board/gtm900b/rffe_gtm900b.c **** 
+ 131:board/gtm900b/rffe_gtm900b.c **** 	tsp_act_update(tspact);
+ 132:board/gtm900b/rffe_gtm900b.c **** }
+ 133:board/gtm900b/rffe_gtm900b.c **** 
+ 134:board/gtm900b/rffe_gtm900b.c **** /* switch RF Frontend Mode */
+ 135:board/gtm900b/rffe_gtm900b.c **** void rffe_mode(enum gsm_band band, int tx)
+ 136:board/gtm900b/rffe_gtm900b.c **** {
+  18              		.loc 1 136 0
+  19              		.cfi_startproc
+  20              		@ args = 0, pretend = 0, frame = 0
+  21              		@ frame_needed = 0, uses_anonymous_args = 0
+  22              	.LVL0:
+ 137:board/gtm900b/rffe_gtm900b.c **** 	if (gtm900_hw_is_mg01gsmt)
+  23              		.loc 1 137 0
+  24 0000 6C309FE5 		ldr	r3, .L9
+  25 0004 003093E5 		ldr	r3, [r3, #0]
+  26 0008 000053E3 		cmp	r3, #0
+ 136:board/gtm900b/rffe_gtm900b.c **** {
+  27              		.loc 1 136 0
+  28 000c 10402DE9 		stmfd	sp!, {r4, lr}
+  29              	.LCFI0:
+  30              		.cfi_def_cfa_offset 8
+ 136:board/gtm900b/rffe_gtm900b.c **** {
+  31              		.loc 1 136 0
+  32 0010 0040A0E1 		mov	r4, r0
+  33              		.cfi_offset 14, -4
+  34              		.cfi_offset 4, -8
+  35              		.loc 1 137 0
+  36 0014 1000000A 		beq	.L2
+  37              	.LVL1:
+  38              	.LBB6:
+  39              	.LBB7:
+  96:board/gtm900b/rffe_gtm900b.c **** 	uint16_t tspact = tsp_act_state();
+  40              		.loc 1 96 0
+  41 0018 FEFFFFEB 		bl	tsp_act_state
+  42              	.LVL2:
+  99:board/gtm900b/rffe_gtm900b.c **** 	tspact &= ~(PA_BAND_SELECT | PA_TX_ENABLE);
+  43              		.loc 1 99 0
+  44 001c 54309FE5 		ldr	r3, .L9+4
+ 102:board/gtm900b/rffe_gtm900b.c **** 	switch (band) {
+  45              		.loc 1 102 0
+  46 0020 020054E3 		cmp	r4, #2
+  99:board/gtm900b/rffe_gtm900b.c **** 	tspact &= ~(PA_BAND_SELECT | PA_TX_ENABLE);
+  47              		.loc 1 99 0
+  48 0024 033000E0 		and	r3, r0, r3
+  49              	.LVL3:
+ 100:board/gtm900b/rffe_gtm900b.c **** 	tspact |=  (CXG_CTLA | CXG_CTLB | CXG_CTLC);	/* low-active */
+  50              		.loc 1 100 0
+  51 0028 160083E3 		orr	r0, r3, #22
+  52              	.LVL4:
+ 102:board/gtm900b/rffe_gtm900b.c **** 	switch (band) {
+  53              		.loc 1 102 0
+  54 002c 0400000A 		beq	.L5
+  55 0030 080054E3 		cmp	r4, #8
+  56 0034 0400000A 		beq	.L6
+  57 0038 010054E3 		cmp	r4, #1
+ 104:board/gtm900b/rffe_gtm900b.c **** 		tspact &= ~CXG_CTLB;		  /* select Ant1 - Rx1 */
+  58              		.loc 1 104 0
+  59 003c 0200C003 		biceq	r0, r0, #2
+  60              	.LVL5:
+  61 0040 090000EA 		b	.L8
+  62              	.LVL6:
+  63              	.L5:
+ 107:board/gtm900b/rffe_gtm900b.c **** 		tspact &= ~CXG_CTLC;		  /* select Ant1 - Rx2 */
+  64              		.loc 1 107 0
+  65 0044 0400C0E3 		bic	r0, r0, #4
+  66              	.LVL7:
+  67 0048 000000EA 		b	.L7
+  68              	.LVL8:
+  69              	.L6:
+ 112:board/gtm900b/rffe_gtm900b.c **** 		tspact &= ~(CXG_CTLB | CXG_CTLC); /* select Ant2 - Rx4 */
+  70              		.loc 1 112 0
+  71 004c 0600C0E3 		bic	r0, r0, #6
+  72              	.LVL9:
+  73              	.L7:
+  74 0050 0008A0E1 		mov	r0, r0, asl #16
+  75 0054 2008A0E1 		mov	r0, r0, lsr #16
+  76              	.LVL10:
+  77 0058 030000EA 		b	.L8
+  78              	.LVL11:
+  79              	.L2:
+  80              	.LBE7:
+  81              	.LBE6:
+  82              	.LBB8:
+  83              	.LBB9:
+  70:board/gtm900b/rffe_gtm900b.c **** 	uint16_t tspact = tsp_act_state();
+  84              		.loc 1 70 0
+  85 005c FEFFFFEB 		bl	tsp_act_state
+  86              	.LVL12:
+  73:board/gtm900b/rffe_gtm900b.c **** 	tspact &= ~(PA_BAND_SELECT | PA_TX_ENABLE);
+  87              		.loc 1 73 0
+  88 0060 10309FE5 		ldr	r3, .L9+4
+  89 0064 033000E0 		and	r3, r0, r3
+  90              	.LVL13:
+  91:board/gtm900b/rffe_gtm900b.c **** 	tsp_act_update(tspact);
+  91              		.loc 1 91 0
+  92 0068 060083E3 		orr	r0, r3, #6
+  93              	.LVL14:
+  94              	.L8:
+  95              	.LBE9:
+  96              	.LBE8:
+ 138:board/gtm900b/rffe_gtm900b.c **** 		rffe_mode_mg01gsmt(band, tx);
+ 139:board/gtm900b/rffe_gtm900b.c **** 	else
+ 140:board/gtm900b/rffe_gtm900b.c **** 		rffe_mode_mgc2gsmt(band, tx);
+ 141:board/gtm900b/rffe_gtm900b.c **** }
+  97              		.loc 1 141 0
+  98 006c 1040BDE8 		ldmfd	sp!, {r4, lr}
+  99              	.LBB11:
+ 100              	.LBB10:
+  91:board/gtm900b/rffe_gtm900b.c **** 	tsp_act_update(tspact);
+ 101              		.loc 1 91 0
+ 102 0070 FEFFFFEA 		b	tsp_act_update
+ 103              	.L10:
+ 104              		.align	2
+ 105              	.L9:
+ 106 0074 00000000 		.word	gtm900_hw_is_mg01gsmt
+ 107 0078 F7FD0000 		.word	65015
+ 108              	.LBE10:
+ 109              	.LBE11:
+ 110              		.cfi_endproc
+ 111              	.LFE5:
+ 113              		.section	.text.rffe_get_rx_ports,"ax",%progbits
+ 114              		.align	2
+ 115              		.global	rffe_get_rx_ports
+ 117              	rffe_get_rx_ports:
+ 118              	.LFB6:
+ 142:board/gtm900b/rffe_gtm900b.c **** 
+ 143:board/gtm900b/rffe_gtm900b.c **** uint32_t rffe_get_rx_ports(void)
+ 144:board/gtm900b/rffe_gtm900b.c **** {
+ 119              		.loc 1 144 0
+ 120              		.cfi_startproc
+ 121              		@ args = 0, pretend = 0, frame = 0
+ 122              		@ frame_needed = 0, uses_anonymous_args = 0
+ 123              		@ link register save eliminated.
+ 145:board/gtm900b/rffe_gtm900b.c **** 	return (1 << PORT_LO) | (1 << PORT_DCS1800) | (1 << PORT_PCS1900);
+ 146:board/gtm900b/rffe_gtm900b.c **** }
+ 124              		.loc 1 146 0
+ 125 0000 3100A0E3 		mov	r0, #49
+ 126 0004 1EFF2FE1 		bx	lr
+ 127              		.cfi_endproc
+ 128              	.LFE6:
+ 130              		.section	.text.rffe_get_tx_ports,"ax",%progbits
+ 131              		.align	2
+ 132              		.global	rffe_get_tx_ports
+ 134              	rffe_get_tx_ports:
+ 135              	.LFB7:
+ 147:board/gtm900b/rffe_gtm900b.c **** 
+ 148:board/gtm900b/rffe_gtm900b.c **** uint32_t rffe_get_tx_ports(void)
+ 149:board/gtm900b/rffe_gtm900b.c **** {
+ 136              		.loc 1 149 0
+ 137              		.cfi_startproc
+ 138              		@ args = 0, pretend = 0, frame = 0
+ 139              		@ frame_needed = 0, uses_anonymous_args = 0
+ 140              		@ link register save eliminated.
+ 150:board/gtm900b/rffe_gtm900b.c **** 	return (1 << PORT_LO) | (1 << PORT_HI);
+ 151:board/gtm900b/rffe_gtm900b.c **** }
+ 141              		.loc 1 151 0
+ 142 0000 0300A0E3 		mov	r0, #3
+ 143 0004 1EFF2FE1 		bx	lr
+ 144              		.cfi_endproc
+ 145              	.LFE7:
+ 147              		.section	.text.rffe_iq_swapped,"ax",%progbits
+ 148              		.align	2
+ 149              		.global	rffe_iq_swapped
+ 151              	rffe_iq_swapped:
+ 152              	.LFB8:
+ 152:board/gtm900b/rffe_gtm900b.c **** 
+ 153:board/gtm900b/rffe_gtm900b.c **** /* Returns need for IQ swap */
+ 154:board/gtm900b/rffe_gtm900b.c **** int rffe_iq_swapped(uint16_t band_arfcn, int tx)
+ 155:board/gtm900b/rffe_gtm900b.c **** {
+ 153              		.loc 1 155 0
+ 154              		.cfi_startproc
+ 155              		@ args = 0, pretend = 0, frame = 0
+ 156              		@ frame_needed = 0, uses_anonymous_args = 0
+ 157              		@ link register save eliminated.
+ 158              	.LVL15:
+ 159              		.loc 1 155 0
+ 160 0000 0008A0E1 		mov	r0, r0, asl #16
+ 161              	.LVL16:
+ 156:board/gtm900b/rffe_gtm900b.c **** 	return trf6151_iq_swapped(band_arfcn, tx);
+ 162              		.loc 1 156 0
+ 163 0004 2008A0E1 		mov	r0, r0, lsr #16
+ 157:board/gtm900b/rffe_gtm900b.c **** }
+ 164              		.loc 1 157 0
+ 156:board/gtm900b/rffe_gtm900b.c **** 	return trf6151_iq_swapped(band_arfcn, tx);
+ 165              		.loc 1 156 0
+ 166 0008 FEFFFFEA 		b	trf6151_iq_swapped
+ 167              		.cfi_endproc
+ 168              	.LFE8:
+ 170              		.section	.text.rffe_init,"ax",%progbits
+ 171              		.align	2
+ 172              		.global	rffe_init
+ 174              	rffe_init:
+ 175              	.LFB9:
+ 158:board/gtm900b/rffe_gtm900b.c **** 
+ 159:board/gtm900b/rffe_gtm900b.c **** #define ARM_CONF_REG	0xfffef006
+ 160:board/gtm900b/rffe_gtm900b.c **** 
+ 161:board/gtm900b/rffe_gtm900b.c **** void rffe_init(void)
+ 162:board/gtm900b/rffe_gtm900b.c **** {
+ 176              		.loc 1 162 0
+ 177              		.cfi_startproc
+ 178              		@ args = 0, pretend = 0, frame = 0
+ 179              		@ frame_needed = 0, uses_anonymous_args = 0
+ 163:board/gtm900b/rffe_gtm900b.c **** 	uint16_t reg;
+ 164:board/gtm900b/rffe_gtm900b.c **** 
+ 165:board/gtm900b/rffe_gtm900b.c **** 	reg = readw(ARM_CONF_REG);
+ 180              		.loc 1 165 0
+ 181 0000 34209FE5 		ldr	r2, .L15
+ 166:board/gtm900b/rffe_gtm900b.c **** 	reg &= ~ (1 << 7);	/* TSPACT4 I/O function, not nRDYMEM */
+ 182              		.loc 1 166 0
+ 183 0004 34309FE5 		ldr	r3, .L15+4
+ 165:board/gtm900b/rffe_gtm900b.c **** 	reg = readw(ARM_CONF_REG);
+ 184              		.loc 1 165 0
+ 185 0008 B91F52E1 		ldrh	r1, [r2, #-249]
+ 186              	.LVL17:
+ 167:board/gtm900b/rffe_gtm900b.c **** 	writew(reg, ARM_CONF_REG);
+ 168:board/gtm900b/rffe_gtm900b.c **** 
+ 169:board/gtm900b/rffe_gtm900b.c **** 	/* Configure the TSPEN which is connected to the TWL3025 */
+ 170:board/gtm900b/rffe_gtm900b.c **** 	tsp_setup(IOTA_STROBE, 1, 0, 0);
+ 187              		.loc 1 170 0
+ 188 000c 0000A0E3 		mov	r0, #0
+ 166:board/gtm900b/rffe_gtm900b.c **** 	reg &= ~ (1 << 7);	/* TSPACT4 I/O function, not nRDYMEM */
+ 189              		.loc 1 166 0
+ 190 0010 033001E0 		and	r3, r1, r3
+ 191              	.LVL18:
+ 162:board/gtm900b/rffe_gtm900b.c **** {
+ 192              		.loc 1 162 0
+ 193 0014 04E02DE5 		str	lr, [sp, #-4]!
+ 194              	.LCFI1:
+ 195              		.cfi_def_cfa_offset 4
+ 196              		.loc 1 170 0
+ 197 0018 0110A0E3 		mov	r1, #1
+ 167:board/gtm900b/rffe_gtm900b.c **** 	writew(reg, ARM_CONF_REG);
+ 198              		.loc 1 167 0
+ 199 001c B93F42E1 		strh	r3, [r2, #-249]	@ movhi
+ 200              		.loc 1 170 0
+ 201 0020 0020A0E1 		mov	r2, r0
+ 202 0024 0030A0E1 		mov	r3, r0
+ 203              	.LVL19:
+ 204              		.cfi_offset 14, -4
+ 205 0028 FEFFFFEB 		bl	tsp_setup
+ 171:board/gtm900b/rffe_gtm900b.c **** 
+ 172:board/gtm900b/rffe_gtm900b.c **** 	trf6151_init(RITA_STROBE, RITA_RESET);
+ 206              		.loc 1 172 0
+ 207 002c 0200A0E3 		mov	r0, #2
+ 208 0030 0110A0E3 		mov	r1, #1
+ 173:board/gtm900b/rffe_gtm900b.c **** }
+ 209              		.loc 1 173 0
+ 210 0034 04E09DE4 		ldr	lr, [sp], #4
+ 172:board/gtm900b/rffe_gtm900b.c **** 	trf6151_init(RITA_STROBE, RITA_RESET);
+ 211              		.loc 1 172 0
+ 212 0038 FEFFFFEA 		b	trf6151_init
+ 213              	.L16:
+ 214              		.align	2
+ 215              	.L15:
+ 216 003c FFF0FEFF 		.word	-69377
+ 217 0040 7FFF0000 		.word	65407
+ 218              		.cfi_endproc
+ 219              	.LFE9:
+ 221              		.section	.text.rffe_get_gain,"ax",%progbits
+ 222              		.align	2
+ 223              		.global	rffe_get_gain
+ 225              	rffe_get_gain:
+ 226              	.LFB10:
+ 174:board/gtm900b/rffe_gtm900b.c **** 
+ 175:board/gtm900b/rffe_gtm900b.c **** uint8_t rffe_get_gain(void)
+ 176:board/gtm900b/rffe_gtm900b.c **** {
+ 227              		.loc 1 176 0
+ 228              		.cfi_startproc
+ 229              		@ args = 0, pretend = 0, frame = 0
+ 230              		@ frame_needed = 0, uses_anonymous_args = 0
+ 231              		@ link register save eliminated.
+ 177:board/gtm900b/rffe_gtm900b.c **** 	return trf6151_get_gain();
+ 178:board/gtm900b/rffe_gtm900b.c **** }
+ 232              		.loc 1 178 0
+ 177:board/gtm900b/rffe_gtm900b.c **** 	return trf6151_get_gain();
+ 233              		.loc 1 177 0
+ 234 0000 FEFFFFEA 		b	trf6151_get_gain
+ 235              		.cfi_endproc
+ 236              	.LFE10:
+ 238              		.section	.text.rffe_set_gain,"ax",%progbits
+ 239              		.align	2
+ 240              		.global	rffe_set_gain
+ 242              	rffe_set_gain:
+ 243              	.LFB11:
+ 179:board/gtm900b/rffe_gtm900b.c **** 
+ 180:board/gtm900b/rffe_gtm900b.c **** void rffe_set_gain(uint8_t dbm)
+ 181:board/gtm900b/rffe_gtm900b.c **** {
+ 244              		.loc 1 181 0
+ 245              		.cfi_startproc
+ 246              		@ args = 0, pretend = 0, frame = 0
+ 247              		@ frame_needed = 0, uses_anonymous_args = 0
+ 248              		@ link register save eliminated.
+ 249              	.LVL20:
+ 250              		.loc 1 181 0
+ 251 0000 FF0000E2 		and	r0, r0, #255
+ 252              	.LVL21:
+ 182:board/gtm900b/rffe_gtm900b.c **** 	trf6151_set_gain(dbm);
+ 183:board/gtm900b/rffe_gtm900b.c **** }
+ 253              		.loc 1 183 0
+ 182:board/gtm900b/rffe_gtm900b.c **** 	trf6151_set_gain(dbm);
+ 254              		.loc 1 182 0
+ 255 0004 FEFFFFEA 		b	trf6151_set_gain
+ 256              		.cfi_endproc
+ 257              	.LFE11:
+ 259              		.section	.text.rffe_compute_gain,"ax",%progbits
+ 260              		.align	2
+ 261              		.global	rffe_compute_gain
+ 263              	rffe_compute_gain:
+ 264              	.LFB12:
+ 184:board/gtm900b/rffe_gtm900b.c **** 
+ 185:board/gtm900b/rffe_gtm900b.c **** const uint8_t system_inherent_gain = SYSTEM_INHERENT_GAIN;
+ 186:board/gtm900b/rffe_gtm900b.c **** 
+ 187:board/gtm900b/rffe_gtm900b.c **** /* Given the expected input level of exp_inp dBm/8 and the target of target_bb
+ 188:board/gtm900b/rffe_gtm900b.c ****  * dBm8, configure the RF Frontend with the respective gain */
+ 189:board/gtm900b/rffe_gtm900b.c **** void rffe_compute_gain(int16_t exp_inp, int16_t target_bb)
+ 190:board/gtm900b/rffe_gtm900b.c **** {
+ 265              		.loc 1 190 0
+ 266              		.cfi_startproc
+ 267              		@ args = 0, pretend = 0, frame = 0
+ 268              		@ frame_needed = 0, uses_anonymous_args = 0
+ 269              		@ link register save eliminated.
+ 270              	.LVL22:
+ 271              		.loc 1 190 0
+ 272 0000 0008A0E1 		mov	r0, r0, asl #16
+ 273              	.LVL23:
+ 274 0004 0118A0E1 		mov	r1, r1, asl #16
+ 275              	.LVL24:
+ 191:board/gtm900b/rffe_gtm900b.c **** 	trf6151_compute_gain(exp_inp, target_bb);
+ 276              		.loc 1 191 0
+ 277 0008 4008A0E1 		mov	r0, r0, asr #16
+ 278 000c 4118A0E1 		mov	r1, r1, asr #16
+ 192:board/gtm900b/rffe_gtm900b.c **** }
+ 279              		.loc 1 192 0
+ 191:board/gtm900b/rffe_gtm900b.c **** 	trf6151_compute_gain(exp_inp, target_bb);
+ 280              		.loc 1 191 0
+ 281 0010 FEFFFFEA 		b	trf6151_compute_gain
+ 282              		.cfi_endproc
+ 283              	.LFE12:
+ 285              		.section	.text.rffe_rx_win_ctrl,"ax",%progbits
+ 286              		.align	2
+ 287              		.global	rffe_rx_win_ctrl
+ 289              	rffe_rx_win_ctrl:
+ 290              	.LFB13:
+ 193:board/gtm900b/rffe_gtm900b.c **** 
+ 194:board/gtm900b/rffe_gtm900b.c **** void rffe_rx_win_ctrl(int16_t exp_inp, int16_t target_bb)
+ 195:board/gtm900b/rffe_gtm900b.c **** {
+ 291              		.loc 1 195 0
+ 292              		.cfi_startproc
+ 293              		@ args = 0, pretend = 0, frame = 0
+ 294              		@ frame_needed = 0, uses_anonymous_args = 0
+ 295              		@ link register save eliminated.
+ 296              	.LVL25:
+ 196:board/gtm900b/rffe_gtm900b.c **** 	/* FIXME */
+ 197:board/gtm900b/rffe_gtm900b.c **** }
+ 297              		.loc 1 197 0
+ 298 0000 1EFF2FE1 		bx	lr
+ 299              		.cfi_endproc
+ 300              	.LFE13:
+ 302              		.global	system_inherent_gain
+ 303              		.section	.rodata
+ 306              	system_inherent_gain:
+ 307 0000 4A       		.byte	74
+ 308              		.text
+ 309              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 rffe_gtm900b.c
+     /tmp/ccxnFwFl.s:12     .text.rffe_mode:0000000000000000 $a
+     /tmp/ccxnFwFl.s:15     .text.rffe_mode:0000000000000000 rffe_mode
+     /tmp/ccxnFwFl.s:106    .text.rffe_mode:0000000000000074 $d
+     /tmp/ccxnFwFl.s:114    .text.rffe_get_rx_ports:0000000000000000 $a
+     /tmp/ccxnFwFl.s:117    .text.rffe_get_rx_ports:0000000000000000 rffe_get_rx_ports
+     /tmp/ccxnFwFl.s:131    .text.rffe_get_tx_ports:0000000000000000 $a
+     /tmp/ccxnFwFl.s:134    .text.rffe_get_tx_ports:0000000000000000 rffe_get_tx_ports
+     /tmp/ccxnFwFl.s:148    .text.rffe_iq_swapped:0000000000000000 $a
+     /tmp/ccxnFwFl.s:151    .text.rffe_iq_swapped:0000000000000000 rffe_iq_swapped
+     /tmp/ccxnFwFl.s:171    .text.rffe_init:0000000000000000 $a
+     /tmp/ccxnFwFl.s:174    .text.rffe_init:0000000000000000 rffe_init
+     /tmp/ccxnFwFl.s:216    .text.rffe_init:000000000000003c $d
+     /tmp/ccxnFwFl.s:222    .text.rffe_get_gain:0000000000000000 $a
+     /tmp/ccxnFwFl.s:225    .text.rffe_get_gain:0000000000000000 rffe_get_gain
+     /tmp/ccxnFwFl.s:239    .text.rffe_set_gain:0000000000000000 $a
+     /tmp/ccxnFwFl.s:242    .text.rffe_set_gain:0000000000000000 rffe_set_gain
+     /tmp/ccxnFwFl.s:260    .text.rffe_compute_gain:0000000000000000 $a
+     /tmp/ccxnFwFl.s:263    .text.rffe_compute_gain:0000000000000000 rffe_compute_gain
+     /tmp/ccxnFwFl.s:286    .text.rffe_rx_win_ctrl:0000000000000000 $a
+     /tmp/ccxnFwFl.s:289    .text.rffe_rx_win_ctrl:0000000000000000 rffe_rx_win_ctrl
+     /tmp/ccxnFwFl.s:306    .rodata:0000000000000000 system_inherent_gain
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+tsp_act_state
+tsp_act_update
+gtm900_hw_is_mg01gsmt
+trf6151_iq_swapped
+tsp_setup
+trf6151_init
+trf6151_get_gain
+trf6151_set_gain
+trf6151_compute_gain

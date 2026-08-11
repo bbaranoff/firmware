@@ -1,0 +1,532 @@
+   1              		.file	"rfch.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.global	__umodsi3
+  12              		.global	__modsi3
+  13              		.section	.text.rfch_get_params,"ax",%progbits
+  14              		.align	2
+  15              		.global	rfch_get_params
+  17              	rfch_get_params:
+  18              	.LFB18:
+  19              		.file 1 "layer1/rfch.c"
+   1:layer1/rfch.c **** /* RF Channel utilities */
+   2:layer1/rfch.c **** 
+   3:layer1/rfch.c **** /* (C) 2010 by Sylvain Munaut <tnt@246tNt.com>
+   4:layer1/rfch.c ****  *
+   5:layer1/rfch.c ****  * All Rights Reserved
+   6:layer1/rfch.c ****  *
+   7:layer1/rfch.c ****  * This program is free software; you can redistribute it and/or modify
+   8:layer1/rfch.c ****  * it under the terms of the GNU General Public License as published by
+   9:layer1/rfch.c ****  * the Free Software Foundation; either version 2 of the License, or
+  10:layer1/rfch.c ****  * (at your option) any later version.
+  11:layer1/rfch.c ****  *
+  12:layer1/rfch.c ****  * This program is distributed in the hope that it will be useful,
+  13:layer1/rfch.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  14:layer1/rfch.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  15:layer1/rfch.c ****  * GNU General Public License for more details.
+  16:layer1/rfch.c ****  *
+  17:layer1/rfch.c ****  */
+  18:layer1/rfch.c **** 
+  19:layer1/rfch.c **** #include <stdint.h>
+  20:layer1/rfch.c **** 
+  21:layer1/rfch.c **** #include <osmocom/gsm/gsm_utils.h>
+  22:layer1/rfch.c **** 
+  23:layer1/rfch.c **** #include <layer1/sync.h>
+  24:layer1/rfch.c **** 
+  25:layer1/rfch.c **** 
+  26:layer1/rfch.c **** /*
+  27:layer1/rfch.c ****  * Hopping sequence generation
+  28:layer1/rfch.c ****  *
+  29:layer1/rfch.c ****  * The algorithm is explained in GSM 05.02 Section 6.2.3
+  30:layer1/rfch.c ****  *
+  31:layer1/rfch.c ****  *	if HSN = 0 (cyclic hopping) then:
+  32:layer1/rfch.c ****  *		MAI, integer (0 .. N-1) :
+  33:layer1/rfch.c ****  *			MAI = (FN + MAIO) modulo N
+  34:layer1/rfch.c ****  *
+  35:layer1/rfch.c ****  *	else:
+  36:layer1/rfch.c ****  *		M, integer (0 .. 152) :
+  37:layer1/rfch.c ****  *			M = T2 + RNTABLE((HSN xor T1R) + T3)
+  38:layer1/rfch.c ****  *
+  39:layer1/rfch.c ****  *		S, integer (0 .. N-1) :
+  40:layer1/rfch.c ****  *			M' = M modulo (2 ^ NBIN)
+  41:layer1/rfch.c ****  *			T' = T3 modulo (2 ^ NBIN)
+  42:layer1/rfch.c ****  *
+  43:layer1/rfch.c ****  *			if M' < N then:
+  44:layer1/rfch.c ****  *				S = M'
+  45:layer1/rfch.c ****  *			else:
+  46:layer1/rfch.c ****  *				S = (M'+T') modulo N
+  47:layer1/rfch.c ****  *
+  48:layer1/rfch.c ****  *		MAI, integer (0 .. N-1) :
+  49:layer1/rfch.c ****  *			MAI = (S + MAIO) modulo N
+  50:layer1/rfch.c ****  */
+  51:layer1/rfch.c **** 
+  52:layer1/rfch.c **** static uint8_t rn_table[114] = {
+  53:layer1/rfch.c **** 	 48,  98,  63,   1,  36,  95,  78, 102,  94,  73,
+  54:layer1/rfch.c **** 	  0,  64,  25,  81,  76,  59, 124,  23, 104, 100,
+  55:layer1/rfch.c **** 	101,  47, 118,  85,  18,  56,  96,  86,  54,   2,
+  56:layer1/rfch.c **** 	 80,  34, 127,  13,   6,  89,  57, 103,  12,  74,
+  57:layer1/rfch.c **** 	 55, 111,  75,  38, 109,  71, 112,  29,  11,  88,
+  58:layer1/rfch.c **** 	 87,  19,   3,  68, 110,  26,  33,  31,   8,  45,
+  59:layer1/rfch.c **** 	 82,  58,  40, 107,  32,   5, 106,  92,  62,  67,
+  60:layer1/rfch.c **** 	 77, 108, 122,  37,  60,  66, 121,  42,  51, 126,
+  61:layer1/rfch.c **** 	117, 114,   4,  90,  43,  52,  53, 113, 120,  72,
+  62:layer1/rfch.c **** 	 16,  49,   7,  79, 119,  61,  22,  84,   9,  97,
+  63:layer1/rfch.c **** 	 91,  15,  21,  24,  46,  39,  93, 105,  65,  70,
+  64:layer1/rfch.c **** 	125,  99,  17, 123,
+  65:layer1/rfch.c **** };
+  66:layer1/rfch.c **** 
+  67:layer1/rfch.c **** 
+  68:layer1/rfch.c **** static int pow_nbin_mask(int n)
+  69:layer1/rfch.c **** {
+  70:layer1/rfch.c **** 	int x;
+  71:layer1/rfch.c **** 	x =	(n     ) |
+  72:layer1/rfch.c **** 		(n >> 1) |
+  73:layer1/rfch.c **** 		(n >> 2) |
+  74:layer1/rfch.c **** 		(n >> 3) |
+  75:layer1/rfch.c **** 		(n >> 4) |
+  76:layer1/rfch.c **** 		(n >> 5) |
+  77:layer1/rfch.c **** 		(n >> 6);
+  78:layer1/rfch.c **** 	return x;
+  79:layer1/rfch.c **** }
+  80:layer1/rfch.c **** 
+  81:layer1/rfch.c **** /*! Hopping sequence generator.
+  82:layer1/rfch.c ****  * \param[in] t GSM time (frame number)
+  83:layer1/rfch.c ****  * \param[in] hsn Hopping Sequence Number
+  84:layer1/rfch.c ****  * \param[in] maio Mobile Allocation Index OFfset
+  85:layer1/rfch.c ****  * \param[in] n number of entries in mobile allocation (arfcn table)
+  86:layer1/rfch.c ****  * \param[in] arfcn_tbl Array of ARFCN representing the mobile allocation
+  87:layer1/rfch.c ****  * \returns ARFCN to use for given input parameters at time 't' or MAI if arfcn_tbl == NULL */
+  88:layer1/rfch.c **** static int16_t rfch_hop_seq_gen(const struct gsm_time *t,
+  89:layer1/rfch.c ****                                 uint8_t hsn, uint8_t maio,
+  90:layer1/rfch.c ****                                 uint8_t n, const uint16_t *arfcn_tbl)
+  91:layer1/rfch.c **** {
+  92:layer1/rfch.c **** 	int mai;
+  93:layer1/rfch.c **** 
+  94:layer1/rfch.c **** 	if (!hsn) {
+  95:layer1/rfch.c **** 		/* cyclic hopping */
+  96:layer1/rfch.c **** 		mai = (t->fn + maio) % n;
+  97:layer1/rfch.c **** 	} else {
+  98:layer1/rfch.c **** 		/* pseudo random hopping */
+  99:layer1/rfch.c **** 		int m, mp, tp, s, pnm;
+ 100:layer1/rfch.c **** 
+ 101:layer1/rfch.c **** 		pnm = pow_nbin_mask(n);
+ 102:layer1/rfch.c **** 
+ 103:layer1/rfch.c **** 		m = t->t2 + rn_table[(hsn ^ (t->t1 & 63)) + t->t3];
+ 104:layer1/rfch.c **** 		mp = m & pnm;
+ 105:layer1/rfch.c **** 
+ 106:layer1/rfch.c **** 		if (mp < n)
+ 107:layer1/rfch.c **** 			s = mp;
+ 108:layer1/rfch.c **** 		else {
+ 109:layer1/rfch.c **** 			tp = t->t3 & pnm;
+ 110:layer1/rfch.c **** 			s = (mp + tp) % n;
+ 111:layer1/rfch.c **** 		}
+ 112:layer1/rfch.c **** 
+ 113:layer1/rfch.c **** 		mai = (s + maio) % n;
+ 114:layer1/rfch.c **** 	}
+ 115:layer1/rfch.c **** 
+ 116:layer1/rfch.c **** 	return arfcn_tbl ? arfcn_tbl[mai] : mai;
+ 117:layer1/rfch.c **** }
+ 118:layer1/rfch.c **** 
+ 119:layer1/rfch.c **** 
+ 120:layer1/rfch.c **** /*! Get RF Channel parameters at a given GSM time (frame number)
+ 121:layer1/rfch.c ****  *  \param[in] t GSM time for which to obtain parameters
+ 122:layer1/rfch.c ****  *  \param[out] arfcn_p ARFCN to use at time t
+ 123:layer1/rfch.c ****  *  \oaram[out] tsc_p Training sequence to use at time t
+ 124:layer1/rfch.c ****  *  \param[out] tn_p Timeslot Number to use at time t */
+ 125:layer1/rfch.c **** void rfch_get_params(const struct gsm_time *t,
+ 126:layer1/rfch.c ****                      uint16_t *arfcn_p, uint8_t *tsc_p, uint8_t *tn_p)
+ 127:layer1/rfch.c **** {
+  20              		.loc 1 127 0
+  21              		.cfi_startproc
+  22              		@ args = 0, pretend = 0, frame = 0
+  23              		@ frame_needed = 0, uses_anonymous_args = 0
+  24              	.LVL0:
+  25 0000 F0412DE9 		stmfd	sp!, {r4, r5, r6, r7, r8, lr}
+  26              	.LCFI0:
+  27              		.cfi_def_cfa_offset 24
+  28              		.loc 1 127 0
+  29 0004 0370A0E1 		mov	r7, r3
+  30              		.cfi_offset 14, -4
+  31              		.cfi_offset 8, -8
+  32              		.cfi_offset 7, -12
+  33              		.cfi_offset 6, -16
+  34              		.cfi_offset 5, -20
+  35              		.cfi_offset 4, -24
+ 128:layer1/rfch.c **** 	if (l1s.dedicated.type == GSM_DCHAN_NONE) {
+  36              		.loc 1 128 0
+  37 0008 2C319FE5 		ldr	r3, .L13
+  38              	.LVL1:
+ 127:layer1/rfch.c **** {
+  39              		.loc 1 127 0
+  40 000c 0250A0E1 		mov	r5, r2
+  41              		.loc 1 128 0
+  42 0010 0C2B93E5 		ldr	r2, [r3, #2828]
+  43              	.LVL2:
+  44 0014 000052E3 		cmp	r2, #0
+ 127:layer1/rfch.c **** {
+  45              		.loc 1 127 0
+  46 0018 0140A0E1 		mov	r4, r1
+  47              		.loc 1 128 0
+  48 001c 0B00001A 		bne	.L2
+ 129:layer1/rfch.c **** 		/* Serving cell only */
+ 130:layer1/rfch.c **** 		if (arfcn_p)
+  49              		.loc 1 130 0
+  50 0020 000051E3 		cmp	r1, #0
+ 131:layer1/rfch.c **** 			*arfcn_p = l1s.serving_cell.arfcn;
+  51              		.loc 1 131 0
+  52 0024 B831D311 		ldrneh	r3, [r3, #24]
+  53 0028 B030C111 		strneh	r3, [r1, #0]	@ movhi
+ 132:layer1/rfch.c **** 
+ 133:layer1/rfch.c **** 		if (tsc_p)
+  54              		.loc 1 133 0
+  55 002c 000055E3 		cmp	r5, #0
+ 134:layer1/rfch.c **** 			*tsc_p = l1s.serving_cell.bsic & 0x7;
+  56              		.loc 1 134 0
+  57 0030 04319F15 		ldrne	r3, .L13
+  58 0034 1A30D315 		ldrneb	r3, [r3, #26]	@ zero_extendqisi2
+  59 0038 07300312 		andne	r3, r3, #7
+  60 003c 0030C515 		strneb	r3, [r5, #0]
+ 135:layer1/rfch.c **** 
+ 136:layer1/rfch.c **** 		if (tn_p)
+  61              		.loc 1 136 0
+  62 0040 000057E3 		cmp	r7, #0
+ 137:layer1/rfch.c **** 			*tn_p = 0;
+  63              		.loc 1 137 0
+  64 0044 0030A013 		movne	r3, #0
+ 136:layer1/rfch.c **** 		if (tn_p)
+  65              		.loc 1 136 0
+  66 0048 3900001A 		bne	.L12
+  67 004c F081BDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, pc}
+  68              	.L2:
+ 138:layer1/rfch.c **** 	} else {
+ 139:layer1/rfch.c **** 		/* Dedicated channel */
+ 140:layer1/rfch.c **** 		if (arfcn_p) {
+  69              		.loc 1 140 0
+  70 0050 000051E3 		cmp	r1, #0
+  71 0054 2E00000A 		beq	.L6
+ 141:layer1/rfch.c **** 			if (l1s.dedicated.h) {
+  72              		.loc 1 141 0
+  73 0058 132BD3E5 		ldrb	r2, [r3, #2835]	@ zero_extendqisi2
+  74 005c 000052E3 		cmp	r2, #0
+  75 0060 2800000A 		beq	.L7
+ 142:layer1/rfch.c **** 				*arfcn_p = rfch_hop_seq_gen(t,
+ 143:layer1/rfch.c **** 						l1s.dedicated.h1.hsn,
+  76              		.loc 1 143 0
+  77 0064 141BD3E5 		ldrb	r1, [r3, #2836]	@ zero_extendqisi2
+  78              	.LVL3:
+  79              	.LBB10:
+  80              	.LBB11:
+  94:layer1/rfch.c **** 	if (!hsn) {
+  81              		.loc 1 94 0
+  82 0068 000051E3 		cmp	r1, #0
+  83              	.LBE11:
+  84              	.LBE10:
+ 144:layer1/rfch.c **** 						l1s.dedicated.h1.maio,
+  85              		.loc 1 144 0
+  86 006c 158BD3E5 		ldrb	r8, [r3, #2837]	@ zero_extendqisi2
+ 145:layer1/rfch.c **** 						l1s.dedicated.h1.n,
+  87              		.loc 1 145 0
+  88 0070 166BD3E5 		ldrb	r6, [r3, #2838]	@ zero_extendqisi2
+  89              	.LVL4:
+  90              	.LBB24:
+  91              	.LBB23:
+  94:layer1/rfch.c **** 	if (!hsn) {
+  92              		.loc 1 94 0
+  93 0074 0400001A 		bne	.L8
+  94              	.LVL5:
+  96:layer1/rfch.c **** 		mai = (t->fn + maio) % n;
+  95              		.loc 1 96 0
+  96 0078 000090E5 		ldr	r0, [r0, #0]
+  97              	.LVL6:
+  98 007c 0610A0E1 		mov	r1, r6
+  99              	.LVL7:
+ 100 0080 000088E0 		add	r0, r8, r0
+ 101 0084 FEFFFFEB 		bl	__umodsi3
+ 102              	.LVL8:
+ 103 0088 180000EA 		b	.L9
+ 104              	.LVL9:
+ 105              	.L8:
+ 106              	.LBB12:
+ 103:layer1/rfch.c **** 		m = t->t2 + rn_table[(hsn ^ (t->t1 & 63)) + t->t3];
+ 107              		.loc 1 103 0
+ 108 008c B4C0D0E1 		ldrh	ip, [r0, #4]
+ 109              	.LBB13:
+ 110              	.LBB16:
+  73:layer1/rfch.c **** 		(n >> 2) |
+ 111              		.loc 1 73 0
+ 112 0090 4621A0E1 		mov	r2, r6, asr #2
+ 113              	.LBE16:
+ 114              	.LBE13:
+ 103:layer1/rfch.c **** 		m = t->t2 + rn_table[(hsn ^ (t->t1 & 63)) + t->t3];
+ 115              		.loc 1 103 0
+ 116 0094 3FC00CE2 		and	ip, ip, #63
+ 117 0098 01102CE0 		eor	r1, ip, r1
+ 118              	.LVL10:
+ 119 009c 0730D0E5 		ldrb	r3, [r0, #7]	@ zero_extendqisi2
+ 120              	.LBB19:
+ 121              	.LBB15:
+  71:layer1/rfch.c **** 	x =	(n     ) |
+ 122              		.loc 1 71 0
+ 123 00a0 A62082E1 		orr	r2, r2, r6, lsr #1
+ 124              	.LBE15:
+ 125              	.LBE19:
+ 103:layer1/rfch.c **** 		m = t->t2 + rn_table[(hsn ^ (t->t1 & 63)) + t->t3];
+ 126              		.loc 1 103 0
+ 127 00a4 94C09FE5 		ldr	ip, .L13+4
+ 128              	.LBB20:
+ 129              	.LBB17:
+  72:layer1/rfch.c **** 		(n >> 1) |
+ 130              		.loc 1 72 0
+ 131 00a8 062082E1 		orr	r2, r2, r6
+  73:layer1/rfch.c **** 		(n >> 2) |
+ 132              		.loc 1 73 0
+ 133 00ac A62182E1 		orr	r2, r2, r6, lsr #3
+ 134              	.LBE17:
+ 135              	.LBE20:
+ 103:layer1/rfch.c **** 		m = t->t2 + rn_table[(hsn ^ (t->t1 & 63)) + t->t3];
+ 136              		.loc 1 103 0
+ 137 00b0 03C08CE0 		add	ip, ip, r3
+ 138 00b4 01C0DCE7 		ldrb	ip, [ip, r1]	@ zero_extendqisi2
+ 139              	.LBB21:
+ 140              	.LBB14:
+  74:layer1/rfch.c **** 		(n >> 3) |
+ 141              		.loc 1 74 0
+ 142 00b8 262282E1 		orr	r2, r2, r6, lsr #4
+ 143              	.LBE14:
+ 144              	.LBE21:
+ 103:layer1/rfch.c **** 		m = t->t2 + rn_table[(hsn ^ (t->t1 & 63)) + t->t3];
+ 145              		.loc 1 103 0
+ 146 00bc 0610D0E5 		ldrb	r1, [r0, #6]	@ zero_extendqisi2
+ 147              	.LBB22:
+ 148              	.LBB18:
+  75:layer1/rfch.c **** 		(n >> 4) |
+ 149              		.loc 1 75 0
+ 150 00c0 A62282E1 		orr	r2, r2, r6, lsr #5
+  71:layer1/rfch.c **** 	x =	(n     ) |
+ 151              		.loc 1 71 0
+ 152 00c4 262382E1 		orr	r2, r2, r6, lsr #6
+ 153              	.LVL11:
+ 154              	.LBE18:
+ 155              	.LBE22:
+ 103:layer1/rfch.c **** 		m = t->t2 + rn_table[(hsn ^ (t->t1 & 63)) + t->t3];
+ 156              		.loc 1 103 0
+ 157 00c8 01008CE0 		add	r0, ip, r1
+ 158              	.LVL12:
+ 104:layer1/rfch.c **** 		mp = m & pnm;
+ 159              		.loc 1 104 0
+ 160 00cc 000002E0 		and	r0, r2, r0
+ 161              	.LVL13:
+ 106:layer1/rfch.c **** 		if (mp < n)
+ 162              		.loc 1 106 0
+ 163 00d0 060050E1 		cmp	r0, r6
+ 164              	.LVL14:
+ 109:layer1/rfch.c **** 			tp = t->t3 & pnm;
+ 165              		.loc 1 109 0
+ 166 00d4 033002A0 		andge	r3, r2, r3
+ 167              	.LVL15:
+ 110:layer1/rfch.c **** 			s = (mp + tp) % n;
+ 168              		.loc 1 110 0
+ 169 00d8 000083A0 		addge	r0, r3, r0
+ 170              	.LVL16:
+ 171 00dc 0610A0A1 		movge	r1, r6
+ 172 00e0 FEFFFFAB 		blge	__modsi3
+ 173              	.LVL17:
+ 174              	.L10:
+ 113:layer1/rfch.c **** 		mai = (s + maio) % n;
+ 175              		.loc 1 113 0
+ 176 00e4 080080E0 		add	r0, r0, r8
+ 177              	.LVL18:
+ 178 00e8 0610A0E1 		mov	r1, r6
+ 179 00ec FEFFFFEB 		bl	__modsi3
+ 180              	.LVL19:
+ 181              	.L9:
+ 182              	.LBE12:
+ 116:layer1/rfch.c **** 	return arfcn_tbl ? arfcn_tbl[mai] : mai;
+ 183              		.loc 1 116 0
+ 184 00f0 44309FE5 		ldr	r3, .L13
+ 185 00f4 160D80E2 		add	r0, r0, #1408
+ 186              	.LVL20:
+ 187 00f8 800083E0 		add	r0, r3, r0, asl #1
+ 188              	.LVL21:
+ 189              	.LBE23:
+ 190              	.LBE24:
+ 142:layer1/rfch.c **** 				*arfcn_p = rfch_hop_seq_gen(t,
+ 191              		.loc 1 142 0
+ 192 00fc B801D0E1 		ldrh	r0, [r0, #24]
+ 193 0100 B000C4E1 		strh	r0, [r4, #0]	@ movhi
+ 194 0104 020000EA 		b	.L6
+ 195              	.LVL22:
+ 196              	.L7:
+ 146:layer1/rfch.c **** 						l1s.dedicated.h1.ma);
+ 147:layer1/rfch.c **** 			} else {
+ 148:layer1/rfch.c **** 				*arfcn_p = l1s.dedicated.h0.arfcn;
+ 197              		.loc 1 148 0
+ 198 0108 34209FE5 		ldr	r2, .L13+8
+ 199 010c B22093E1 		ldrh	r2, [r3, r2]
+ 200 0110 B020C1E1 		strh	r2, [r1, #0]	@ movhi
+ 201              	.LVL23:
+ 202              	.L6:
+ 149:layer1/rfch.c **** 			}
+ 150:layer1/rfch.c **** 		}
+ 151:layer1/rfch.c **** 
+ 152:layer1/rfch.c **** 		if (tsc_p)
+ 203              		.loc 1 152 0
+ 204 0114 000055E3 		cmp	r5, #0
+ 153:layer1/rfch.c **** 			*tsc_p = l1s.dedicated.tsc;
+ 205              		.loc 1 153 0
+ 206 0118 1C309F15 		ldrne	r3, .L13
+ 207 011c 113BD315 		ldrneb	r3, [r3, #2833]	@ zero_extendqisi2
+ 208 0120 0030C515 		strneb	r3, [r5, #0]
+ 154:layer1/rfch.c **** 
+ 155:layer1/rfch.c **** 		if (tn_p)
+ 209              		.loc 1 155 0
+ 210 0124 000057E3 		cmp	r7, #0
+ 211 0128 F081BD08 		ldmeqfd	sp!, {r4, r5, r6, r7, r8, pc}
+ 156:layer1/rfch.c **** 			*tn_p = l1s.dedicated.tn;
+ 212              		.loc 1 156 0
+ 213 012c 08309FE5 		ldr	r3, .L13
+ 214 0130 123BD3E5 		ldrb	r3, [r3, #2834]	@ zero_extendqisi2
+ 215              	.L12:
+ 216 0134 0030C7E5 		strb	r3, [r7, #0]
+ 217 0138 F081BDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, pc}
+ 218              	.L14:
+ 219              		.align	2
+ 220              	.L13:
+ 221 013c 00000000 		.word	l1s
+ 222 0140 00000000 		.word	.LANCHOR0
+ 223 0144 140B0000 		.word	2836
+ 224              		.cfi_endproc
+ 225              	.LFE18:
+ 227              		.section	.rodata
+ 228              		.align	2
+ 229              		.set	.LANCHOR0,. + 0
+ 232              	rn_table:
+ 233 0000 30       		.byte	48
+ 234 0001 62       		.byte	98
+ 235 0002 3F       		.byte	63
+ 236 0003 01       		.byte	1
+ 237 0004 24       		.byte	36
+ 238 0005 5F       		.byte	95
+ 239 0006 4E       		.byte	78
+ 240 0007 66       		.byte	102
+ 241 0008 5E       		.byte	94
+ 242 0009 49       		.byte	73
+ 243 000a 00       		.byte	0
+ 244 000b 40       		.byte	64
+ 245 000c 19       		.byte	25
+ 246 000d 51       		.byte	81
+ 247 000e 4C       		.byte	76
+ 248 000f 3B       		.byte	59
+ 249 0010 7C       		.byte	124
+ 250 0011 17       		.byte	23
+ 251 0012 68       		.byte	104
+ 252 0013 64       		.byte	100
+ 253 0014 65       		.byte	101
+ 254 0015 2F       		.byte	47
+ 255 0016 76       		.byte	118
+ 256 0017 55       		.byte	85
+ 257 0018 12       		.byte	18
+ 258 0019 38       		.byte	56
+ 259 001a 60       		.byte	96
+ 260 001b 56       		.byte	86
+ 261 001c 36       		.byte	54
+ 262 001d 02       		.byte	2
+ 263 001e 50       		.byte	80
+ 264 001f 22       		.byte	34
+ 265 0020 7F       		.byte	127
+ 266 0021 0D       		.byte	13
+ 267 0022 06       		.byte	6
+ 268 0023 59       		.byte	89
+ 269 0024 39       		.byte	57
+ 270 0025 67       		.byte	103
+ 271 0026 0C       		.byte	12
+ 272 0027 4A       		.byte	74
+ 273 0028 37       		.byte	55
+ 274 0029 6F       		.byte	111
+ 275 002a 4B       		.byte	75
+ 276 002b 26       		.byte	38
+ 277 002c 6D       		.byte	109
+ 278 002d 47       		.byte	71
+ 279 002e 70       		.byte	112
+ 280 002f 1D       		.byte	29
+ 281 0030 0B       		.byte	11
+ 282 0031 58       		.byte	88
+ 283 0032 57       		.byte	87
+ 284 0033 13       		.byte	19
+ 285 0034 03       		.byte	3
+ 286 0035 44       		.byte	68
+ 287 0036 6E       		.byte	110
+ 288 0037 1A       		.byte	26
+ 289 0038 21       		.byte	33
+ 290 0039 1F       		.byte	31
+ 291 003a 08       		.byte	8
+ 292 003b 2D       		.byte	45
+ 293 003c 52       		.byte	82
+ 294 003d 3A       		.byte	58
+ 295 003e 28       		.byte	40
+ 296 003f 6B       		.byte	107
+ 297 0040 20       		.byte	32
+ 298 0041 05       		.byte	5
+ 299 0042 6A       		.byte	106
+ 300 0043 5C       		.byte	92
+ 301 0044 3E       		.byte	62
+ 302 0045 43       		.byte	67
+ 303 0046 4D       		.byte	77
+ 304 0047 6C       		.byte	108
+ 305 0048 7A       		.byte	122
+ 306 0049 25       		.byte	37
+ 307 004a 3C       		.byte	60
+ 308 004b 42       		.byte	66
+ 309 004c 79       		.byte	121
+ 310 004d 2A       		.byte	42
+ 311 004e 33       		.byte	51
+ 312 004f 7E       		.byte	126
+ 313 0050 75       		.byte	117
+ 314 0051 72       		.byte	114
+ 315 0052 04       		.byte	4
+ 316 0053 5A       		.byte	90
+ 317 0054 2B       		.byte	43
+ 318 0055 34       		.byte	52
+ 319 0056 35       		.byte	53
+ 320 0057 71       		.byte	113
+ 321 0058 78       		.byte	120
+ 322 0059 48       		.byte	72
+ 323 005a 10       		.byte	16
+ 324 005b 31       		.byte	49
+ 325 005c 07       		.byte	7
+ 326 005d 4F       		.byte	79
+ 327 005e 77       		.byte	119
+ 328 005f 3D       		.byte	61
+ 329 0060 16       		.byte	22
+ 330 0061 54       		.byte	84
+ 331 0062 09       		.byte	9
+ 332 0063 61       		.byte	97
+ 333 0064 5B       		.byte	91
+ 334 0065 0F       		.byte	15
+ 335 0066 15       		.byte	21
+ 336 0067 18       		.byte	24
+ 337 0068 2E       		.byte	46
+ 338 0069 27       		.byte	39
+ 339 006a 5D       		.byte	93
+ 340 006b 69       		.byte	105
+ 341 006c 41       		.byte	65
+ 342 006d 46       		.byte	70
+ 343 006e 7D       		.byte	125
+ 344 006f 63       		.byte	99
+ 345 0070 11       		.byte	17
+ 346 0071 7B       		.byte	123
+ 347 0072 0000     		.text
+ 348              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 rfch.c
+     /tmp/ccTm0eO6.s:14     .text.rfch_get_params:0000000000000000 $a
+     /tmp/ccTm0eO6.s:17     .text.rfch_get_params:0000000000000000 rfch_get_params
+     /tmp/ccTm0eO6.s:221    .text.rfch_get_params:000000000000013c $d
+     /tmp/ccTm0eO6.s:228    .rodata:0000000000000000 $d
+     /tmp/ccTm0eO6.s:232    .rodata:0000000000000000 rn_table
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+__umodsi3
+__modsi3
+l1s

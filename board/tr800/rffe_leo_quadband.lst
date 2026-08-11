@@ -1,0 +1,476 @@
+   1              		.file	"rffe_leo_quadband.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.rffe_mode,"ax",%progbits
+  12              		.align	2
+  13              		.global	rffe_mode
+  15              	rffe_mode:
+  16              	.LFB3:
+  17              		.file 1 "board/tr800/rffe_leo_quadband.c"
+   1:board/tr800/rffe_leo_quadband.c **** /*
+   2:board/tr800/rffe_leo_quadband.c ****  * This code was written by Mychaela Falconia <falcon@freecalypso.org>
+   3:board/tr800/rffe_leo_quadband.c ****  * who refuses to claim copyright on it and has released it as public domain
+   4:board/tr800/rffe_leo_quadband.c ****  * instead. NO rights reserved, all rights relinquished.
+   5:board/tr800/rffe_leo_quadband.c ****  *
+   6:board/tr800/rffe_leo_quadband.c ****  * This program is free software; you can redistribute it and/or modify
+   7:board/tr800/rffe_leo_quadband.c ****  * it under the terms of the GNU General Public License as published by
+   8:board/tr800/rffe_leo_quadband.c ****  * the Free Software Foundation; either version 2 of the License, or
+   9:board/tr800/rffe_leo_quadband.c ****  * (at your option) any later version.
+  10:board/tr800/rffe_leo_quadband.c ****  *
+  11:board/tr800/rffe_leo_quadband.c ****  * This program is distributed in the hope that it will be useful,
+  12:board/tr800/rffe_leo_quadband.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  13:board/tr800/rffe_leo_quadband.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  14:board/tr800/rffe_leo_quadband.c ****  * GNU General Public License for more details.
+  15:board/tr800/rffe_leo_quadband.c ****  */
+  16:board/tr800/rffe_leo_quadband.c **** 
+  17:board/tr800/rffe_leo_quadband.c **** /*
+  18:board/tr800/rffe_leo_quadband.c ****  * This module implements RFFE control for TI's original Leonardo+
+  19:board/tr800/rffe_leo_quadband.c ****  * quadband RFFE, depicted on page 4 of this 2011-find schematic drawing:
+  20:board/tr800/rffe_leo_quadband.c ****  *
+  21:board/tr800/rffe_leo_quadband.c ****  * https://www.freecalypso.org/pub/GSM/Calypso/Leonardo_plus_quadband_schem.pdf
+  22:board/tr800/rffe_leo_quadband.c ****  *
+  23:board/tr800/rffe_leo_quadband.c ****  * This TI-original quadband RFFE is reproduced verbatim on the TR-800
+  24:board/tr800/rffe_leo_quadband.c ****  * packaged module by iWOW.
+  25:board/tr800/rffe_leo_quadband.c ****  *
+  26:board/tr800/rffe_leo_quadband.c ****  * The present C code is based on ../gta0x/rffe_gta0x_triband.c,
+  27:board/tr800/rffe_leo_quadband.c ****  * controlling Openmoko's triband RFFE which is very closely based on
+  28:board/tr800/rffe_leo_quadband.c ****  * Leonardo, with only a few control signal permutations.
+  29:board/tr800/rffe_leo_quadband.c ****  *
+  30:board/tr800/rffe_leo_quadband.c ****  * The present code addition by Mother Mychaela merely brings the TR-800 hw
+  31:board/tr800/rffe_leo_quadband.c ****  * target to the same level of support that already existed in OBB since
+  32:board/tr800/rffe_leo_quadband.c ****  * forever for Compal/Motorola and Openmoko GTA01/02 targets, and more
+  33:board/tr800/rffe_leo_quadband.c ****  * recently GTM900 and FCDEV3B - it does NOT fix the problem of overly
+  34:board/tr800/rffe_leo_quadband.c ****  * simplistic RFFE control timing and other oversimplifications which OBB
+  35:board/tr800/rffe_leo_quadband.c ****  * exhibits in comparison to the official firmware maintained by the
+  36:board/tr800/rffe_leo_quadband.c ****  * custodians of the Calypso+Iota+RF chipset (formerly TI, now FreeCalypso).
+  37:board/tr800/rffe_leo_quadband.c ****  * These massive oversimplifications which OBB exhibits in comparison to
+  38:board/tr800/rffe_leo_quadband.c ****  * officially approved production firmwares result in OBB's radio transmissions
+  39:board/tr800/rffe_leo_quadband.c ****  * being SEVERELY out of compliance (as observed with even the simplest tests
+  40:board/tr800/rffe_leo_quadband.c ****  * with a CMU200 RF test instrument), thus anyone who runs the present code
+  41:board/tr800/rffe_leo_quadband.c ****  * with Tx enabled outside of a Faraday cage will very likely cause
+  42:board/tr800/rffe_leo_quadband.c ****  * interference and disruption to public communication networks!  Furthermore,
+  43:board/tr800/rffe_leo_quadband.c ****  * if you go on with running OBB with Tx enabled after having read this
+  44:board/tr800/rffe_leo_quadband.c ****  * warning, the resulting interference and disruption to public communication
+  45:board/tr800/rffe_leo_quadband.c ****  * networks can be considered intentional on your part, which is likely to be
+  46:board/tr800/rffe_leo_quadband.c ****  * seen as a more severe offense.
+  47:board/tr800/rffe_leo_quadband.c ****  */
+  48:board/tr800/rffe_leo_quadband.c **** 
+  49:board/tr800/rffe_leo_quadband.c **** #include <stdint.h>
+  50:board/tr800/rffe_leo_quadband.c **** #include <stdio.h>
+  51:board/tr800/rffe_leo_quadband.c **** 
+  52:board/tr800/rffe_leo_quadband.c **** #include <debug.h>
+  53:board/tr800/rffe_leo_quadband.c **** #include <memory.h>
+  54:board/tr800/rffe_leo_quadband.c **** #include <rffe.h>
+  55:board/tr800/rffe_leo_quadband.c **** #include <calypso/tsp.h>
+  56:board/tr800/rffe_leo_quadband.c **** #include <rf/trf6151.h>
+  57:board/tr800/rffe_leo_quadband.c **** 
+  58:board/tr800/rffe_leo_quadband.c **** /*
+  59:board/tr800/rffe_leo_quadband.c ****  * OsmocomBB's definition of system inherent gain is similar to what is
+  60:board/tr800/rffe_leo_quadband.c ****  * called "magic gain" (GMagic) in TI's architecture, except that TI's
+  61:board/tr800/rffe_leo_quadband.c ****  * GMagic includes TRF6151 LNA gain whereas OBB's definition of system
+  62:board/tr800/rffe_leo_quadband.c ****  * inherent gain does not.  TI's GMagic is also reckoned in half-dB units
+  63:board/tr800/rffe_leo_quadband.c ****  * instead of integral dB.
+  64:board/tr800/rffe_leo_quadband.c ****  *
+  65:board/tr800/rffe_leo_quadband.c ****  * The canonical GMagic number for Leonardo/TR-800 RFFE is 200, both in
+  66:board/tr800/rffe_leo_quadband.c ****  * iWOW's original calibration and as confirmed with CMU200 measurements
+  67:board/tr800/rffe_leo_quadband.c ****  * at FreeCalypso HQ.  GMagic=200 in TI's universe is equivalent to
+  68:board/tr800/rffe_leo_quadband.c ****  * OsmocomBB's "system inherent gain" of 73 dB.
+  69:board/tr800/rffe_leo_quadband.c ****  */
+  70:board/tr800/rffe_leo_quadband.c **** #define SYSTEM_INHERENT_GAIN	73
+  71:board/tr800/rffe_leo_quadband.c **** 
+  72:board/tr800/rffe_leo_quadband.c **** /* describe how the RF frontend is wired on Leonardo and TR-800 */
+  73:board/tr800/rffe_leo_quadband.c **** 
+  74:board/tr800/rffe_leo_quadband.c **** #define		RITA_RESET	TSPACT(0)	/* Reset of the Rita TRF6151 */
+  75:board/tr800/rffe_leo_quadband.c **** #define		PA_ENABLE	TSPACT(9)	/* Enable the Power Amplifier */
+  76:board/tr800/rffe_leo_quadband.c **** #define		PA_BAND_SEL	TSPACT(3)	/* PA band select, 1=DCS/PCS */
+  77:board/tr800/rffe_leo_quadband.c **** 
+  78:board/tr800/rffe_leo_quadband.c **** /* All FEM controls are low-active */
+  79:board/tr800/rffe_leo_quadband.c **** #define		FEM_7		TSPACT(2)	/* FEM pin 7 */
+  80:board/tr800/rffe_leo_quadband.c **** #define		FEM_8		TSPACT(1)	/* FEM pin 8 */
+  81:board/tr800/rffe_leo_quadband.c **** #define		FEM_9		TSPACT(4)	/* FEM pin 9 */
+  82:board/tr800/rffe_leo_quadband.c **** 
+  83:board/tr800/rffe_leo_quadband.c **** #define		IOTA_STROBE	TSPEN(0)	/* Strobe for the Iota TSP */
+  84:board/tr800/rffe_leo_quadband.c **** #define		RITA_STROBE	TSPEN(2)	/* Strobe for the Rita TSP */
+  85:board/tr800/rffe_leo_quadband.c **** 
+  86:board/tr800/rffe_leo_quadband.c **** /* switch RF Frontend Mode */
+  87:board/tr800/rffe_leo_quadband.c **** void rffe_mode(enum gsm_band band, int tx)
+  88:board/tr800/rffe_leo_quadband.c **** {
+  18              		.loc 1 88 0
+  19              		.cfi_startproc
+  20              		@ args = 0, pretend = 0, frame = 0
+  21              		@ frame_needed = 0, uses_anonymous_args = 0
+  22              	.LVL0:
+  23 0000 10402DE9 		stmfd	sp!, {r4, lr}
+  24              	.LCFI0:
+  25              		.cfi_def_cfa_offset 8
+  26              		.loc 1 88 0
+  27 0004 0040A0E1 		mov	r4, r0
+  28              		.cfi_offset 14, -4
+  29              		.cfi_offset 4, -8
+  89:board/tr800/rffe_leo_quadband.c **** 	uint16_t tspact = tsp_act_state();
+  30              		.loc 1 89 0
+  31 0008 FEFFFFEB 		bl	tsp_act_state
+  32              	.LVL1:
+  90:board/tr800/rffe_leo_quadband.c **** 
+  91:board/tr800/rffe_leo_quadband.c **** 	/* First we mask off all bits from the state cache */
+  92:board/tr800/rffe_leo_quadband.c **** 	tspact &= ~PA_ENABLE;
+  93:board/tr800/rffe_leo_quadband.c **** 	tspact &= ~PA_BAND_SEL;
+  33              		.loc 1 93 0
+  34 000c 14309FE5 		ldr	r3, .L4
+  35 0010 033000E0 		and	r3, r0, r3
+  36              	.LVL2:
+  94:board/tr800/rffe_leo_quadband.c **** 	tspact |= FEM_7 | FEM_8 | FEM_9; /* low-active */
+  37              		.loc 1 94 0
+  38 0014 160083E3 		orr	r0, r3, #22
+  39              	.LVL3:
+  95:board/tr800/rffe_leo_quadband.c **** 
+  96:board/tr800/rffe_leo_quadband.c **** 	switch (band) {
+  40              		.loc 1 96 0
+  41 0018 010054E3 		cmp	r4, #1
+  97:board/tr800/rffe_leo_quadband.c **** 	case GSM_BAND_850:
+  98:board/tr800/rffe_leo_quadband.c **** 		tspact &= ~FEM_9;
+  42              		.loc 1 98 0
+  43 001c 1000C003 		biceq	r0, r0, #16
+  44              	.LVL4:
+  99:board/tr800/rffe_leo_quadband.c **** 		break;
+ 100:board/tr800/rffe_leo_quadband.c **** 	case GSM_BAND_900:
+ 101:board/tr800/rffe_leo_quadband.c **** 	case GSM_BAND_1800:
+ 102:board/tr800/rffe_leo_quadband.c **** 	case GSM_BAND_1900:
+ 103:board/tr800/rffe_leo_quadband.c **** 		break;
+ 104:board/tr800/rffe_leo_quadband.c **** 	default:
+ 105:board/tr800/rffe_leo_quadband.c **** 		/* TODO return/signal error here */
+ 106:board/tr800/rffe_leo_quadband.c **** 		break;
+ 107:board/tr800/rffe_leo_quadband.c **** 	}
+ 108:board/tr800/rffe_leo_quadband.c **** 
+ 109:board/tr800/rffe_leo_quadband.c **** #ifdef CONFIG_TX_ENABLE
+ 110:board/tr800/rffe_leo_quadband.c **** 	/* Then we selectively set the bits on, if required */
+ 111:board/tr800/rffe_leo_quadband.c **** 	if (tx) {
+ 112:board/tr800/rffe_leo_quadband.c **** 		switch (band) {
+ 113:board/tr800/rffe_leo_quadband.c **** 		case GSM_BAND_850:
+ 114:board/tr800/rffe_leo_quadband.c **** 		case GSM_BAND_900:
+ 115:board/tr800/rffe_leo_quadband.c **** 			tspact |= FEM_9;
+ 116:board/tr800/rffe_leo_quadband.c **** 			tspact &= ~FEM_7;
+ 117:board/tr800/rffe_leo_quadband.c **** 			break;
+ 118:board/tr800/rffe_leo_quadband.c **** 		case GSM_BAND_1800:
+ 119:board/tr800/rffe_leo_quadband.c **** 		case GSM_BAND_1900:
+ 120:board/tr800/rffe_leo_quadband.c **** 			tspact &= ~FEM_8;
+ 121:board/tr800/rffe_leo_quadband.c **** 			tspact |= PA_BAND_SEL;
+ 122:board/tr800/rffe_leo_quadband.c **** 			break;
+ 123:board/tr800/rffe_leo_quadband.c **** 		default:
+ 124:board/tr800/rffe_leo_quadband.c **** 			break;
+ 125:board/tr800/rffe_leo_quadband.c **** 		}
+ 126:board/tr800/rffe_leo_quadband.c **** 		tspact |= PA_ENABLE;
+ 127:board/tr800/rffe_leo_quadband.c **** 	}
+ 128:board/tr800/rffe_leo_quadband.c **** #endif /* TRANSMIT_SUPPORT */
+ 129:board/tr800/rffe_leo_quadband.c **** 
+ 130:board/tr800/rffe_leo_quadband.c **** 	tsp_act_update(tspact);
+ 131:board/tr800/rffe_leo_quadband.c **** }
+  45              		.loc 1 131 0
+  46 0020 1040BDE8 		ldmfd	sp!, {r4, lr}
+ 130:board/tr800/rffe_leo_quadband.c **** 	tsp_act_update(tspact);
+  47              		.loc 1 130 0
+  48 0024 FEFFFFEA 		b	tsp_act_update
+  49              	.LVL5:
+  50              	.L5:
+  51              		.align	2
+  52              	.L4:
+  53 0028 F7FD0000 		.word	65015
+  54              		.cfi_endproc
+  55              	.LFE3:
+  57              		.section	.text.rffe_get_rx_ports,"ax",%progbits
+  58              		.align	2
+  59              		.global	rffe_get_rx_ports
+  61              	rffe_get_rx_ports:
+  62              	.LFB4:
+ 132:board/tr800/rffe_leo_quadband.c **** 
+ 133:board/tr800/rffe_leo_quadband.c **** /* Returns RF wiring */
+ 134:board/tr800/rffe_leo_quadband.c **** uint32_t rffe_get_rx_ports(void)
+ 135:board/tr800/rffe_leo_quadband.c **** {
+  63              		.loc 1 135 0
+  64              		.cfi_startproc
+  65              		@ args = 0, pretend = 0, frame = 0
+  66              		@ frame_needed = 0, uses_anonymous_args = 0
+  67              		@ link register save eliminated.
+ 136:board/tr800/rffe_leo_quadband.c **** 	return (1 << PORT_LO) | (1 << PORT_DCS1800) | (1 << PORT_PCS1900);
+ 137:board/tr800/rffe_leo_quadband.c **** }
+  68              		.loc 1 137 0
+  69 0000 3100A0E3 		mov	r0, #49
+  70 0004 1EFF2FE1 		bx	lr
+  71              		.cfi_endproc
+  72              	.LFE4:
+  74              		.section	.text.rffe_get_tx_ports,"ax",%progbits
+  75              		.align	2
+  76              		.global	rffe_get_tx_ports
+  78              	rffe_get_tx_ports:
+  79              	.LFB5:
+ 138:board/tr800/rffe_leo_quadband.c **** 
+ 139:board/tr800/rffe_leo_quadband.c **** uint32_t rffe_get_tx_ports(void)
+ 140:board/tr800/rffe_leo_quadband.c **** {
+  80              		.loc 1 140 0
+  81              		.cfi_startproc
+  82              		@ args = 0, pretend = 0, frame = 0
+  83              		@ frame_needed = 0, uses_anonymous_args = 0
+  84              		@ link register save eliminated.
+ 141:board/tr800/rffe_leo_quadband.c **** 	return (1 << PORT_LO) | (1 << PORT_HI);
+ 142:board/tr800/rffe_leo_quadband.c **** }
+  85              		.loc 1 142 0
+  86 0000 0300A0E3 		mov	r0, #3
+  87 0004 1EFF2FE1 		bx	lr
+  88              		.cfi_endproc
+  89              	.LFE5:
+  91              		.section	.text.rffe_iq_swapped,"ax",%progbits
+  92              		.align	2
+  93              		.global	rffe_iq_swapped
+  95              	rffe_iq_swapped:
+  96              	.LFB6:
+ 143:board/tr800/rffe_leo_quadband.c **** 
+ 144:board/tr800/rffe_leo_quadband.c **** /* Returns need for IQ swap */
+ 145:board/tr800/rffe_leo_quadband.c **** int rffe_iq_swapped(uint16_t band_arfcn, int tx)
+ 146:board/tr800/rffe_leo_quadband.c **** {
+  97              		.loc 1 146 0
+  98              		.cfi_startproc
+  99              		@ args = 0, pretend = 0, frame = 0
+ 100              		@ frame_needed = 0, uses_anonymous_args = 0
+ 101              		@ link register save eliminated.
+ 102              	.LVL6:
+ 103              		.loc 1 146 0
+ 104 0000 0008A0E1 		mov	r0, r0, asl #16
+ 105              	.LVL7:
+ 147:board/tr800/rffe_leo_quadband.c **** 	return trf6151_iq_swapped(band_arfcn, tx);
+ 106              		.loc 1 147 0
+ 107 0004 2008A0E1 		mov	r0, r0, lsr #16
+ 148:board/tr800/rffe_leo_quadband.c **** }
+ 108              		.loc 1 148 0
+ 147:board/tr800/rffe_leo_quadband.c **** 	return trf6151_iq_swapped(band_arfcn, tx);
+ 109              		.loc 1 147 0
+ 110 0008 FEFFFFEA 		b	trf6151_iq_swapped
+ 111              		.cfi_endproc
+ 112              	.LFE6:
+ 114              		.section	.text.rffe_init,"ax",%progbits
+ 115              		.align	2
+ 116              		.global	rffe_init
+ 118              	rffe_init:
+ 119              	.LFB7:
+ 149:board/tr800/rffe_leo_quadband.c **** 
+ 150:board/tr800/rffe_leo_quadband.c **** 
+ 151:board/tr800/rffe_leo_quadband.c **** #define MCU_SW_TRACE	0xfffef00e
+ 152:board/tr800/rffe_leo_quadband.c **** #define ARM_CONF_REG	0xfffef006
+ 153:board/tr800/rffe_leo_quadband.c **** 
+ 154:board/tr800/rffe_leo_quadband.c **** void rffe_init(void)
+ 155:board/tr800/rffe_leo_quadband.c **** {
+ 120              		.loc 1 155 0
+ 121              		.cfi_startproc
+ 122              		@ args = 0, pretend = 0, frame = 0
+ 123              		@ frame_needed = 0, uses_anonymous_args = 0
+ 156:board/tr800/rffe_leo_quadband.c **** 	uint16_t reg;
+ 157:board/tr800/rffe_leo_quadband.c **** 
+ 158:board/tr800/rffe_leo_quadband.c **** 	reg = readw(ARM_CONF_REG);
+ 124              		.loc 1 158 0
+ 125 0000 44309FE5 		ldr	r3, .L10
+ 159:board/tr800/rffe_leo_quadband.c **** 	reg &= ~(1 << 7);	/* TSPACT4 I/O function, not nRDYMEM */
+ 126              		.loc 1 159 0
+ 127 0004 44209FE5 		ldr	r2, .L10+4
+ 158:board/tr800/rffe_leo_quadband.c **** 	reg = readw(ARM_CONF_REG);
+ 128              		.loc 1 158 0
+ 129 0008 B91F53E1 		ldrh	r1, [r3, #-249]
+ 130              	.LVL8:
+ 131              		.loc 1 159 0
+ 132 000c 022001E0 		and	r2, r1, r2
+ 133              	.LVL9:
+ 155:board/tr800/rffe_leo_quadband.c **** {
+ 134              		.loc 1 155 0
+ 135 0010 04E02DE5 		str	lr, [sp, #-4]!
+ 136              	.LCFI1:
+ 137              		.cfi_def_cfa_offset 4
+ 160:board/tr800/rffe_leo_quadband.c **** 	writew(reg, ARM_CONF_REG);
+ 138              		.loc 1 160 0
+ 139 0014 B92F43E1 		strh	r2, [r3, #-249]	@ movhi
+ 161:board/tr800/rffe_leo_quadband.c **** 
+ 162:board/tr800/rffe_leo_quadband.c **** 	reg = readw(MCU_SW_TRACE);
+ 163:board/tr800/rffe_leo_quadband.c **** 	reg &= ~(1 << 1);	/* TSPACT9 I/O function, not MAS(1) */
+ 140              		.loc 1 163 0
+ 141 0018 34209FE5 		ldr	r2, .L10+8
+ 142              	.LVL10:
+ 162:board/tr800/rffe_leo_quadband.c **** 	reg = readw(MCU_SW_TRACE);
+ 143              		.loc 1 162 0
+ 144 001c B11F53E1 		ldrh	r1, [r3, #-241]
+ 145              	.LVL11:
+ 164:board/tr800/rffe_leo_quadband.c **** 	writew(reg, MCU_SW_TRACE);
+ 165:board/tr800/rffe_leo_quadband.c **** 
+ 166:board/tr800/rffe_leo_quadband.c **** 	/* Configure the TSPEN which is connected to the TWL3025 */
+ 167:board/tr800/rffe_leo_quadband.c **** 	tsp_setup(IOTA_STROBE, 1, 0, 0);
+ 146              		.loc 1 167 0
+ 147 0020 0000A0E3 		mov	r0, #0
+ 163:board/tr800/rffe_leo_quadband.c **** 	reg &= ~(1 << 1);	/* TSPACT9 I/O function, not MAS(1) */
+ 148              		.loc 1 163 0
+ 149 0024 022001E0 		and	r2, r1, r2
+ 150              	.LVL12:
+ 164:board/tr800/rffe_leo_quadband.c **** 	writew(reg, MCU_SW_TRACE);
+ 151              		.loc 1 164 0
+ 152 0028 B12F43E1 		strh	r2, [r3, #-241]	@ movhi
+ 153              		.loc 1 167 0
+ 154 002c 0110A0E3 		mov	r1, #1
+ 155 0030 0020A0E1 		mov	r2, r0
+ 156              	.LVL13:
+ 157 0034 0030A0E1 		mov	r3, r0
+ 158              		.cfi_offset 14, -4
+ 159 0038 FEFFFFEB 		bl	tsp_setup
+ 168:board/tr800/rffe_leo_quadband.c **** 
+ 169:board/tr800/rffe_leo_quadband.c **** 	trf6151_init(RITA_STROBE, RITA_RESET);
+ 160              		.loc 1 169 0
+ 161 003c 0200A0E3 		mov	r0, #2
+ 162 0040 0110A0E3 		mov	r1, #1
+ 170:board/tr800/rffe_leo_quadband.c **** }
+ 163              		.loc 1 170 0
+ 164 0044 04E09DE4 		ldr	lr, [sp], #4
+ 169:board/tr800/rffe_leo_quadband.c **** 	trf6151_init(RITA_STROBE, RITA_RESET);
+ 165              		.loc 1 169 0
+ 166 0048 FEFFFFEA 		b	trf6151_init
+ 167              	.L11:
+ 168              		.align	2
+ 169              	.L10:
+ 170 004c FFF0FEFF 		.word	-69377
+ 171 0050 7FFF0000 		.word	65407
+ 172 0054 FDFF0000 		.word	65533
+ 173              		.cfi_endproc
+ 174              	.LFE7:
+ 176              		.section	.text.rffe_get_gain,"ax",%progbits
+ 177              		.align	2
+ 178              		.global	rffe_get_gain
+ 180              	rffe_get_gain:
+ 181              	.LFB8:
+ 171:board/tr800/rffe_leo_quadband.c **** 
+ 172:board/tr800/rffe_leo_quadband.c **** uint8_t rffe_get_gain(void)
+ 173:board/tr800/rffe_leo_quadband.c **** {
+ 182              		.loc 1 173 0
+ 183              		.cfi_startproc
+ 184              		@ args = 0, pretend = 0, frame = 0
+ 185              		@ frame_needed = 0, uses_anonymous_args = 0
+ 186              		@ link register save eliminated.
+ 174:board/tr800/rffe_leo_quadband.c **** 	return trf6151_get_gain();
+ 175:board/tr800/rffe_leo_quadband.c **** }
+ 187              		.loc 1 175 0
+ 174:board/tr800/rffe_leo_quadband.c **** 	return trf6151_get_gain();
+ 188              		.loc 1 174 0
+ 189 0000 FEFFFFEA 		b	trf6151_get_gain
+ 190              		.cfi_endproc
+ 191              	.LFE8:
+ 193              		.section	.text.rffe_set_gain,"ax",%progbits
+ 194              		.align	2
+ 195              		.global	rffe_set_gain
+ 197              	rffe_set_gain:
+ 198              	.LFB9:
+ 176:board/tr800/rffe_leo_quadband.c **** 
+ 177:board/tr800/rffe_leo_quadband.c **** void rffe_set_gain(uint8_t dbm)
+ 178:board/tr800/rffe_leo_quadband.c **** {
+ 199              		.loc 1 178 0
+ 200              		.cfi_startproc
+ 201              		@ args = 0, pretend = 0, frame = 0
+ 202              		@ frame_needed = 0, uses_anonymous_args = 0
+ 203              		@ link register save eliminated.
+ 204              	.LVL14:
+ 205              		.loc 1 178 0
+ 206 0000 FF0000E2 		and	r0, r0, #255
+ 207              	.LVL15:
+ 179:board/tr800/rffe_leo_quadband.c **** 	trf6151_set_gain(dbm);
+ 180:board/tr800/rffe_leo_quadband.c **** }
+ 208              		.loc 1 180 0
+ 179:board/tr800/rffe_leo_quadband.c **** 	trf6151_set_gain(dbm);
+ 209              		.loc 1 179 0
+ 210 0004 FEFFFFEA 		b	trf6151_set_gain
+ 211              		.cfi_endproc
+ 212              	.LFE9:
+ 214              		.section	.text.rffe_compute_gain,"ax",%progbits
+ 215              		.align	2
+ 216              		.global	rffe_compute_gain
+ 218              	rffe_compute_gain:
+ 219              	.LFB10:
+ 181:board/tr800/rffe_leo_quadband.c **** 
+ 182:board/tr800/rffe_leo_quadband.c **** const uint8_t system_inherent_gain = SYSTEM_INHERENT_GAIN;
+ 183:board/tr800/rffe_leo_quadband.c **** 
+ 184:board/tr800/rffe_leo_quadband.c **** /* Given the expected input level of exp_inp dBm/8 and the target of target_bb
+ 185:board/tr800/rffe_leo_quadband.c ****  * dBm8, configure the RF Frontend with the respective gain */
+ 186:board/tr800/rffe_leo_quadband.c **** void rffe_compute_gain(int16_t exp_inp, int16_t target_bb)
+ 187:board/tr800/rffe_leo_quadband.c **** {
+ 220              		.loc 1 187 0
+ 221              		.cfi_startproc
+ 222              		@ args = 0, pretend = 0, frame = 0
+ 223              		@ frame_needed = 0, uses_anonymous_args = 0
+ 224              		@ link register save eliminated.
+ 225              	.LVL16:
+ 226              		.loc 1 187 0
+ 227 0000 0008A0E1 		mov	r0, r0, asl #16
+ 228              	.LVL17:
+ 229 0004 0118A0E1 		mov	r1, r1, asl #16
+ 230              	.LVL18:
+ 188:board/tr800/rffe_leo_quadband.c **** 	trf6151_compute_gain(exp_inp, target_bb);
+ 231              		.loc 1 188 0
+ 232 0008 4008A0E1 		mov	r0, r0, asr #16
+ 233 000c 4118A0E1 		mov	r1, r1, asr #16
+ 189:board/tr800/rffe_leo_quadband.c **** }
+ 234              		.loc 1 189 0
+ 188:board/tr800/rffe_leo_quadband.c **** 	trf6151_compute_gain(exp_inp, target_bb);
+ 235              		.loc 1 188 0
+ 236 0010 FEFFFFEA 		b	trf6151_compute_gain
+ 237              		.cfi_endproc
+ 238              	.LFE10:
+ 240              		.section	.text.rffe_rx_win_ctrl,"ax",%progbits
+ 241              		.align	2
+ 242              		.global	rffe_rx_win_ctrl
+ 244              	rffe_rx_win_ctrl:
+ 245              	.LFB11:
+ 190:board/tr800/rffe_leo_quadband.c **** 
+ 191:board/tr800/rffe_leo_quadband.c **** void rffe_rx_win_ctrl(int16_t exp_inp, int16_t target_bb)
+ 192:board/tr800/rffe_leo_quadband.c **** {
+ 246              		.loc 1 192 0
+ 247              		.cfi_startproc
+ 248              		@ args = 0, pretend = 0, frame = 0
+ 249              		@ frame_needed = 0, uses_anonymous_args = 0
+ 250              		@ link register save eliminated.
+ 251              	.LVL19:
+ 193:board/tr800/rffe_leo_quadband.c **** 	/* FIXME */
+ 194:board/tr800/rffe_leo_quadband.c **** }
+ 252              		.loc 1 194 0
+ 253 0000 1EFF2FE1 		bx	lr
+ 254              		.cfi_endproc
+ 255              	.LFE11:
+ 257              		.global	system_inherent_gain
+ 258              		.section	.rodata
+ 261              	system_inherent_gain:
+ 262 0000 49       		.byte	73
+ 263              		.text
+ 264              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 rffe_leo_quadband.c
+     /tmp/cclZx5nw.s:12     .text.rffe_mode:0000000000000000 $a
+     /tmp/cclZx5nw.s:15     .text.rffe_mode:0000000000000000 rffe_mode
+     /tmp/cclZx5nw.s:53     .text.rffe_mode:0000000000000028 $d
+     /tmp/cclZx5nw.s:58     .text.rffe_get_rx_ports:0000000000000000 $a
+     /tmp/cclZx5nw.s:61     .text.rffe_get_rx_ports:0000000000000000 rffe_get_rx_ports
+     /tmp/cclZx5nw.s:75     .text.rffe_get_tx_ports:0000000000000000 $a
+     /tmp/cclZx5nw.s:78     .text.rffe_get_tx_ports:0000000000000000 rffe_get_tx_ports
+     /tmp/cclZx5nw.s:92     .text.rffe_iq_swapped:0000000000000000 $a
+     /tmp/cclZx5nw.s:95     .text.rffe_iq_swapped:0000000000000000 rffe_iq_swapped
+     /tmp/cclZx5nw.s:115    .text.rffe_init:0000000000000000 $a
+     /tmp/cclZx5nw.s:118    .text.rffe_init:0000000000000000 rffe_init
+     /tmp/cclZx5nw.s:170    .text.rffe_init:000000000000004c $d
+     /tmp/cclZx5nw.s:177    .text.rffe_get_gain:0000000000000000 $a
+     /tmp/cclZx5nw.s:180    .text.rffe_get_gain:0000000000000000 rffe_get_gain
+     /tmp/cclZx5nw.s:194    .text.rffe_set_gain:0000000000000000 $a
+     /tmp/cclZx5nw.s:197    .text.rffe_set_gain:0000000000000000 rffe_set_gain
+     /tmp/cclZx5nw.s:215    .text.rffe_compute_gain:0000000000000000 $a
+     /tmp/cclZx5nw.s:218    .text.rffe_compute_gain:0000000000000000 rffe_compute_gain
+     /tmp/cclZx5nw.s:241    .text.rffe_rx_win_ctrl:0000000000000000 $a
+     /tmp/cclZx5nw.s:244    .text.rffe_rx_win_ctrl:0000000000000000 rffe_rx_win_ctrl
+     /tmp/cclZx5nw.s:261    .rodata:0000000000000000 system_inherent_gain
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+tsp_act_state
+tsp_act_update
+trf6151_iq_swapped
+tsp_setup
+trf6151_init
+trf6151_get_gain
+trf6151_set_gain
+trf6151_compute_gain

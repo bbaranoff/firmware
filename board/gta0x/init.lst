@@ -23,370 +23,347 @@
   14:board/gta0x/init.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   15:board/gta0x/init.c ****  * GNU General Public License for more details.
   16:board/gta0x/init.c ****  *
-  17:board/gta0x/init.c ****  * You should have received a copy of the GNU General Public License along
-  18:board/gta0x/init.c ****  * with this program; if not, write to the Free Software Foundation, Inc.,
-  19:board/gta0x/init.c ****  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-  20:board/gta0x/init.c ****  *
-  21:board/gta0x/init.c ****  */
-  22:board/gta0x/init.c **** 
-  23:board/gta0x/init.c **** #include <stdint.h>
-  24:board/gta0x/init.c **** #include <stdio.h>
-  25:board/gta0x/init.c **** 
-  26:board/gta0x/init.c **** #include <debug.h>
-  27:board/gta0x/init.c **** #include <ctors.h>
-  28:board/gta0x/init.c **** #include <memory.h>
-  29:board/gta0x/init.c **** #include <board.h>
-  30:board/gta0x/init.c **** #include <keypad.h>
-  31:board/gta0x/init.c **** #include <console.h>
-  32:board/gta0x/init.c **** #include <flash/cfi_flash.h>
-  33:board/gta0x/init.c **** 
-  34:board/gta0x/init.c **** #include <calypso/irq.h>
-  35:board/gta0x/init.c **** #include <calypso/clock.h>
-  36:board/gta0x/init.c **** #include <calypso/dma.h>
-  37:board/gta0x/init.c **** #include <calypso/rtc.h>
-  38:board/gta0x/init.c **** #include <calypso/timer.h>
-  39:board/gta0x/init.c **** #include <uart.h>
-  40:board/gta0x/init.c **** #include <calypso/backlight.h>
+  17:board/gta0x/init.c ****  */
+  18:board/gta0x/init.c **** 
+  19:board/gta0x/init.c **** #include <stdint.h>
+  20:board/gta0x/init.c **** #include <stdio.h>
+  21:board/gta0x/init.c **** 
+  22:board/gta0x/init.c **** #include <debug.h>
+  23:board/gta0x/init.c **** #include <ctors.h>
+  24:board/gta0x/init.c **** #include <memory.h>
+  25:board/gta0x/init.c **** #include <board.h>
+  26:board/gta0x/init.c **** #include <keypad.h>
+  27:board/gta0x/init.c **** #include <console.h>
+  28:board/gta0x/init.c **** #include <flash/cfi_flash.h>
+  29:board/gta0x/init.c **** #include <tiffs.h>
+  30:board/gta0x/init.c **** 
+  31:board/gta0x/init.c **** #include <calypso/irq.h>
+  32:board/gta0x/init.c **** #include <calypso/clock.h>
+  33:board/gta0x/init.c **** #include <calypso/dma.h>
+  34:board/gta0x/init.c **** #include <calypso/rtc.h>
+  35:board/gta0x/init.c **** #include <calypso/timer.h>
+  36:board/gta0x/init.c **** #include <uart.h>
+  37:board/gta0x/init.c **** #include <calypso/backlight.h>
+  38:board/gta0x/init.c **** 
+  39:board/gta0x/init.c **** #include <comm/sercomm.h>
+  40:board/gta0x/init.c **** #include <comm/timer.h>
   41:board/gta0x/init.c **** 
-  42:board/gta0x/init.c **** #include <comm/sercomm.h>
-  43:board/gta0x/init.c **** #include <comm/timer.h>
-  44:board/gta0x/init.c **** 
-  45:board/gta0x/init.c **** #include <abb/twl3025.h>
-  46:board/gta0x/init.c **** #include <rf/trf6151.h>
-  47:board/gta0x/init.c **** #include "../compal/keymap.h"
-  48:board/gta0x/init.c **** 
-  49:board/gta0x/init.c **** #define ARMIO_LATCH_OUT 0xfffe4802
-  50:board/gta0x/init.c **** #define IO_CNTL_REG	0xfffe4804
-  51:board/gta0x/init.c **** #define ASIC_CONF_REG	0xfffef008
-  52:board/gta0x/init.c **** 
-  53:board/gta0x/init.c **** static void board_io_init(void)
-  54:board/gta0x/init.c **** {
-  55:board/gta0x/init.c **** 	uint16_t reg;
-  56:board/gta0x/init.c **** 
-  57:board/gta0x/init.c **** 	reg = readw(ASIC_CONF_REG);
-  58:board/gta0x/init.c **** 	/* LCD Set I/O(3) / SA0 to I/O(3) mode */
-  59:board/gta0x/init.c **** 	reg &= ~(1 << 10);
-  60:board/gta0x/init.c **** 	/* Set function pins to I2C Mode */
-  61:board/gta0x/init.c **** 	reg |= ((1 << 12) | (1 << 7));		/* SCL / SDA */
-  62:board/gta0x/init.c **** 	/* TWL3025: Set SPI+RIF RX clock to rising edge */
-  63:board/gta0x/init.c **** 	reg |= (1 << 13) | (1 << 14);
-  64:board/gta0x/init.c **** 	writew(reg, ASIC_CONF_REG);
-  65:board/gta0x/init.c **** 
-  66:board/gta0x/init.c **** 	/* LCD Set I/O(3) to output mode */
-  67:board/gta0x/init.c **** 	reg = readw(IO_CNTL_REG);
-  68:board/gta0x/init.c **** 	reg &= ~(1 << 3);
-  69:board/gta0x/init.c **** 	writew(reg, IO_CNTL_REG);
+  42:board/gta0x/init.c **** #include <abb/twl3025.h>
+  43:board/gta0x/init.c **** #include <rf/trf6151.h>
+  44:board/gta0x/init.c **** #include "../compal/keymap.h"
+  45:board/gta0x/init.c **** 
+  46:board/gta0x/init.c **** #define ARMIO_LATCH_OUT 0xfffe4802
+  47:board/gta0x/init.c **** #define IO_CNTL_REG	0xfffe4804
+  48:board/gta0x/init.c **** #define ASIC_CONF_REG	0xfffef008
+  49:board/gta0x/init.c **** #define IO_CONF_REG	0xfffef00a
+  50:board/gta0x/init.c **** 
+  51:board/gta0x/init.c **** static void board_io_init(void)
+  52:board/gta0x/init.c **** {
+  53:board/gta0x/init.c **** 	uint16_t reg;
+  54:board/gta0x/init.c **** 
+  55:board/gta0x/init.c **** 	reg = readw(ASIC_CONF_REG);
+  56:board/gta0x/init.c **** 	/* TWL3025: Set SPI+RIF RX clock to rising edge */
+  57:board/gta0x/init.c **** 	reg |= (1 << 13) | (1 << 14);
+  58:board/gta0x/init.c **** 	writew(reg, ASIC_CONF_REG);
+  59:board/gta0x/init.c **** 
+  60:board/gta0x/init.c **** 	/*
+  61:board/gta0x/init.c **** 	 * Most Calypso peripheral interface signals are unconnected
+  62:board/gta0x/init.c **** 	 * on this modem.  We configure them to be GPIOs in IO_CONF_REG,
+  63:board/gta0x/init.c **** 	 * then configure them to be outputs in IO_CNTL_REG, then set
+  64:board/gta0x/init.c **** 	 * the outputs to 0 in ARMIO_LATCH_OUT.
+  65:board/gta0x/init.c **** 	 */
+  66:board/gta0x/init.c **** 	writew(0x03F5, IO_CONF_REG);
+  67:board/gta0x/init.c **** 	writew(0xC000, IO_CNTL_REG);
+  68:board/gta0x/init.c **** 	writew(0x0000, ARMIO_LATCH_OUT);
+  69:board/gta0x/init.c **** }
   70:board/gta0x/init.c **** 
-  71:board/gta0x/init.c **** 	/* LCD Set I/O(3) output low */
-  72:board/gta0x/init.c **** 	reg = readw(ARMIO_LATCH_OUT);
-  73:board/gta0x/init.c **** 	reg &= ~(1 << 3);
-  74:board/gta0x/init.c **** 	writew(reg, ARMIO_LATCH_OUT);
-  75:board/gta0x/init.c **** }
-  76:board/gta0x/init.c **** 
-  77:board/gta0x/init.c **** void board_init(int with_irq)
-  78:board/gta0x/init.c **** {
-  18              		.loc 1 78 0
+  71:board/gta0x/init.c **** void board_init(int with_irq)
+  72:board/gta0x/init.c **** {
+  18              		.loc 1 72 0
   19              		.cfi_startproc
   20              		@ args = 0, pretend = 0, frame = 0
   21              		@ frame_needed = 0, uses_anonymous_args = 0
   22              	.LVL0:
-  23 0000 17402DE9 		stmfd	sp!, {r0, r1, r2, r4, lr}
+  23 0000 37402DE9 		stmfd	sp!, {r0, r1, r2, r4, r5, lr}
   24              	.LCFI0:
-  25              		.cfi_def_cfa_offset 20
-  79:board/gta0x/init.c **** 	/* Configure the memory interface */
-  80:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_nCS0, 3, CALYPSO_MEM_16bit, 1);
-  26              		.loc 1 80 0
+  25              		.cfi_def_cfa_offset 24
+  73:board/gta0x/init.c **** 	/* Configure the memory interface */
+  74:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_nCS0, 3, CALYPSO_MEM_16bit, 1);
+  26              		.loc 1 74 0
   27 0004 0120A0E3 		mov	r2, #1
   28              		.cfi_offset 14, -4
-  29              		.cfi_offset 4, -8
-  30              		.cfi_offset 2, -12
-  31              		.cfi_offset 1, -16
-  32              		.cfi_offset 0, -20
-  78:board/gta0x/init.c **** {
-  33              		.loc 1 78 0
-  34 0008 0040A0E1 		mov	r4, r0
-  35              		.loc 1 80 0
-  36 000c 0230A0E1 		mov	r3, r2
-  37 0010 0000A0E3 		mov	r0, #0
-  38              	.LVL1:
-  39 0014 0310A0E3 		mov	r1, #3
-  40 0018 FEFFFFEB 		bl	calypso_mem_cfg
-  81:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_nCS1, 3, CALYPSO_MEM_16bit, 1);
-  41              		.loc 1 81 0
-  42 001c 0120A0E3 		mov	r2, #1
-  43 0020 0230A0E1 		mov	r3, r2
-  44 0024 0200A0E3 		mov	r0, #2
-  45 0028 0310A0E3 		mov	r1, #3
-  46 002c FEFFFFEB 		bl	calypso_mem_cfg
-  82:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_nCS2, 5, CALYPSO_MEM_16bit, 1);
-  47              		.loc 1 82 0
-  48 0030 0120A0E3 		mov	r2, #1
-  49 0034 0230A0E1 		mov	r3, r2
-  50 0038 0400A0E3 		mov	r0, #4
-  51 003c 0510A0E3 		mov	r1, #5
-  52 0040 FEFFFFEB 		bl	calypso_mem_cfg
-  83:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_nCS3, 5, CALYPSO_MEM_16bit, 1);
-  53              		.loc 1 83 0
-  54 0044 0120A0E3 		mov	r2, #1
-  55 0048 0230A0E1 		mov	r3, r2
-  56 004c 0600A0E3 		mov	r0, #6
-  57 0050 0510A0E3 		mov	r1, #5
-  58 0054 FEFFFFEB 		bl	calypso_mem_cfg
-  84:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_CS4, 0, CALYPSO_MEM_8bit, 1);
-  59              		.loc 1 84 0
-  60 0058 0010A0E3 		mov	r1, #0
-  61 005c 0120A0E1 		mov	r2, r1
-  62 0060 0A00A0E3 		mov	r0, #10
-  63 0064 0130A0E3 		mov	r3, #1
-  64 0068 FEFFFFEB 		bl	calypso_mem_cfg
-  85:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_nCS6, 0, CALYPSO_MEM_32bit, 1);
-  65              		.loc 1 85 0
-  66 006c 0C00A0E3 		mov	r0, #12
-  67 0070 0010A0E3 		mov	r1, #0
-  68 0074 0220A0E3 		mov	r2, #2
-  69 0078 0130A0E3 		mov	r3, #1
-  70 007c FEFFFFEB 		bl	calypso_mem_cfg
-  86:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_nCS7, 0, CALYPSO_MEM_32bit, 0);
-  71              		.loc 1 86 0
-  72 0080 0010A0E3 		mov	r1, #0
-  73 0084 0130A0E1 		mov	r3, r1
-  74 0088 0800A0E3 		mov	r0, #8
-  75 008c 0220A0E3 		mov	r2, #2
-  76 0090 FEFFFFEB 		bl	calypso_mem_cfg
+  29              		.cfi_offset 5, -8
+  30              		.cfi_offset 4, -12
+  31              		.cfi_offset 2, -16
+  32              		.cfi_offset 1, -20
+  33              		.cfi_offset 0, -24
+  72:board/gta0x/init.c **** {
+  34              		.loc 1 72 0
+  35 0008 0050A0E1 		mov	r5, r0
+  36              		.loc 1 74 0
+  37 000c 0230A0E1 		mov	r3, r2
+  38 0010 0000A0E3 		mov	r0, #0
+  39              	.LVL1:
+  40 0014 0310A0E3 		mov	r1, #3
+  41 0018 FEFFFFEB 		bl	calypso_mem_cfg
+  75:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_nCS1, 3, CALYPSO_MEM_16bit, 1);
+  42              		.loc 1 75 0
+  43 001c 0120A0E3 		mov	r2, #1
+  44 0020 0230A0E1 		mov	r3, r2
+  45 0024 0200A0E3 		mov	r0, #2
+  46 0028 0310A0E3 		mov	r1, #3
+  47 002c FEFFFFEB 		bl	calypso_mem_cfg
+  76:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_nCS2, 5, CALYPSO_MEM_16bit, 1);
+  48              		.loc 1 76 0
+  49 0030 0120A0E3 		mov	r2, #1
+  50 0034 0230A0E1 		mov	r3, r2
+  51 0038 0400A0E3 		mov	r0, #4
+  52 003c 0510A0E3 		mov	r1, #5
+  53 0040 FEFFFFEB 		bl	calypso_mem_cfg
+  77:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_nCS3, 5, CALYPSO_MEM_16bit, 1);
+  54              		.loc 1 77 0
+  55 0044 0120A0E3 		mov	r2, #1
+  56 0048 0230A0E1 		mov	r3, r2
+  57 004c 0600A0E3 		mov	r0, #6
+  58 0050 0510A0E3 		mov	r1, #5
+  59 0054 FEFFFFEB 		bl	calypso_mem_cfg
+  78:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_CS4, 0, CALYPSO_MEM_8bit, 1);
+  60              		.loc 1 78 0
+  61 0058 0010A0E3 		mov	r1, #0
+  62 005c 0120A0E1 		mov	r2, r1
+  63 0060 0A00A0E3 		mov	r0, #10
+  64 0064 0130A0E3 		mov	r3, #1
+  65 0068 FEFFFFEB 		bl	calypso_mem_cfg
+  79:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_nCS6, 0, CALYPSO_MEM_32bit, 1);
+  66              		.loc 1 79 0
+  67 006c 0C00A0E3 		mov	r0, #12
+  68 0070 0010A0E3 		mov	r1, #0
+  69 0074 0220A0E3 		mov	r2, #2
+  70 0078 0130A0E3 		mov	r3, #1
+  71 007c FEFFFFEB 		bl	calypso_mem_cfg
+  80:board/gta0x/init.c **** 	calypso_mem_cfg(CALYPSO_nCS7, 0, CALYPSO_MEM_32bit, 0);
+  72              		.loc 1 80 0
+  73 0080 0010A0E3 		mov	r1, #0
+  74 0084 0130A0E1 		mov	r3, r1
+  75 0088 0800A0E3 		mov	r0, #8
+  76 008c 0220A0E3 		mov	r2, #2
+  77 0090 FEFFFFEB 		bl	calypso_mem_cfg
+  81:board/gta0x/init.c **** 
+  82:board/gta0x/init.c **** 	/* Set VTCXO_DIV2 = 1, configure PLL for 104 MHz and give ARM half of that */
+  83:board/gta0x/init.c **** 	calypso_clock_set(2, CALYPSO_PLL13_104_MHZ, ARM_MCLK_DIV_2);
+  78              		.loc 1 83 0
+  79 0094 0200A0E3 		mov	r0, #2
+  80 0098 0020A0E1 		mov	r2, r0
+  81 009c 021BA0E3 		mov	r1, #2048
+  82 00a0 FEFFFFEB 		bl	calypso_clock_set
+  84:board/gta0x/init.c **** 
+  85:board/gta0x/init.c **** 	/* Configure the RHEA bridge with some sane default values */
+  86:board/gta0x/init.c **** 	calypso_rhea_cfg(0, 0, 0xff, 0, 1, 0, 0);
+  83              		.loc 1 86 0
+  84 00a4 0040A0E3 		mov	r4, #0
+  85 00a8 0130A0E3 		mov	r3, #1
+  86 00ac 0410A0E1 		mov	r1, r4
+  87 00b0 00308DE5 		str	r3, [sp, #0]
+  88 00b4 0400A0E1 		mov	r0, r4
+  89 00b8 FF20A0E3 		mov	r2, #255
+  90 00bc 0430A0E1 		mov	r3, r4
+  91 00c0 04408DE5 		str	r4, [sp, #4]
+  92 00c4 08408DE5 		str	r4, [sp, #8]
+  93 00c8 FEFFFFEB 		bl	calypso_rhea_cfg
+  94              	.LBB4:
+  95              	.LBB5:
+  55:board/gta0x/init.c **** 	reg = readw(ASIC_CONF_REG);
+  96              		.loc 1 55 0
+  97 00cc C0309FE5 		ldr	r3, .L3
+  98 00d0 B72F53E1 		ldrh	r2, [r3, #-247]
+  99              	.LVL2:
+  57:board/gta0x/init.c **** 	reg |= (1 << 13) | (1 << 14);
+ 100              		.loc 1 57 0
+ 101 00d4 062A82E3 		orr	r2, r2, #24576
+ 102              	.LVL3:
+  58:board/gta0x/init.c **** 	writew(reg, ASIC_CONF_REG);
+ 103              		.loc 1 58 0
+ 104 00d8 B72F43E1 		strh	r2, [r3, #-247]	@ movhi
+  66:board/gta0x/init.c **** 	writew(0x03F5, IO_CONF_REG);
+ 105              		.loc 1 66 0
+ 106 00dc B4209FE5 		ldr	r2, .L3+4
+ 107              	.LVL4:
+ 108 00e0 B52F43E1 		strh	r2, [r3, #-245]	@ movhi
+  67:board/gta0x/init.c **** 	writew(0xC000, IO_CNTL_REG);
+ 109              		.loc 1 67 0
+ 110 00e4 2A3B43E2 		sub	r3, r3, #43008
+ 111 00e8 0329A0E3 		mov	r2, #49152
+ 112 00ec BB2F43E1 		strh	r2, [r3, #-251]	@ movhi
+ 113              	.LBE5:
+ 114              	.LBE4:
   87:board/gta0x/init.c **** 
-  88:board/gta0x/init.c **** 	/* Set VTCXO_DIV2 = 1, configure PLL for 104 MHz and give ARM half of that */
-  89:board/gta0x/init.c **** 	calypso_clock_set(2, CALYPSO_PLL13_104_MHZ, ARM_MCLK_DIV_2);
-  77              		.loc 1 89 0
-  78 0094 0200A0E3 		mov	r0, #2
-  79 0098 0020A0E1 		mov	r2, r0
-  80 009c 021BA0E3 		mov	r1, #2048
-  81 00a0 FEFFFFEB 		bl	calypso_clock_set
+  88:board/gta0x/init.c **** 	/* Initialize board-specific GPIO */
+  89:board/gta0x/init.c **** 	board_io_init();
   90:board/gta0x/init.c **** 
-  91:board/gta0x/init.c **** 	/* Configure the RHEA bridge with some sane default values */
-  92:board/gta0x/init.c **** 	calypso_rhea_cfg(0, 0, 0xff, 0, 1, 0, 0);
-  82              		.loc 1 92 0
-  83 00a4 0000A0E3 		mov	r0, #0
-  84 00a8 0130A0E3 		mov	r3, #1
-  85 00ac 0010A0E1 		mov	r1, r0
-  86 00b0 00308DE5 		str	r3, [sp, #0]
-  87 00b4 FF20A0E3 		mov	r2, #255
-  88 00b8 0030A0E1 		mov	r3, r0
-  89 00bc 04008DE5 		str	r0, [sp, #4]
-  90 00c0 08008DE5 		str	r0, [sp, #8]
-  91 00c4 FEFFFFEB 		bl	calypso_rhea_cfg
-  92              	.LBB4:
-  93              	.LBB5:
-  57:board/gta0x/init.c **** 	reg = readw(ASIC_CONF_REG);
-  94              		.loc 1 57 0
-  95 00c8 C8209FE5 		ldr	r2, .L3
-  59:board/gta0x/init.c **** 	reg &= ~(1 << 10);
-  96              		.loc 1 59 0
-  97 00cc C8309FE5 		ldr	r3, .L3+4
-  57:board/gta0x/init.c **** 	reg = readw(ASIC_CONF_REG);
-  98              		.loc 1 57 0
-  99 00d0 B71F52E1 		ldrh	r1, [r2, #-247]
- 100              	.LVL2:
-  59:board/gta0x/init.c **** 	reg &= ~(1 << 10);
- 101              		.loc 1 59 0
- 102 00d4 033001E0 		and	r3, r1, r3
- 103              	.LVL3:
-  63:board/gta0x/init.c **** 	reg |= (1 << 13) | (1 << 14);
- 104              		.loc 1 63 0
- 105 00d8 073A83E3 		orr	r3, r3, #28672
- 106              	.LVL4:
- 107 00dc 803083E3 		orr	r3, r3, #128
- 108              	.LVL5:
-  64:board/gta0x/init.c **** 	writew(reg, ASIC_CONF_REG);
- 109              		.loc 1 64 0
- 110 00e0 B73F42E1 		strh	r3, [r2, #-247]	@ movhi
-  67:board/gta0x/init.c **** 	reg = readw(IO_CNTL_REG);
- 111              		.loc 1 67 0
- 112 00e4 B4309FE5 		ldr	r3, .L3+8
- 113              	.LVL6:
-  68:board/gta0x/init.c **** 	reg &= ~(1 << 3);
- 114              		.loc 1 68 0
- 115 00e8 B4209FE5 		ldr	r2, .L3+12
-  67:board/gta0x/init.c **** 	reg = readw(IO_CNTL_REG);
- 116              		.loc 1 67 0
- 117 00ec BB1F53E1 		ldrh	r1, [r3, #-251]
- 118              	.LVL7:
-  68:board/gta0x/init.c **** 	reg &= ~(1 << 3);
+  91:board/gta0x/init.c **** 	/* Enable bootrom mapping to route exception vectors to RAM */
+  92:board/gta0x/init.c **** 	calypso_bootrom(with_irq);
+ 115              		.loc 1 92 0
+ 116 00f0 0500A0E1 		mov	r0, r5
+ 117              	.LBB7:
+ 118              	.LBB6:
+  68:board/gta0x/init.c **** 	writew(0x0000, ARMIO_LATCH_OUT);
  119              		.loc 1 68 0
- 120 00f0 022001E0 		and	r2, r1, r2
- 121              	.LVL8:
-  69:board/gta0x/init.c **** 	writew(reg, IO_CNTL_REG);
- 122              		.loc 1 69 0
- 123 00f4 BB2F43E1 		strh	r2, [r3, #-251]	@ movhi
-  73:board/gta0x/init.c **** 	reg &= ~(1 << 3);
- 124              		.loc 1 73 0
- 125 00f8 A4209FE5 		ldr	r2, .L3+12
- 126              	.LVL9:
-  72:board/gta0x/init.c **** 	reg = readw(ARMIO_LATCH_OUT);
- 127              		.loc 1 72 0
- 128 00fc BD1F53E1 		ldrh	r1, [r3, #-253]
- 129              	.LVL10:
-  73:board/gta0x/init.c **** 	reg &= ~(1 << 3);
- 130              		.loc 1 73 0
- 131 0100 022001E0 		and	r2, r1, r2
- 132              	.LVL11:
-  74:board/gta0x/init.c **** 	writew(reg, ARMIO_LATCH_OUT);
- 133              		.loc 1 74 0
- 134 0104 BD2F43E1 		strh	r2, [r3, #-253]	@ movhi
- 135              	.LBE5:
- 136              	.LBE4:
-  93:board/gta0x/init.c **** 
-  94:board/gta0x/init.c **** 	/* Initialize board-specific GPIO */
-  95:board/gta0x/init.c **** 	board_io_init();
-  96:board/gta0x/init.c **** 
-  97:board/gta0x/init.c **** 	/* Enable bootrom mapping to route exception vectors to RAM */
-  98:board/gta0x/init.c **** 	calypso_bootrom(with_irq);
- 137              		.loc 1 98 0
- 138 0108 0400A0E1 		mov	r0, r4
- 139 010c FEFFFFEB 		bl	calypso_bootrom
- 140              	.LVL12:
-  99:board/gta0x/init.c **** 	calypso_exceptions_install();
- 141              		.loc 1 99 0
- 142 0110 FEFFFFEB 		bl	calypso_exceptions_install
- 100:board/gta0x/init.c **** 
- 101:board/gta0x/init.c **** 	/* Initialize interrupt controller */
- 102:board/gta0x/init.c **** 	if (with_irq)
- 143              		.loc 1 102 0
- 144 0114 000054E3 		cmp	r4, #0
- 103:board/gta0x/init.c **** 		irq_init();
- 145              		.loc 1 103 0
- 146 0118 FEFFFF1B 		blne	irq_init
- 147              	.L2:
- 104:board/gta0x/init.c **** 
- 105:board/gta0x/init.c **** 	sercomm_bind_uart(UART_MODEM);
- 148              		.loc 1 105 0
- 149 011c 0100A0E3 		mov	r0, #1
- 150 0120 FEFFFFEB 		bl	sercomm_bind_uart
- 106:board/gta0x/init.c **** 	cons_bind_uart(UART_IRDA);
- 107:board/gta0x/init.c **** 
- 108:board/gta0x/init.c **** 	/* initialize MODEM UART to be used for sercomm */
- 109:board/gta0x/init.c **** 	uart_init(UART_MODEM, with_irq);
- 151              		.loc 1 109 0
- 152 0124 FF4004E2 		and	r4, r4, #255
- 153              	.LVL13:
- 106:board/gta0x/init.c **** 	cons_bind_uart(UART_IRDA);
- 154              		.loc 1 106 0
- 155 0128 0000A0E3 		mov	r0, #0
- 156 012c FEFFFFEB 		bl	cons_bind_uart
- 157              		.loc 1 109 0
- 158 0130 0410A0E1 		mov	r1, r4
- 159 0134 0100A0E3 		mov	r0, #1
- 160 0138 FEFFFFEB 		bl	uart_init
- 110:board/gta0x/init.c **** 	uart_baudrate(UART_MODEM, UART_115200);
- 161              		.loc 1 110 0
- 162 013c 0210A0E3 		mov	r1, #2
- 163 0140 0100A0E3 		mov	r0, #1
- 164 0144 FEFFFFEB 		bl	uart_baudrate
- 111:board/gta0x/init.c **** 
- 112:board/gta0x/init.c **** 	/* Initialize IRDA UART to be used for old-school console code.
- 113:board/gta0x/init.c **** 	 * note: IRDA uart only accessible on C115 and C117 PCB */
- 114:board/gta0x/init.c **** 	uart_init(UART_IRDA, with_irq);
- 165              		.loc 1 114 0
- 166 0148 0410A0E1 		mov	r1, r4
- 167 014c 0000A0E3 		mov	r0, #0
- 168 0150 FEFFFFEB 		bl	uart_init
- 115:board/gta0x/init.c **** 	uart_baudrate(UART_IRDA, UART_115200);
- 169              		.loc 1 115 0
- 170 0154 0210A0E3 		mov	r1, #2
- 171 0158 0000A0E3 		mov	r0, #0
- 172 015c FEFFFFEB 		bl	uart_baudrate
+ 120 00f4 BD4F43E1 		strh	r4, [r3, #-253]	@ movhi
+ 121              	.LBE6:
+ 122              	.LBE7:
+ 123              		.loc 1 92 0
+ 124 00f8 FEFFFFEB 		bl	calypso_bootrom
+  93:board/gta0x/init.c **** 	calypso_exceptions_install();
+ 125              		.loc 1 93 0
+ 126 00fc FEFFFFEB 		bl	calypso_exceptions_install
+  94:board/gta0x/init.c **** 
+  95:board/gta0x/init.c **** 	/* Initialize interrupt controller */
+  96:board/gta0x/init.c **** 	if (with_irq)
+ 127              		.loc 1 96 0
+ 128 0100 040055E1 		cmp	r5, r4
+  97:board/gta0x/init.c **** 		irq_init();
+ 129              		.loc 1 97 0
+ 130 0104 FEFFFF1B 		blne	irq_init
+ 131              	.L2:
+  98:board/gta0x/init.c **** 
+  99:board/gta0x/init.c **** 	sercomm_bind_uart(UART_MODEM);
+ 132              		.loc 1 99 0
+ 133 0108 0100A0E3 		mov	r0, #1
+ 134 010c FEFFFFEB 		bl	sercomm_bind_uart
+ 100:board/gta0x/init.c **** 	cons_bind_uart(UART_IRDA);
+ 101:board/gta0x/init.c **** 
+ 102:board/gta0x/init.c **** 	/* initialize MODEM UART to be used for sercomm */
+ 103:board/gta0x/init.c **** 	uart_init(UART_MODEM, with_irq);
+ 135              		.loc 1 103 0
+ 136 0110 FF5005E2 		and	r5, r5, #255
+ 137              	.LVL5:
+ 100:board/gta0x/init.c **** 	cons_bind_uart(UART_IRDA);
+ 138              		.loc 1 100 0
+ 139 0114 0000A0E3 		mov	r0, #0
+ 140 0118 FEFFFFEB 		bl	cons_bind_uart
+ 141              		.loc 1 103 0
+ 142 011c 0510A0E1 		mov	r1, r5
+ 143 0120 0100A0E3 		mov	r0, #1
+ 144 0124 FEFFFFEB 		bl	uart_init
+ 104:board/gta0x/init.c **** 	uart_baudrate(UART_MODEM, UART_115200);
+ 145              		.loc 1 104 0
+ 146 0128 0210A0E3 		mov	r1, #2
+ 147 012c 0100A0E3 		mov	r0, #1
+ 148 0130 FEFFFFEB 		bl	uart_baudrate
+ 105:board/gta0x/init.c **** 
+ 106:board/gta0x/init.c **** 	/* Initialize IRDA UART to be used for old-school console code.
+ 107:board/gta0x/init.c **** 	 * note: IRDA uart only accessible on C115 and C117 PCB */
+ 108:board/gta0x/init.c **** 	uart_init(UART_IRDA, with_irq);
+ 149              		.loc 1 108 0
+ 150 0134 0510A0E1 		mov	r1, r5
+ 151 0138 0000A0E3 		mov	r0, #0
+ 152 013c FEFFFFEB 		bl	uart_init
+ 109:board/gta0x/init.c **** 	uart_baudrate(UART_IRDA, UART_115200);
+ 153              		.loc 1 109 0
+ 154 0140 0210A0E3 		mov	r1, #2
+ 155 0144 0000A0E3 		mov	r0, #0
+ 156 0148 FEFFFFEB 		bl	uart_baudrate
+ 110:board/gta0x/init.c **** 
+ 111:board/gta0x/init.c **** 	/* Initialize hardware timers */
+ 112:board/gta0x/init.c **** 	hwtimer_init();
+ 157              		.loc 1 112 0
+ 158 014c FEFFFFEB 		bl	hwtimer_init
+ 113:board/gta0x/init.c **** 
+ 114:board/gta0x/init.c **** 	/* Initialize DMA controller */
+ 115:board/gta0x/init.c **** 	dma_init();
+ 159              		.loc 1 115 0
+ 160 0150 FEFFFFEB 		bl	dma_init
  116:board/gta0x/init.c **** 
- 117:board/gta0x/init.c **** 	/* Initialize hardware timers */
- 118:board/gta0x/init.c **** 	hwtimer_init();
- 173              		.loc 1 118 0
- 174 0160 FEFFFFEB 		bl	hwtimer_init
+ 117:board/gta0x/init.c **** 	/* Initialize real time clock */
+ 118:board/gta0x/init.c **** 	rtc_init();
+ 161              		.loc 1 118 0
+ 162 0154 FEFFFFEB 		bl	rtc_init
  119:board/gta0x/init.c **** 
- 120:board/gta0x/init.c **** 	/* Initialize DMA controller */
- 121:board/gta0x/init.c **** 	dma_init();
- 175              		.loc 1 121 0
- 176 0164 FEFFFFEB 		bl	dma_init
+ 120:board/gta0x/init.c **** 	/* Initialize system timers (uses hwtimer 2) */
+ 121:board/gta0x/init.c **** 	timer_init();
+ 163              		.loc 1 121 0
+ 164 0158 FEFFFFEB 		bl	timer_init
  122:board/gta0x/init.c **** 
- 123:board/gta0x/init.c **** 	/* Initialize real time clock */
- 124:board/gta0x/init.c **** 	rtc_init();
- 177              		.loc 1 124 0
- 178 0168 FEFFFFEB 		bl	rtc_init
- 125:board/gta0x/init.c **** 
- 126:board/gta0x/init.c **** 	/* Initialize system timers (uses hwtimer 2) */
- 127:board/gta0x/init.c **** 	timer_init();
- 179              		.loc 1 127 0
- 180 016c FEFFFFEB 		bl	timer_init
- 128:board/gta0x/init.c **** 
- 129:board/gta0x/init.c **** 	/* Initialize LCD driver (uses I2C) and backlight */
- 130:board/gta0x/init.c **** 	bl_mode_pwl(1);
- 181              		.loc 1 130 0
- 182 0170 0100A0E3 		mov	r0, #1
- 183 0174 FEFFFFEB 		bl	bl_mode_pwl
- 131:board/gta0x/init.c **** 	bl_level(50);
- 184              		.loc 1 131 0
- 185 0178 3200A0E3 		mov	r0, #50
- 186 017c FEFFFFEB 		bl	bl_level
+ 123:board/gta0x/init.c **** 	/* Initialize LCD driver (uses I2C) and backlight */
+ 124:board/gta0x/init.c **** 	bl_mode_pwl(1);
+ 165              		.loc 1 124 0
+ 166 015c 0100A0E3 		mov	r0, #1
+ 167 0160 FEFFFFEB 		bl	bl_mode_pwl
+ 125:board/gta0x/init.c **** 	bl_level(50);
+ 168              		.loc 1 125 0
+ 169 0164 3200A0E3 		mov	r0, #50
+ 170 0168 FEFFFFEB 		bl	bl_level
+ 126:board/gta0x/init.c **** 
+ 127:board/gta0x/init.c **** 	/* Initialize keypad driver */
+ 128:board/gta0x/init.c **** 	keypad_init(keymap, with_irq);
+ 171              		.loc 1 128 0
+ 172 016c 0510A0E1 		mov	r1, r5
+ 173 0170 24009FE5 		ldr	r0, .L3+8
+ 174 0174 FEFFFFEB 		bl	keypad_init
+ 129:board/gta0x/init.c **** 
+ 130:board/gta0x/init.c **** 	/* Initialize ABB driver (uses SPI) */
+ 131:board/gta0x/init.c **** 	twl3025_init();
+ 175              		.loc 1 131 0
+ 176 0178 FEFFFFEB 		bl	twl3025_init
  132:board/gta0x/init.c **** 
- 133:board/gta0x/init.c **** 	/* Initialize keypad driver */
- 134:board/gta0x/init.c **** 	keypad_init(keymap, with_irq);
- 187              		.loc 1 134 0
- 188 0180 20009FE5 		ldr	r0, .L3+16
- 189 0184 0410A0E1 		mov	r1, r4
- 190 0188 FEFFFFEB 		bl	keypad_init
- 135:board/gta0x/init.c **** 
- 136:board/gta0x/init.c **** 	/* Initialize ABB driver (uses SPI) */
- 137:board/gta0x/init.c **** 	twl3025_init();
- 138:board/gta0x/init.c **** }
- 191              		.loc 1 138 0
- 192 018c 0CD08DE2 		add	sp, sp, #12
- 193 0190 1040BDE8 		ldmfd	sp!, {r4, lr}
- 137:board/gta0x/init.c **** 	twl3025_init();
- 194              		.loc 1 137 0
- 195 0194 FEFFFFEA 		b	twl3025_init
- 196              	.L4:
- 197              		.align	2
- 198              	.L3:
- 199 0198 FFF0FEFF 		.word	-69377
- 200 019c FFFB0000 		.word	64511
- 201 01a0 FF48FEFF 		.word	-112385
- 202 01a4 F7FF0000 		.word	65527
- 203 01a8 00000000 		.word	.LANCHOR0
- 204              		.cfi_endproc
- 205              	.LFE41:
- 207              		.section	.rodata
- 208              		.align	2
- 209              		.set	.LANCHOR0,. + 0
- 212              	keymap:
- 213 0000 0D       		.byte	13
- 214 0001 0F       		.byte	15
- 215 0002 0A       		.byte	10
- 216 0003 05       		.byte	5
- 217 0004 10       		.byte	16
- 218 0005 0B       		.byte	11
- 219 0006 06       		.byte	6
- 220 0007 11       		.byte	17
- 221 0008 0C       		.byte	12
- 222 0009 07       		.byte	7
- 223 000a 12       		.byte	18
- 224 000b 08       		.byte	8
- 225 000c 0E       		.byte	14
- 226 000d 13       		.byte	19
- 227 000e 09       		.byte	9
- 228 000f 01       		.byte	1
- 229 0010 02       		.byte	2
- 230 0011 03       		.byte	3
- 231 0012 04       		.byte	4
- 232 0013 00       		.byte	0
- 233 0014 18       		.byte	24
- 234 0015 1E       		.byte	30
- 235 0016 1F       		.byte	31
- 236 0017 00       		.text
- 237              	.Letext0:
+ 133:board/gta0x/init.c **** 	/* Initialize TIFFS reader (7 sectors of 64 KiB each) */
+ 134:board/gta0x/init.c **** 	tiffs_init(0x380000, 0x10000, 7);
+ 177              		.loc 1 134 0
+ 178 017c 0E07A0E3 		mov	r0, #3670016
+ 179 0180 0118A0E3 		mov	r1, #65536
+ 180 0184 0720A0E3 		mov	r2, #7
+ 135:board/gta0x/init.c **** }
+ 181              		.loc 1 135 0
+ 182 0188 0CD08DE2 		add	sp, sp, #12
+ 183 018c 3040BDE8 		ldmfd	sp!, {r4, r5, lr}
+ 134:board/gta0x/init.c **** 	tiffs_init(0x380000, 0x10000, 7);
+ 184              		.loc 1 134 0
+ 185 0190 FEFFFFEA 		b	tiffs_init
+ 186              	.L4:
+ 187              		.align	2
+ 188              	.L3:
+ 189 0194 FFF0FEFF 		.word	-69377
+ 190 0198 F5030000 		.word	1013
+ 191 019c 00000000 		.word	.LANCHOR0
+ 192              		.cfi_endproc
+ 193              	.LFE41:
+ 195              		.section	.rodata
+ 196              		.align	2
+ 197              		.set	.LANCHOR0,. + 0
+ 200              	keymap:
+ 201 0000 0D       		.byte	13
+ 202 0001 0F       		.byte	15
+ 203 0002 0A       		.byte	10
+ 204 0003 05       		.byte	5
+ 205 0004 10       		.byte	16
+ 206 0005 0B       		.byte	11
+ 207 0006 06       		.byte	6
+ 208 0007 11       		.byte	17
+ 209 0008 0C       		.byte	12
+ 210 0009 07       		.byte	7
+ 211 000a 12       		.byte	18
+ 212 000b 08       		.byte	8
+ 213 000c 0E       		.byte	14
+ 214 000d 13       		.byte	19
+ 215 000e 09       		.byte	9
+ 216 000f 01       		.byte	1
+ 217 0010 02       		.byte	2
+ 218 0011 03       		.byte	3
+ 219 0012 04       		.byte	4
+ 220 0013 00       		.byte	0
+ 221 0014 18       		.byte	24
+ 222 0015 1E       		.byte	30
+ 223 0016 1E       		.byte	30
+ 224 0017 1E       		.byte	30
+ 225              		.text
+ 226              	.Letext0:
 DEFINED SYMBOLS
                             *ABS*:0000000000000000 init.c
-     /tmp/cc2L6GiJ.s:12     .text.board_init:0000000000000000 $a
-     /tmp/cc2L6GiJ.s:15     .text.board_init:0000000000000000 board_init
-     /tmp/cc2L6GiJ.s:199    .text.board_init:0000000000000198 $d
-     /tmp/cc2L6GiJ.s:208    .rodata:0000000000000000 $d
-     /tmp/cc2L6GiJ.s:212    .rodata:0000000000000000 keymap
+     /tmp/ccGtfYAB.s:12     .text.board_init:0000000000000000 $a
+     /tmp/ccGtfYAB.s:15     .text.board_init:0000000000000000 board_init
+     /tmp/ccGtfYAB.s:189    .text.board_init:0000000000000194 $d
+     /tmp/ccGtfYAB.s:196    .rodata:0000000000000000 $d
+     /tmp/ccGtfYAB.s:200    .rodata:0000000000000000 keymap
                      .debug_frame:0000000000000010 $d
 
 UNDEFINED SYMBOLS
@@ -408,3 +385,4 @@ bl_mode_pwl
 bl_level
 keypad_init
 twl3025_init
+tiffs_init

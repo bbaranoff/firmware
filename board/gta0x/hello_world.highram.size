@@ -1,2 +1,2 @@
    text	   data	    bss	    dec	    hex	filename
-  15718	    380	  17556	  33654	   8376	board/gta0x/hello_world.highram.elf
+  16586	    384	  17584	  34554	   86fa	board/gta0x/hello_world.highram.elf

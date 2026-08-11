@@ -1,0 +1,972 @@
+   1              		.file	"main.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.tspact_toggle,"ax",%progbits
+  12              		.align	2
+  14              	tspact_toggle:
+  15              	.LFB62:
+  16              		.file 1 "apps/layer1/main.c"
+   1:apps/layer1/main.c **** /* main program of Free Software for Calypso Phone */
+   2:apps/layer1/main.c **** 
+   3:apps/layer1/main.c **** /* (C) 2010 by Harald Welte <laforge@gnumonks.org>
+   4:apps/layer1/main.c ****  *
+   5:apps/layer1/main.c ****  * All Rights Reserved
+   6:apps/layer1/main.c ****  *
+   7:apps/layer1/main.c ****  * This program is free software; you can redistribute it and/or modify
+   8:apps/layer1/main.c ****  * it under the terms of the GNU General Public License as published by
+   9:apps/layer1/main.c ****  * the Free Software Foundation; either version 2 of the License, or
+  10:apps/layer1/main.c ****  * (at your option) any later version.
+  11:apps/layer1/main.c ****  *
+  12:apps/layer1/main.c ****  * This program is distributed in the hope that it will be useful,
+  13:apps/layer1/main.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  14:apps/layer1/main.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  15:apps/layer1/main.c ****  * GNU General Public License for more details.
+  16:apps/layer1/main.c ****  *
+  17:apps/layer1/main.c ****  */
+  18:apps/layer1/main.c **** 
+  19:apps/layer1/main.c **** #include <stdint.h>
+  20:apps/layer1/main.c **** #include <stdio.h>
+  21:apps/layer1/main.c **** 
+  22:apps/layer1/main.c **** #include <debug.h>
+  23:apps/layer1/main.c **** #include <memory.h>
+  24:apps/layer1/main.c **** #include <string.h>
+  25:apps/layer1/main.c **** #include <delay.h>
+  26:apps/layer1/main.c **** #include <rffe.h>
+  27:apps/layer1/main.c **** #include <keypad.h>
+  28:apps/layer1/main.c **** #include <board.h>
+  29:apps/layer1/main.c **** 
+  30:apps/layer1/main.c **** #include <abb/twl3025.h>
+  31:apps/layer1/main.c **** #include <rf/trf6151.h>
+  32:apps/layer1/main.c **** #include <rf/readcal.h>
+  33:apps/layer1/main.c **** 
+  34:apps/layer1/main.c **** #include <comm/sercomm.h>
+  35:apps/layer1/main.c **** #include <comm/timer.h>
+  36:apps/layer1/main.c **** 
+  37:apps/layer1/main.c **** #include <calypso/clock.h>
+  38:apps/layer1/main.c **** #include <calypso/tpu.h>
+  39:apps/layer1/main.c **** #include <calypso/tsp.h>
+  40:apps/layer1/main.c **** #include <calypso/irq.h>
+  41:apps/layer1/main.c **** #include <calypso/misc.h>
+  42:apps/layer1/main.c **** #include <calypso/sim.h>
+  43:apps/layer1/main.c **** 
+  44:apps/layer1/main.c **** #include <layer1/sync.h>
+  45:apps/layer1/main.c **** #include <layer1/async.h>
+  46:apps/layer1/main.c **** #include <layer1/tpu_window.h>
+  47:apps/layer1/main.c **** #include <layer1/l23_api.h>
+  48:apps/layer1/main.c **** 
+  49:apps/layer1/main.c **** #include <fb/framebuffer.h>
+  50:apps/layer1/main.c **** 
+  51:apps/layer1/main.c **** const char *hr = "======================================================================\n";
+  52:apps/layer1/main.c **** 
+  53:apps/layer1/main.c **** /* MAIN program **************************************************************/
+  54:apps/layer1/main.c **** 
+  55:apps/layer1/main.c **** static void key_handler(enum key_codes code, enum key_states state);
+  56:apps/layer1/main.c **** 
+  57:apps/layer1/main.c **** int main(void)
+  58:apps/layer1/main.c **** {
+  59:apps/layer1/main.c **** 	uint8_t atr[20];
+  60:apps/layer1/main.c **** 
+  61:apps/layer1/main.c **** 	board_init(1);
+  62:apps/layer1/main.c **** 
+  63:apps/layer1/main.c **** 	puts("\n\nOsmocomBB Layer 1 (revision " GIT_REVISION ")\n");
+  64:apps/layer1/main.c **** 	puts(hr);
+  65:apps/layer1/main.c **** 
+  66:apps/layer1/main.c **** 	/* Dump device identification */
+  67:apps/layer1/main.c **** 	dump_dev_id();
+  68:apps/layer1/main.c **** 	puts(hr);
+  69:apps/layer1/main.c **** 
+  70:apps/layer1/main.c **** 	keypad_set_handler(&key_handler);
+  71:apps/layer1/main.c **** 
+  72:apps/layer1/main.c **** 	/* Dump clock config after PLL set */
+  73:apps/layer1/main.c **** 	calypso_clk_dump();
+  74:apps/layer1/main.c **** 	puts(hr);
+  75:apps/layer1/main.c **** 
+  76:apps/layer1/main.c **** 	fb_clear();
+  77:apps/layer1/main.c **** 
+  78:apps/layer1/main.c **** 	fb_setfg(FB_COLOR_BLACK);
+  79:apps/layer1/main.c **** 	fb_setbg(FB_COLOR_WHITE);
+  80:apps/layer1/main.c **** 	fb_setfont(FB_FONT_HELVB14);
+  81:apps/layer1/main.c **** 
+  82:apps/layer1/main.c **** 	fb_gotoxy(2,20);
+  83:apps/layer1/main.c **** 	fb_putstr("Layer 1",framebuffer->width-4);
+  84:apps/layer1/main.c **** 
+  85:apps/layer1/main.c **** 	fb_setfg(FB_COLOR_RED);
+  86:apps/layer1/main.c **** 	fb_setbg(FB_COLOR_BLUE);
+  87:apps/layer1/main.c **** 
+  88:apps/layer1/main.c **** 	fb_gotoxy(2,25);
+  89:apps/layer1/main.c **** 	fb_boxto(framebuffer->width-3,38);
+  90:apps/layer1/main.c **** 
+  91:apps/layer1/main.c **** 	fb_setfg(FB_COLOR_WHITE);
+  92:apps/layer1/main.c **** 	fb_setfont(FB_FONT_HELVR08);
+  93:apps/layer1/main.c **** 	fb_gotoxy(8,33);
+  94:apps/layer1/main.c **** 	fb_putstr("osmocom-bb",framebuffer->width-4);
+  95:apps/layer1/main.c **** 
+  96:apps/layer1/main.c **** 	fb_flush();
+  97:apps/layer1/main.c **** 
+  98:apps/layer1/main.c **** 	/* initialize SIM */
+  99:apps/layer1/main.c **** 	calypso_sim_init();
+ 100:apps/layer1/main.c **** 
+ 101:apps/layer1/main.c **** 	puts("Power up simcard:\n");
+ 102:apps/layer1/main.c **** 	memset(atr,0,sizeof(atr));
+ 103:apps/layer1/main.c **** 	calypso_sim_powerup(atr);
+ 104:apps/layer1/main.c **** 
+ 105:apps/layer1/main.c **** 	read_factory_rf_calibration();
+ 106:apps/layer1/main.c **** 	layer1_init();
+ 107:apps/layer1/main.c **** 
+ 108:apps/layer1/main.c **** 	tpu_frame_irq_en(1, 1);
+ 109:apps/layer1/main.c **** 
+ 110:apps/layer1/main.c **** 	while (1) {
+ 111:apps/layer1/main.c **** 		l1a_compl_execute();
+ 112:apps/layer1/main.c **** 		osmo_timers_update();
+ 113:apps/layer1/main.c **** 		sim_handler();
+ 114:apps/layer1/main.c **** 		l1a_l23_handler();
+ 115:apps/layer1/main.c **** 	}
+ 116:apps/layer1/main.c **** 
+ 117:apps/layer1/main.c **** 	/* NOT REACHED */
+ 118:apps/layer1/main.c **** 
+ 119:apps/layer1/main.c **** 	twl3025_power_off();
+ 120:apps/layer1/main.c **** }
+ 121:apps/layer1/main.c **** 
+ 122:apps/layer1/main.c **** static int afcout = 0;
+ 123:apps/layer1/main.c **** 
+ 124:apps/layer1/main.c **** static void tspact_toggle(uint8_t num)
+ 125:apps/layer1/main.c **** {
+  17              		.loc 1 125 0
+  18              		.cfi_startproc
+  19              		@ args = 0, pretend = 0, frame = 0
+  20              		@ frame_needed = 0, uses_anonymous_args = 0
+  21              	.LVL0:
+  22 0000 30402DE9 		stmfd	sp!, {r4, r5, lr}
+  23              	.LCFI0:
+  24              		.cfi_def_cfa_offset 12
+  25              		.loc 1 125 0
+  26 0004 0040A0E1 		mov	r4, r0
+  27              		.cfi_offset 14, -4
+  28              		.cfi_offset 5, -8
+  29              		.cfi_offset 4, -12
+ 126:apps/layer1/main.c **** 	printf("TSPACT%u toggle\n", num);
+ 127:apps/layer1/main.c **** 	tsp_act_toggle((1 << num));
+  30              		.loc 1 127 0
+  31 0008 0150A0E3 		mov	r5, #1
+ 126:apps/layer1/main.c **** 	printf("TSPACT%u toggle\n", num);
+  32              		.loc 1 126 0
+  33 000c 0410A0E1 		mov	r1, r4
+  34              		.loc 1 127 0
+  35 0010 1544A0E1 		mov	r4, r5, asl r4
+ 126:apps/layer1/main.c **** 	printf("TSPACT%u toggle\n", num);
+  36              		.loc 1 126 0
+  37 0014 24009FE5 		ldr	r0, .L2
+  38              	.LVL1:
+  39 0018 FEFFFFEB 		bl	printf
+  40              		.loc 1 127 0
+  41 001c 0408A0E1 		mov	r0, r4, asl #16
+  42 0020 2008A0E1 		mov	r0, r0, lsr #16
+  43 0024 FEFFFFEB 		bl	tsp_act_toggle
+  44              	.LBB34:
+  45              	.LBB35:
+  46              		.file 2 "include/calypso/tpu.h"
+   1:include/calypso/tpu.h **** #ifndef _CALYPSO_TPU_H
+   2:include/calypso/tpu.h **** #define _CALYPSO_TPU_H
+   3:include/calypso/tpu.h **** 
+   4:include/calypso/tpu.h **** #define BITS_PER_TDMA		1250
+   5:include/calypso/tpu.h **** #define QBITS_PER_TDMA		(BITS_PER_TDMA * 4)	/* 5000 */
+   6:include/calypso/tpu.h **** #define TPU_RANGE		QBITS_PER_TDMA
+   7:include/calypso/tpu.h **** #define	SWITCH_TIME		(TPU_RANGE-10)
+   8:include/calypso/tpu.h **** 
+   9:include/calypso/tpu.h **** /* Assert or de-assert TPU reset */
+  10:include/calypso/tpu.h **** void tpu_reset(int active);
+  11:include/calypso/tpu.h **** /* Enable or Disable a new scenario loaded into the TPU */
+  12:include/calypso/tpu.h **** void tpu_enable(int active);
+  13:include/calypso/tpu.h **** /* Enable or Disable the clock of the TPU Module */
+  14:include/calypso/tpu.h **** void tpu_clk_enable(int active);
+  15:include/calypso/tpu.h **** /* Enable Frame Interrupt generation on next frame.  DSP will reset it */
+  16:include/calypso/tpu.h **** void tpu_dsp_frameirq_enable(void);
+  17:include/calypso/tpu.h **** /* Is a Frame interrupt still pending for the DSP ? */
+  18:include/calypso/tpu.h **** int tpu_dsp_fameirq_pending(void);
+  19:include/calypso/tpu.h **** /* Rewind the TPU, i.e. restart enqueueing instructions at the base addr */
+  20:include/calypso/tpu.h **** void tpu_rewind(void);
+  21:include/calypso/tpu.h **** /* Enqueue a raw TPU instruction */
+  22:include/calypso/tpu.h **** void tpu_enqueue(uint16_t instr);
+  23:include/calypso/tpu.h **** /* Initialize TPU and TPU driver */
+  24:include/calypso/tpu.h **** void tpu_init(void);
+  25:include/calypso/tpu.h **** /* (Busy)Wait until TPU is idle */
+  26:include/calypso/tpu.h **** void tpu_wait_idle(void);
+  27:include/calypso/tpu.h **** /* Enable FRAME interrupt generation */
+  28:include/calypso/tpu.h **** void tpu_frame_irq_en(int mcu, int dsp);
+  29:include/calypso/tpu.h **** /* Force the generation of a DSP interrupt */
+  30:include/calypso/tpu.h **** void tpu_force_dsp_frame_irq(void);
+  31:include/calypso/tpu.h **** 
+  32:include/calypso/tpu.h **** /* Get the current TPU SYNCHRO register */
+  33:include/calypso/tpu.h **** uint16_t tpu_get_synchro(void);
+  34:include/calypso/tpu.h **** /* Get the current TPU OFFSET register */
+  35:include/calypso/tpu.h **** uint16_t tpu_get_offset(void);
+  36:include/calypso/tpu.h **** 
+  37:include/calypso/tpu.h **** enum tpu_instr {
+  38:include/calypso/tpu.h **** 	TPU_INSTR_AT		= (1 << 13),
+  39:include/calypso/tpu.h **** 	TPU_INSTR_OFFSET	= (2 << 13),
+  40:include/calypso/tpu.h **** 	TPU_INSTR_SYNCHRO	= (3 << 13),	/* Loading delta synchro value in TPU synchro register */
+  41:include/calypso/tpu.h **** 	TPU_INSTR_WAIT		= (5 << 13),	/* Wait a certain period (in GSM qbits) */
+  42:include/calypso/tpu.h **** 	TPU_INSTR_SLEEP		= (0 << 13),	/* Stop the sequencer by disabling TPU ENABLE bit in ctrl reg */
+  43:include/calypso/tpu.h **** 	/* data processing */
+  44:include/calypso/tpu.h **** 	TPU_INSTR_MOVE		= (4 << 13),
+  45:include/calypso/tpu.h **** };
+  46:include/calypso/tpu.h **** 
+  47:include/calypso/tpu.h **** /* Addresses internal to the TPU, only accessible via MOVE */
+  48:include/calypso/tpu.h **** enum tpu_reg_int {
+  49:include/calypso/tpu.h **** 	TPUI_TSP_CTRL1	= 0x00,
+  50:include/calypso/tpu.h **** 	TPUI_TSP_CTRL2	= 0x01,
+  51:include/calypso/tpu.h **** 	TPUI_TX_1	= 0x04,
+  52:include/calypso/tpu.h **** 	TPUI_TX_2	= 0x03,
+  53:include/calypso/tpu.h **** 	TPUI_TX_3	= 0x02,
+  54:include/calypso/tpu.h **** 	TPUI_TX_4	= 0x05,
+  55:include/calypso/tpu.h **** 	TPUI_TSP_ACT_L	= 0x06,
+  56:include/calypso/tpu.h **** 	TPUI_TSP_ACT_U	= 0x07,
+  57:include/calypso/tpu.h **** 	TPUI_TSP_SET1	= 0x09,
+  58:include/calypso/tpu.h **** 	TPUI_TSP_SET2	= 0x0a,
+  59:include/calypso/tpu.h **** 	TPUI_TSP_SET3	= 0x0b,
+  60:include/calypso/tpu.h **** 	TPUI_DSP_INT_PG	= 0x10,
+  61:include/calypso/tpu.h **** 	TPUI_GAUGING_EN = 0x11,
+  62:include/calypso/tpu.h **** };
+  63:include/calypso/tpu.h **** 
+  64:include/calypso/tpu.h **** enum tpui_ctrl2_bits {
+  65:include/calypso/tpu.h **** 	TPUI_CTRL2_RD		= (1 << 0),
+  66:include/calypso/tpu.h **** 	TPUI_CTRL2_WR		= (1 << 1),
+  67:include/calypso/tpu.h **** };
+  68:include/calypso/tpu.h **** 
+  69:include/calypso/tpu.h **** static inline uint16_t tpu_mod5000(int16_t time)
+  70:include/calypso/tpu.h **** {
+  71:include/calypso/tpu.h **** 	if (time < 0)
+  72:include/calypso/tpu.h **** 		return time + 5000;
+  73:include/calypso/tpu.h **** 	if (time >= 5000)
+  74:include/calypso/tpu.h **** 		return time - 5000;
+  75:include/calypso/tpu.h **** 	return time;
+  76:include/calypso/tpu.h **** }
+  77:include/calypso/tpu.h **** 
+  78:include/calypso/tpu.h **** /* Enqueue a SLEEP operation (stop sequencer by disabling TPU ENABLE bit) */
+  79:include/calypso/tpu.h **** static inline void tpu_enq_sleep(void)
+  80:include/calypso/tpu.h **** {
+  81:include/calypso/tpu.h **** 	tpu_enqueue(TPU_INSTR_SLEEP);
+  47              		.loc 2 81 0
+  48 0028 0000A0E3 		mov	r0, #0
+  49 002c FEFFFFEB 		bl	tpu_enqueue
+  50              	.LBE35:
+  51              	.LBE34:
+ 128:apps/layer1/main.c **** 	tpu_enq_sleep();
+ 129:apps/layer1/main.c **** 	tpu_enable(1);
+  52              		.loc 1 129 0
+  53 0030 0500A0E1 		mov	r0, r5
+  54 0034 FEFFFFEB 		bl	tpu_enable
+ 130:apps/layer1/main.c **** 	tpu_wait_idle();
+ 131:apps/layer1/main.c **** }
+  55              		.loc 1 131 0
+  56 0038 3040BDE8 		ldmfd	sp!, {r4, r5, lr}
+ 130:apps/layer1/main.c **** 	tpu_wait_idle();
+  57              		.loc 1 130 0
+  58 003c FEFFFFEA 		b	tpu_wait_idle
+  59              	.L3:
+  60              		.align	2
+  61              	.L2:
+  62 0040 00000000 		.word	.LC0
+  63              		.cfi_endproc
+  64              	.LFE62:
+  66              		.section	.text.key_handler,"ax",%progbits
+  67              		.align	2
+  69              	key_handler:
+  70              	.LFB63:
+ 132:apps/layer1/main.c **** 
+ 133:apps/layer1/main.c **** static void key_handler(enum key_codes code, enum key_states state)
+ 134:apps/layer1/main.c **** {
+  71              		.loc 1 134 0
+  72              		.cfi_startproc
+  73              		@ args = 0, pretend = 0, frame = 0
+  74              		@ frame_needed = 0, uses_anonymous_args = 0
+  75              	.LVL2:
+ 135:apps/layer1/main.c **** 	if (state != PRESSED)
+  76              		.loc 1 135 0
+  77 0000 000051E3 		cmp	r1, #0
+ 134:apps/layer1/main.c **** {
+  78              		.loc 1 134 0
+  79 0004 04E02DE5 		str	lr, [sp, #-4]!
+  80              	.LCFI1:
+  81              		.cfi_def_cfa_offset 4
+  82              		.loc 1 135 0
+  83 0008 04F09D14 		ldrne	pc, [sp], #4
+  84              		.cfi_offset 14, -4
+ 136:apps/layer1/main.c **** 		return;
+ 137:apps/layer1/main.c **** 
+ 138:apps/layer1/main.c **** 	switch (code) {
+  85              		.loc 1 138 0
+  86 000c 040040E2 		sub	r0, r0, #4
+  87              	.LVL3:
+  88 0010 050050E3 		cmp	r0, #5
+  89 0014 00F19F97 		ldrls	pc, [pc, r0, asl #2]
+  90 0018 230000EA 		b	.L6
+  91              	.L12:
+  92 001c 34000000 		.word	.L7
+  93 0020 3C000000 		.word	.L8
+  94 0024 48000000 		.word	.L9
+  95 0028 50000000 		.word	.L10
+  96 002c AC000000 		.word	.L6
+  97 0030 70000000 		.word	.L11
+  98              	.L7:
+ 139:apps/layer1/main.c **** 	case KEY_4:
+ 140:apps/layer1/main.c **** 		tspact_toggle(6);	/* TRENA (RFFE) */
+  99              		.loc 1 140 0
+ 100 0034 0600A0E3 		mov	r0, #6
+ 101              	.LVL4:
+ 102 0038 000000EA 		b	.L15
+ 103              	.LVL5:
+ 104              	.L8:
+ 141:apps/layer1/main.c **** 		break;
+ 142:apps/layer1/main.c **** 	case KEY_5:
+ 143:apps/layer1/main.c **** 		tspact_toggle(8);	/* GSM_TXEN (RFFE) */
+ 105              		.loc 1 143 0
+ 106 003c 0800A0E3 		mov	r0, #8
+ 107              	.LVL6:
+ 108              	.L15:
+ 109 0040 FEFFFFEB 		bl	tspact_toggle
+ 110              	.LVL7:
+ 144:apps/layer1/main.c **** 		break;
+ 111              		.loc 1 144 0
+ 112 0044 180000EA 		b	.L6
+ 113              	.LVL8:
+ 114              	.L9:
+ 145:apps/layer1/main.c **** 	case KEY_6:
+ 146:apps/layer1/main.c **** 		tspact_toggle(1);	/* PAENA (RFFE) */
+ 115              		.loc 1 146 0
+ 116 0048 0100A0E3 		mov	r0, #1
+ 117              	.LVL9:
+ 118 004c FBFFFFEA 		b	.L15
+ 119              	.LVL10:
+ 120              	.L10:
+ 147:apps/layer1/main.c **** 		break;
+ 148:apps/layer1/main.c **** 	case KEY_7:			/* decrement AFC OUT */
+ 149:apps/layer1/main.c **** 		afcout -= 100;
+ 121              		.loc 1 149 0
+ 122 0050 5C309FE5 		ldr	r3, .L17
+ 123 0054 002093E5 		ldr	r2, [r3, #0]
+ 124 0058 642042E2 		sub	r2, r2, #100
+ 150:apps/layer1/main.c **** 		if (afcout < -4096)
+ 125              		.loc 1 150 0
+ 126 005c 010A72E3 		cmn	r2, #4096
+ 149:apps/layer1/main.c **** 		afcout -= 100;
+ 127              		.loc 1 149 0
+ 128 0060 002083E5 		str	r2, [r3, #0]
+ 151:apps/layer1/main.c **** 			afcout = -4096;
+ 129              		.loc 1 151 0
+ 130 0064 4C209FB5 		ldrlt	r2, .L17+4
+ 150:apps/layer1/main.c **** 		if (afcout < -4096)
+ 131              		.loc 1 150 0
+ 132 0068 070000BA 		blt	.L16
+ 133 006c 070000EA 		b	.L14
+ 134              	.L11:
+ 152:apps/layer1/main.c **** 		twl3025_afc_set(afcout);
+ 153:apps/layer1/main.c **** 		printf("AFC OUT: %u\n", twl3025_afcout_get());
+ 154:apps/layer1/main.c **** 		break;
+ 155:apps/layer1/main.c **** 	case KEY_9:			/* increase AFC OUT */
+ 156:apps/layer1/main.c **** 		afcout += 100;
+ 135              		.loc 1 156 0
+ 136 0070 3C309FE5 		ldr	r3, .L17
+ 137 0074 001093E5 		ldr	r1, [r3, #0]
+ 138              	.LVL11:
+ 157:apps/layer1/main.c **** 		if (afcout > 4095)
+ 139              		.loc 1 157 0
+ 140 0078 3C209FE5 		ldr	r2, .L17+8
+ 156:apps/layer1/main.c **** 		afcout += 100;
+ 141              		.loc 1 156 0
+ 142 007c 641081E2 		add	r1, r1, #100
+ 143              		.loc 1 157 0
+ 144 0080 020051E1 		cmp	r1, r2
+ 156:apps/layer1/main.c **** 		afcout += 100;
+ 145              		.loc 1 156 0
+ 146 0084 001083E5 		str	r1, [r3, #0]
+ 147              		.loc 1 157 0
+ 148 0088 000000DA 		ble	.L14
+ 149              	.L16:
+ 158:apps/layer1/main.c **** 			afcout = 4095;
+ 150              		.loc 1 158 0
+ 151 008c 002083E5 		str	r2, [r3, #0]
+ 152              	.L14:
+ 159:apps/layer1/main.c **** 		twl3025_afc_set(afcout);
+ 153              		.loc 1 159 0
+ 154 0090 1C309FE5 		ldr	r3, .L17
+ 155 0094 F000D3E1 		ldrsh	r0, [r3, #0]
+ 156              	.LVL12:
+ 157 0098 FEFFFFEB 		bl	twl3025_afc_set
+ 160:apps/layer1/main.c **** 		printf("AFC OUT: %u\n", twl3025_afcout_get());
+ 158              		.loc 1 160 0
+ 159 009c FEFFFFEB 		bl	twl3025_afcout_get
+ 160 00a0 0010A0E1 		mov	r1, r0
+ 161 00a4 14009FE5 		ldr	r0, .L17+12
+ 162 00a8 FEFFFFEB 		bl	printf
+ 163              	.L6:
+ 161:apps/layer1/main.c **** 		break;
+ 162:apps/layer1/main.c **** 	default:
+ 163:apps/layer1/main.c **** 		break;
+ 164:apps/layer1/main.c **** 	}
+ 165:apps/layer1/main.c **** 	/* power down SIM, TODO:  this will happen with every key pressed,
+ 166:apps/layer1/main.c ****        put it somewhere else ! */
+ 167:apps/layer1/main.c **** 	calypso_sim_powerdown();
+ 168:apps/layer1/main.c **** }
+ 164              		.loc 1 168 0
+ 165 00ac 04E09DE4 		ldr	lr, [sp], #4
+ 167:apps/layer1/main.c **** 	calypso_sim_powerdown();
+ 166              		.loc 1 167 0
+ 167 00b0 FEFFFFEA 		b	calypso_sim_powerdown
+ 168              	.L18:
+ 169              		.align	2
+ 170              	.L17:
+ 171 00b4 00000000 		.word	.LANCHOR0
+ 172 00b8 00F0FFFF 		.word	-4096
+ 173 00bc FF0F0000 		.word	4095
+ 174 00c0 11000000 		.word	.LC1
+ 175              		.cfi_endproc
+ 176              	.LFE63:
+ 178              		.section	.text.main,"ax",%progbits
+ 179              		.align	2
+ 180              		.global	main
+ 182              	main:
+ 183              	.LFB61:
+  58:apps/layer1/main.c **** {
+ 184              		.loc 1 58 0
+ 185              		.cfi_startproc
+ 186              		@ args = 0, pretend = 0, frame = 20
+ 187              		@ frame_needed = 0, uses_anonymous_args = 0
+ 188 0000 F0402DE9 		stmfd	sp!, {r4, r5, r6, r7, lr}
+ 189              	.LCFI2:
+ 190              		.cfi_def_cfa_offset 20
+  61:apps/layer1/main.c **** 	board_init(1);
+ 191              		.loc 1 61 0
+ 192 0004 0100A0E3 		mov	r0, #1
+  58:apps/layer1/main.c **** {
+ 193              		.loc 1 58 0
+ 194 0008 14D04DE2 		sub	sp, sp, #20
+ 195              	.LCFI3:
+ 196              		.cfi_def_cfa_offset 40
+  64:apps/layer1/main.c **** 	puts(hr);
+ 197              		.loc 1 64 0
+ 198 000c 48419FE5 		ldr	r4, .L21
+ 199              		.cfi_offset 14, -4
+ 200              		.cfi_offset 7, -8
+ 201              		.cfi_offset 6, -12
+ 202              		.cfi_offset 5, -16
+ 203              		.cfi_offset 4, -20
+  61:apps/layer1/main.c **** 	board_init(1);
+ 204              		.loc 1 61 0
+ 205 0010 FEFFFFEB 		bl	board_init
+  63:apps/layer1/main.c **** 	puts("\n\nOsmocomBB Layer 1 (revision " GIT_REVISION ")\n");
+ 206              		.loc 1 63 0
+ 207 0014 44019FE5 		ldr	r0, .L21+4
+ 208 0018 FEFFFFEB 		bl	puts
+  64:apps/layer1/main.c **** 	puts(hr);
+ 209              		.loc 1 64 0
+ 210 001c 000094E5 		ldr	r0, [r4, #0]
+ 211 0020 FEFFFFEB 		bl	puts
+  67:apps/layer1/main.c **** 	dump_dev_id();
+ 212              		.loc 1 67 0
+ 213 0024 FEFFFFEB 		bl	dump_dev_id
+  68:apps/layer1/main.c **** 	puts(hr);
+ 214              		.loc 1 68 0
+ 215 0028 000094E5 		ldr	r0, [r4, #0]
+ 216 002c FEFFFFEB 		bl	puts
+ 217              	.LBB36:
+ 218              	.LBB37:
+ 219              		.file 3 "include/fb/framebuffer.h"
+   1:include/fb/framebuffer.h **** #ifndef _FB_FRAMEBUFFER_H
+   2:include/fb/framebuffer.h **** #define _FB_FRAMEBUFFER_H
+   3:include/fb/framebuffer.h **** 
+   4:include/fb/framebuffer.h **** #include <fb/font.h>
+   5:include/fb/framebuffer.h **** #include <stdint.h>
+   6:include/fb/framebuffer.h **** 
+   7:include/fb/framebuffer.h **** /* color is encoded as <special><red><green><blue> */
+   8:include/fb/framebuffer.h **** /* if a color is "special", then the RGB components most likely
+   9:include/fb/framebuffer.h ****    don't make sense. Use "special" colours when you have to
+  10:include/fb/framebuffer.h ****    mask out bits with transparency or you have to encode
+  11:include/fb/framebuffer.h ****    colours in a fixed color palette ... */
+  12:include/fb/framebuffer.h **** 
+  13:include/fb/framebuffer.h **** #define FB_COLOR_WHITE		0x00ffffffU
+  14:include/fb/framebuffer.h **** #define FB_COLOR_BLACK		0x00000000U
+  15:include/fb/framebuffer.h **** #define FB_COLOR_TRANSP		0x01ffffffU
+  16:include/fb/framebuffer.h **** 
+  17:include/fb/framebuffer.h **** #define FB_COLOR_RGB(r,g,b) ((((r) & 0xff)<<16)|(((g)&0xff)<<8)|((b)&0xff))
+  18:include/fb/framebuffer.h **** #define FB_COLOR_RED		FB_COLOR_RGB(0xff,0x00,0x00)
+  19:include/fb/framebuffer.h **** #define FB_COLOR_GREEN		FB_COLOR_RGB(0x00,0xff,0x00)
+  20:include/fb/framebuffer.h **** #define FB_COLOR_BLUE		FB_COLOR_RGB(0x00,0x00,0xff)
+  21:include/fb/framebuffer.h **** 
+  22:include/fb/framebuffer.h **** /* encode */
+  23:include/fb/framebuffer.h **** 
+  24:include/fb/framebuffer.h **** /* decode */
+  25:include/fb/framebuffer.h **** #define FB_COLOR_IS_SPECIAL(v)     (!!((v) & 0xff000000U))
+  26:include/fb/framebuffer.h **** #define FB_COLOR_TO_R(v)		(((v)>>16) & 0xff)
+  27:include/fb/framebuffer.h **** #define FB_COLOR_TO_G(v)		(((v)>> 8) & 0xff)
+  28:include/fb/framebuffer.h **** #define FB_COLOR_TO_B(v)		( (v)      & 0xff)
+  29:include/fb/framebuffer.h **** 
+  30:include/fb/framebuffer.h **** struct framebuffer {
+  31:include/fb/framebuffer.h **** 	char name[8];				// keep it short!
+  32:include/fb/framebuffer.h **** 	void (*init)();				// (re)initialize
+  33:include/fb/framebuffer.h **** 	void (*clear)();			// clear display
+  34:include/fb/framebuffer.h **** 	void (*set_p)(uint16_t x,uint16_t y);	// set pixel to fg color
+  35:include/fb/framebuffer.h **** 	void (*boxto)(uint16_t x,uint16_t y);	// draw box to xy
+  36:include/fb/framebuffer.h **** 	void (*lineto)(uint16_t x,uint16_t y);	// draw line to xy
+  37:include/fb/framebuffer.h **** 	int (*putstr)(char *c,int maxwidth);	// put text in current font to fb
+  38:include/fb/framebuffer.h **** 	void (*flush)();			// flush changes
+  39:include/fb/framebuffer.h **** 
+  40:include/fb/framebuffer.h **** 	uint16_t width,height;			// width/height of fb
+  41:include/fb/framebuffer.h **** 	uint16_t cursor_x,cursor_y;		// current cursor
+  42:include/fb/framebuffer.h **** 	uint32_t fg_color,bg_color;		// current fg/bg color
+  43:include/fb/framebuffer.h **** 	enum fb_font_id font;			// current font
+  44:include/fb/framebuffer.h **** };
+  45:include/fb/framebuffer.h **** 
+  46:include/fb/framebuffer.h **** /* there is a single framebuffer, the specific driver defines
+  47:include/fb/framebuffer.h ****    the "framebuffer" symbol */
+  48:include/fb/framebuffer.h **** extern struct framebuffer *framebuffer;
+  49:include/fb/framebuffer.h **** 
+  50:include/fb/framebuffer.h **** static inline void
+  51:include/fb/framebuffer.h **** fb_init(){
+  52:include/fb/framebuffer.h **** 	framebuffer->init();
+  53:include/fb/framebuffer.h **** }
+  54:include/fb/framebuffer.h **** 
+  55:include/fb/framebuffer.h **** static inline void
+  56:include/fb/framebuffer.h **** fb_clear(){
+  57:include/fb/framebuffer.h **** 	framebuffer->clear();
+ 220              		.loc 3 57 0
+ 221 0030 2C519FE5 		ldr	r5, .L21+8
+ 222              	.LBE37:
+ 223              	.LBE36:
+  70:apps/layer1/main.c **** 	keypad_set_handler(&key_handler);
+ 224              		.loc 1 70 0
+ 225 0034 2C019FE5 		ldr	r0, .L21+12
+ 226 0038 FEFFFFEB 		bl	keypad_set_handler
+  73:apps/layer1/main.c **** 	calypso_clk_dump();
+ 227              		.loc 1 73 0
+ 228 003c FEFFFFEB 		bl	calypso_clk_dump
+  74:apps/layer1/main.c **** 	puts(hr);
+ 229              		.loc 1 74 0
+ 230 0040 000094E5 		ldr	r0, [r4, #0]
+ 231 0044 FEFFFFEB 		bl	puts
+ 232              	.LBB39:
+ 233              	.LBB38:
+ 234              		.loc 3 57 0
+ 235 0048 003095E5 		ldr	r3, [r5, #0]
+ 236 004c 0FE0A0E1 		mov	lr, pc
+ 237 0050 0CF093E5 		ldr	pc, [r3, #12]
+ 238              	.LVL13:
+ 239              	.LBE38:
+ 240              	.LBE39:
+ 241              	.LBB40:
+ 242              	.LBB42:
+  58:include/fb/framebuffer.h **** }
+  59:include/fb/framebuffer.h **** 
+  60:include/fb/framebuffer.h **** static inline void
+  61:include/fb/framebuffer.h **** fb_boxto(uint16_t x,uint16_t y){
+  62:include/fb/framebuffer.h **** 	framebuffer->boxto(x,y);
+  63:include/fb/framebuffer.h **** }
+  64:include/fb/framebuffer.h **** 
+  65:include/fb/framebuffer.h **** static inline void
+  66:include/fb/framebuffer.h **** fb_lineto(uint16_t x,uint16_t y){
+  67:include/fb/framebuffer.h **** 	framebuffer->lineto(x,y);
+  68:include/fb/framebuffer.h **** }
+  69:include/fb/framebuffer.h **** 
+  70:include/fb/framebuffer.h **** static inline void
+  71:include/fb/framebuffer.h **** fb_set_p(uint16_t x,uint16_t y){
+  72:include/fb/framebuffer.h **** 	framebuffer->set_p(x,y);
+  73:include/fb/framebuffer.h **** }
+  74:include/fb/framebuffer.h **** 
+  75:include/fb/framebuffer.h **** static inline int
+  76:include/fb/framebuffer.h **** fb_putstr(char *str,int maxwidth){
+  77:include/fb/framebuffer.h **** 	return framebuffer->putstr(str,maxwidth);
+  78:include/fb/framebuffer.h **** }
+  79:include/fb/framebuffer.h **** 
+  80:include/fb/framebuffer.h **** static inline void
+  81:include/fb/framebuffer.h **** fb_flush(){
+  82:include/fb/framebuffer.h **** 	framebuffer->flush();
+  83:include/fb/framebuffer.h **** }
+  84:include/fb/framebuffer.h **** 
+  85:include/fb/framebuffer.h **** static inline void
+  86:include/fb/framebuffer.h **** fb_gotoxy(uint16_t x,uint16_t y){
+  87:include/fb/framebuffer.h **** 	framebuffer->cursor_x = x;
+  88:include/fb/framebuffer.h **** 	framebuffer->cursor_y = y;
+  89:include/fb/framebuffer.h **** }
+  90:include/fb/framebuffer.h **** 
+  91:include/fb/framebuffer.h **** static inline void
+  92:include/fb/framebuffer.h **** fb_setfg(uint32_t color){
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 243              		.loc 3 93 0
+ 244 0054 003095E5 		ldr	r3, [r5, #0]
+ 245              	.LBE42:
+ 246              	.LBE40:
+ 247              	.LBB44:
+ 248              	.LBB46:
+  87:include/fb/framebuffer.h **** 	framebuffer->cursor_x = x;
+ 249              		.loc 3 87 0
+ 250 0058 0220A0E3 		mov	r2, #2	@ movhi
+ 251              	.LBE46:
+ 252              	.LBE44:
+  83:apps/layer1/main.c **** 	fb_putstr("Layer 1",framebuffer->width-4);
+ 253              		.loc 1 83 0
+ 254 005c B412D3E1 		ldrh	r1, [r3, #36]
+ 255              	.LBB48:
+ 256              	.LBB41:
+ 257              		.loc 3 93 0
+ 258 0060 0060A0E3 		mov	r6, #0
+ 259              	.LBE41:
+ 260              	.LBE48:
+ 261              	.LBB49:
+ 262              	.LBB50:
+  94:include/fb/framebuffer.h **** }
+  95:include/fb/framebuffer.h **** 
+  96:include/fb/framebuffer.h **** static inline void
+  97:include/fb/framebuffer.h **** fb_setbg(uint32_t color){
+  98:include/fb/framebuffer.h **** 	framebuffer->bg_color = color;
+  99:include/fb/framebuffer.h **** }
+ 100:include/fb/framebuffer.h **** 
+ 101:include/fb/framebuffer.h **** static inline void
+ 102:include/fb/framebuffer.h **** fb_setfont(enum fb_font_id fid){
+ 103:include/fb/framebuffer.h **** 	framebuffer->font = fid;
+ 263              		.loc 3 103 0
+ 264 0064 0140A0E3 		mov	r4, #1
+ 265              	.LBE50:
+ 266              	.LBE49:
+ 267              	.LBB52:
+ 268              	.LBB45:
+  87:include/fb/framebuffer.h **** 	framebuffer->cursor_x = x;
+ 269              		.loc 3 87 0
+ 270 0068 B822C3E1 		strh	r2, [r3, #40]	@ movhi
+ 271              	.LBE45:
+ 272              	.LBE52:
+ 273              	.LBB53:
+ 274              	.LBB54:
+  98:include/fb/framebuffer.h **** 	framebuffer->bg_color = color;
+ 275              		.loc 3 98 0
+ 276 006c FF74E0E3 		mvn	r7, #-16777216
+ 277              	.LBE54:
+ 278              	.LBE53:
+ 279              	.LBB56:
+ 280              	.LBB47:
+  88:include/fb/framebuffer.h **** 	framebuffer->cursor_y = y;
+ 281              		.loc 3 88 0
+ 282 0070 1420A0E3 		mov	r2, #20	@ movhi
+ 283 0074 BA22C3E1 		strh	r2, [r3, #42]	@ movhi
+ 284              	.LBE47:
+ 285              	.LBE56:
+ 286              	.LBB57:
+ 287              	.LBB43:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 288              		.loc 3 93 0
+ 289 0078 2C6083E5 		str	r6, [r3, #44]
+ 290              	.LVL14:
+ 291              	.LBE43:
+ 292              	.LBE57:
+ 293              	.LBB58:
+ 294              	.LBB55:
+  98:include/fb/framebuffer.h **** 	framebuffer->bg_color = color;
+ 295              		.loc 3 98 0
+ 296 007c 307083E5 		str	r7, [r3, #48]
+ 297              	.LVL15:
+ 298              	.LBE55:
+ 299              	.LBE58:
+ 300              	.LBB59:
+ 301              	.LBB51:
+ 302              		.loc 3 103 0
+ 303 0080 344083E5 		str	r4, [r3, #52]
+ 304              	.LVL16:
+ 305              	.LBE51:
+ 306              	.LBE59:
+ 307              	.LBB60:
+ 308              	.LBB61:
+  77:include/fb/framebuffer.h **** 	return framebuffer->putstr(str,maxwidth);
+ 309              		.loc 3 77 0
+ 310 0084 041041E2 		sub	r1, r1, #4
+ 311 0088 DC009FE5 		ldr	r0, .L21+16
+ 312 008c 0FE0A0E1 		mov	lr, pc
+ 313 0090 1CF093E5 		ldr	pc, [r3, #28]
+ 314              	.LVL17:
+ 315              	.LBE61:
+ 316              	.LBE60:
+ 317              	.LBB62:
+ 318              	.LBB63:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 319              		.loc 3 93 0
+ 320 0094 003095E5 		ldr	r3, [r5, #0]
+ 321 0098 FF28A0E3 		mov	r2, #16711680
+ 322              	.LBE63:
+ 323              	.LBE62:
+  89:apps/layer1/main.c **** 	fb_boxto(framebuffer->width-3,38);
+ 324              		.loc 1 89 0
+ 325 009c B402D3E1 		ldrh	r0, [r3, #36]
+ 326              	.LBB65:
+ 327              	.LBB64:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 328              		.loc 3 93 0
+ 329 00a0 2C2083E5 		str	r2, [r3, #44]
+ 330              	.LVL18:
+ 331              	.LBE64:
+ 332              	.LBE65:
+ 333              	.LBB66:
+ 334              	.LBB67:
+  98:include/fb/framebuffer.h **** 	framebuffer->bg_color = color;
+ 335              		.loc 3 98 0
+ 336 00a4 FF20A0E3 		mov	r2, #255
+ 337 00a8 302083E5 		str	r2, [r3, #48]
+ 338              	.LVL19:
+ 339              	.LBE67:
+ 340              	.LBE66:
+  89:apps/layer1/main.c **** 	fb_boxto(framebuffer->width-3,38);
+ 341              		.loc 1 89 0
+ 342 00ac 030040E2 		sub	r0, r0, #3
+ 343              	.LBB68:
+ 344              	.LBB69:
+  87:include/fb/framebuffer.h **** 	framebuffer->cursor_x = x;
+ 345              		.loc 3 87 0
+ 346 00b0 0220A0E3 		mov	r2, #2	@ movhi
+ 347 00b4 B822C3E1 		strh	r2, [r3, #40]	@ movhi
+ 348              	.LBE69:
+ 349              	.LBE68:
+  89:apps/layer1/main.c **** 	fb_boxto(framebuffer->width-3,38);
+ 350              		.loc 1 89 0
+ 351 00b8 0008A0E1 		mov	r0, r0, asl #16
+ 352              	.LBB71:
+ 353              	.LBB70:
+  88:include/fb/framebuffer.h **** 	framebuffer->cursor_y = y;
+ 354              		.loc 3 88 0
+ 355 00bc 1920A0E3 		mov	r2, #25	@ movhi
+ 356 00c0 BA22C3E1 		strh	r2, [r3, #42]	@ movhi
+ 357              	.LVL20:
+ 358              	.LBE70:
+ 359              	.LBE71:
+ 360              	.LBB72:
+ 361              	.LBB73:
+  62:include/fb/framebuffer.h **** 	framebuffer->boxto(x,y);
+ 362              		.loc 3 62 0
+ 363 00c4 2008A0E1 		mov	r0, r0, lsr #16
+ 364 00c8 2610A0E3 		mov	r1, #38
+ 365 00cc 0FE0A0E1 		mov	lr, pc
+ 366 00d0 14F093E5 		ldr	pc, [r3, #20]
+ 367              	.LVL21:
+ 368              	.LBE73:
+ 369              	.LBE72:
+ 370              	.LBB74:
+ 371              	.LBB75:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 372              		.loc 3 93 0
+ 373 00d4 003095E5 		ldr	r3, [r5, #0]
+ 374              	.LBE75:
+ 375              	.LBE74:
+ 376              	.LBB77:
+ 377              	.LBB78:
+  87:include/fb/framebuffer.h **** 	framebuffer->cursor_x = x;
+ 378              		.loc 3 87 0
+ 379 00d8 0820A0E3 		mov	r2, #8	@ movhi
+ 380              	.LBE78:
+ 381              	.LBE77:
+  94:apps/layer1/main.c **** 	fb_putstr("osmocom-bb",framebuffer->width-4);
+ 382              		.loc 1 94 0
+ 383 00dc B412D3E1 		ldrh	r1, [r3, #36]
+ 384              	.LBB80:
+ 385              	.LBB79:
+  87:include/fb/framebuffer.h **** 	framebuffer->cursor_x = x;
+ 386              		.loc 3 87 0
+ 387 00e0 B822C3E1 		strh	r2, [r3, #40]	@ movhi
+  88:include/fb/framebuffer.h **** 	framebuffer->cursor_y = y;
+ 388              		.loc 3 88 0
+ 389 00e4 2120A0E3 		mov	r2, #33	@ movhi
+ 390 00e8 BA22C3E1 		strh	r2, [r3, #42]	@ movhi
+ 391              	.LBE79:
+ 392              	.LBE80:
+ 393              	.LBB81:
+ 394              	.LBB82:
+  77:include/fb/framebuffer.h **** 	return framebuffer->putstr(str,maxwidth);
+ 395              		.loc 3 77 0
+ 396 00ec 041041E2 		sub	r1, r1, #4
+ 397              	.LBE82:
+ 398              	.LBE81:
+ 399              	.LBB84:
+ 400              	.LBB76:
+  93:include/fb/framebuffer.h **** 	framebuffer->fg_color = color;
+ 401              		.loc 3 93 0
+ 402 00f0 2C7083E5 		str	r7, [r3, #44]
+ 403              	.LVL22:
+ 404              	.LBE76:
+ 405              	.LBE84:
+ 406              	.LBB85:
+ 407              	.LBB86:
+ 408              		.loc 3 103 0
+ 409 00f4 346083E5 		str	r6, [r3, #52]
+ 410              	.LVL23:
+ 411              	.LBE86:
+ 412              	.LBE85:
+ 413              	.LBB87:
+ 414              	.LBB83:
+  77:include/fb/framebuffer.h **** 	return framebuffer->putstr(str,maxwidth);
+ 415              		.loc 3 77 0
+ 416 00f8 70009FE5 		ldr	r0, .L21+20
+ 417 00fc 0FE0A0E1 		mov	lr, pc
+ 418 0100 1CF093E5 		ldr	pc, [r3, #28]
+ 419              	.LBE83:
+ 420              	.LBE87:
+ 421              	.LBB88:
+ 422              	.LBB89:
+  82:include/fb/framebuffer.h **** 	framebuffer->flush();
+ 423              		.loc 3 82 0
+ 424 0104 003095E5 		ldr	r3, [r5, #0]
+ 425 0108 0FE0A0E1 		mov	lr, pc
+ 426 010c 20F093E5 		ldr	pc, [r3, #32]
+ 427              	.LBE89:
+ 428              	.LBE88:
+  99:apps/layer1/main.c **** 	calypso_sim_init();
+ 429              		.loc 1 99 0
+ 430 0110 FEFFFFEB 		bl	calypso_sim_init
+ 101:apps/layer1/main.c **** 	puts("Power up simcard:\n");
+ 431              		.loc 1 101 0
+ 432 0114 58009FE5 		ldr	r0, .L21+24
+ 433 0118 FEFFFFEB 		bl	puts
+ 102:apps/layer1/main.c **** 	memset(atr,0,sizeof(atr));
+ 434              		.loc 1 102 0
+ 435 011c 0610A0E1 		mov	r1, r6
+ 436 0120 1420A0E3 		mov	r2, #20
+ 437 0124 0D00A0E1 		mov	r0, sp
+ 438 0128 FEFFFFEB 		bl	memset
+ 103:apps/layer1/main.c **** 	calypso_sim_powerup(atr);
+ 439              		.loc 1 103 0
+ 440 012c 0D00A0E1 		mov	r0, sp
+ 441 0130 FEFFFFEB 		bl	calypso_sim_powerup
+ 105:apps/layer1/main.c **** 	read_factory_rf_calibration();
+ 442              		.loc 1 105 0
+ 443 0134 FEFFFFEB 		bl	read_factory_rf_calibration
+ 106:apps/layer1/main.c **** 	layer1_init();
+ 444              		.loc 1 106 0
+ 445 0138 FEFFFFEB 		bl	layer1_init
+ 108:apps/layer1/main.c **** 	tpu_frame_irq_en(1, 1);
+ 446              		.loc 1 108 0
+ 447 013c 0400A0E1 		mov	r0, r4
+ 448 0140 0410A0E1 		mov	r1, r4
+ 449 0144 FEFFFFEB 		bl	tpu_frame_irq_en
+ 450              	.L20:
+ 111:apps/layer1/main.c **** 		l1a_compl_execute();
+ 451              		.loc 1 111 0 discriminator 1
+ 452 0148 FEFFFFEB 		bl	l1a_compl_execute
+ 112:apps/layer1/main.c **** 		osmo_timers_update();
+ 453              		.loc 1 112 0 discriminator 1
+ 454 014c FEFFFFEB 		bl	osmo_timers_update
+ 113:apps/layer1/main.c **** 		sim_handler();
+ 455              		.loc 1 113 0 discriminator 1
+ 456 0150 FEFFFFEB 		bl	sim_handler
+ 114:apps/layer1/main.c **** 		l1a_l23_handler();
+ 457              		.loc 1 114 0 discriminator 1
+ 458 0154 FEFFFFEB 		bl	l1a_l23_handler
+ 459 0158 FAFFFFEA 		b	.L20
+ 460              	.L22:
+ 461              		.align	2
+ 462              	.L21:
+ 463 015c 00000000 		.word	.LANCHOR1
+ 464 0160 1E000000 		.word	.LC2
+ 465 0164 00000000 		.word	framebuffer
+ 466 0168 00000000 		.word	key_handler
+ 467 016c 5A000000 		.word	.LC3
+ 468 0170 62000000 		.word	.LC4
+ 469 0174 6D000000 		.word	.LC5
+ 470              		.cfi_endproc
+ 471              	.LFE61:
+ 473              		.global	hr
+ 474              		.section	.rodata.str1.1,"aMS",%progbits,1
+ 475              	.LC0:
+ 476 0000 54535041 		.ascii	"TSPACT%u toggle\012\000"
+ 476      43542575 
+ 476      20746F67 
+ 476      676C650A 
+ 476      00
+ 477              	.LC1:
+ 478 0011 41464320 		.ascii	"AFC OUT: %u\012\000"
+ 478      4F55543A 
+ 478      2025750A 
+ 478      00
+ 479              	.LC2:
+ 480 001e 0A0A4F73 		.ascii	"\012\012OsmocomBB Layer 1 (revision 0.2.0-55-g6fef1"
+ 480      6D6F636F 
+ 480      6D424220 
+ 480      4C617965 
+ 480      72203120 
+ 481 004b 3462632D 		.ascii	"4bc-modified)\012\000"
+ 481      6D6F6469 
+ 481      66696564 
+ 481      290A00
+ 482              	.LC3:
+ 483 005a 4C617965 		.ascii	"Layer 1\000"
+ 483      72203100 
+ 484              	.LC4:
+ 485 0062 6F736D6F 		.ascii	"osmocom-bb\000"
+ 485      636F6D2D 
+ 485      626200
+ 486              	.LC5:
+ 487 006d 506F7765 		.ascii	"Power up simcard:\012\000"
+ 487      72207570 
+ 487      2073696D 
+ 487      63617264 
+ 487      3A0A00
+ 488              	.LC6:
+ 489 0080 3D3D3D3D 		.ascii	"==================================================="
+ 489      3D3D3D3D 
+ 489      3D3D3D3D 
+ 489      3D3D3D3D 
+ 489      3D3D3D3D 
+ 490 00b3 3D3D3D3D 		.ascii	"===================\012\000"
+ 490      3D3D3D3D 
+ 490      3D3D3D3D 
+ 490      3D3D3D3D 
+ 490      3D3D3D0A 
+ 491              		.data
+ 492              		.align	2
+ 493              		.set	.LANCHOR1,. + 0
+ 496              	hr:
+ 497 0000 80000000 		.word	.LC6
+ 498              		.bss
+ 499              		.align	2
+ 500              		.set	.LANCHOR0,. + 0
+ 503              	afcout:
+ 504 0000 00000000 		.space	4
+ 505              		.text
+ 506              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 main.c
+     /tmp/ccUwuhKs.s:12     .text.tspact_toggle:0000000000000000 $a
+     /tmp/ccUwuhKs.s:14     .text.tspact_toggle:0000000000000000 tspact_toggle
+     /tmp/ccUwuhKs.s:62     .text.tspact_toggle:0000000000000040 $d
+     /tmp/ccUwuhKs.s:67     .text.key_handler:0000000000000000 $a
+     /tmp/ccUwuhKs.s:69     .text.key_handler:0000000000000000 key_handler
+     /tmp/ccUwuhKs.s:92     .text.key_handler:000000000000001c $d
+     /tmp/ccUwuhKs.s:100    .text.key_handler:0000000000000034 $a
+     /tmp/ccUwuhKs.s:171    .text.key_handler:00000000000000b4 $d
+     /tmp/ccUwuhKs.s:179    .text.main:0000000000000000 $a
+     /tmp/ccUwuhKs.s:182    .text.main:0000000000000000 main
+     /tmp/ccUwuhKs.s:463    .text.main:000000000000015c $d
+     /tmp/ccUwuhKs.s:496    .data:0000000000000000 hr
+     /tmp/ccUwuhKs.s:492    .data:0000000000000000 $d
+     /tmp/ccUwuhKs.s:499    .bss:0000000000000000 $d
+     /tmp/ccUwuhKs.s:503    .bss:0000000000000000 afcout
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+printf
+tsp_act_toggle
+tpu_enqueue
+tpu_enable
+tpu_wait_idle
+twl3025_afc_set
+twl3025_afcout_get
+calypso_sim_powerdown
+board_init
+puts
+dump_dev_id
+keypad_set_handler
+calypso_clk_dump
+calypso_sim_init
+memset
+calypso_sim_powerup
+read_factory_rf_calibration
+layer1_init
+tpu_frame_irq_en
+l1a_compl_execute
+osmo_timers_update
+sim_handler
+l1a_l23_handler
+framebuffer

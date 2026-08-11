@@ -1,0 +1,384 @@
+   1              		.file	"init.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.pll_init,"ax",%progbits
+  12              		.align	2
+  13              		.global	pll_init
+  15              	pll_init:
+  16              	.LFB37:
+  17              		.file 1 "board/mt62xx/init.c"
+   1:board/mt62xx/init.c **** /* Initialization for the MT62xx Basebands */
+   2:board/mt62xx/init.c **** 
+   3:board/mt62xx/init.c **** /* (C) 2010 by Steve Markgraf <steve@steve-m.de>
+   4:board/mt62xx/init.c ****  *
+   5:board/mt62xx/init.c ****  * All Rights Reserved
+   6:board/mt62xx/init.c ****  *
+   7:board/mt62xx/init.c ****  * This program is free software; you can redistribute it and/or modify
+   8:board/mt62xx/init.c ****  * it under the terms of the GNU General Public License as published by
+   9:board/mt62xx/init.c ****  * the Free Software Foundation; either version 2 of the License, or
+  10:board/mt62xx/init.c ****  * (at your option) any later version.
+  11:board/mt62xx/init.c ****  *
+  12:board/mt62xx/init.c ****  * This program is distributed in the hope that it will be useful,
+  13:board/mt62xx/init.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  14:board/mt62xx/init.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  15:board/mt62xx/init.c ****  * GNU General Public License for more details.
+  16:board/mt62xx/init.c ****  *
+  17:board/mt62xx/init.c ****  */
+  18:board/mt62xx/init.c **** 
+  19:board/mt62xx/init.c **** #include <stdint.h>
+  20:board/mt62xx/init.c **** #include <stdio.h>
+  21:board/mt62xx/init.c **** 
+  22:board/mt62xx/init.c **** #include <debug.h>
+  23:board/mt62xx/init.c **** #include <ctors.h>
+  24:board/mt62xx/init.c **** #include <memory.h>
+  25:board/mt62xx/init.c **** #include <board.h>
+  26:board/mt62xx/init.c **** #include <keypad.h>
+  27:board/mt62xx/init.c **** #include <uart.h>
+  28:board/mt62xx/init.c **** #include <console.h>
+  29:board/mt62xx/init.c **** #include <delay.h>
+  30:board/mt62xx/init.c **** 
+  31:board/mt62xx/init.c **** #include <flash/cfi_flash.h>
+  32:board/mt62xx/init.c **** 
+  33:board/mt62xx/init.c **** #include <comm/sercomm.h>
+  34:board/mt62xx/init.c **** #include <comm/timer.h>
+  35:board/mt62xx/init.c **** 
+  36:board/mt62xx/init.c **** #include <mtk/emi.h>
+  37:board/mt62xx/init.c **** #include <mtk/mt6235.h>
+  38:board/mt62xx/init.c **** #include <mtk/system.h>
+  39:board/mt62xx/init.c **** 
+  40:board/mt62xx/init.c **** void pll_init(void)
+  41:board/mt62xx/init.c **** {
+  18              		.loc 1 41 0
+  19              		.cfi_startproc
+  20              		@ args = 0, pretend = 0, frame = 0
+  21              		@ frame_needed = 0, uses_anonymous_args = 0
+  22 0000 10402DE9 		stmfd	sp!, {r4, lr}
+  23              	.LCFI0:
+  24              		.cfi_def_cfa_offset 8
+  42:board/mt62xx/init.c **** 	/* Power on PLL */
+  43:board/mt62xx/init.c **** 	writew(0, MTK_PLL_PDN_CON);
+  25              		.loc 1 43 0
+  26 0004 0030A0E3 		mov	r3, #0
+  27 0008 8344A0E3 		mov	r4, #-2097152000
+  28              		.cfi_offset 14, -4
+  29              		.cfi_offset 4, -8
+  44:board/mt62xx/init.c **** 	writew(PLL_CLKSQ_DIV2_DSP | PLL_CLKSQ_DIV2_MCU, MTK_PLL_CLK_CON);
+  30              		.loc 1 44 0
+  31 000c 0320A0E3 		mov	r2, #3	@ movhi
+  43:board/mt62xx/init.c **** 	writew(0, MTK_PLL_PDN_CON);
+  32              		.loc 1 43 0
+  33 0010 BC31C4E1 		strh	r3, [r4, #28]	@ movhi
+  34              		.loc 1 44 0
+  35 0014 B821C4E1 		strh	r2, [r4, #24]	@ movhi
+  45:board/mt62xx/init.c **** 
+  46:board/mt62xx/init.c **** 	writew(PLL_RST, MTK_PLL_PLL);
+  36              		.loc 1 46 0
+  37 0018 8020A0E3 		mov	r2, #128	@ movhi
+  38 001c B020C4E1 		strh	r2, [r4, #0]	@ movhi
+  47:board/mt62xx/init.c **** 	writew(0, MTK_PLL_PLL);
+  48:board/mt62xx/init.c **** 	delay_ms(1);
+  39              		.loc 1 48 0
+  40 0020 0100A0E3 		mov	r0, #1
+  47:board/mt62xx/init.c **** 	writew(0, MTK_PLL_PLL);
+  41              		.loc 1 47 0
+  42 0024 B030C4E1 		strh	r3, [r4, #0]	@ movhi
+  43              		.loc 1 48 0
+  44 0028 FEFFFFEB 		bl	delay_ms
+  49:board/mt62xx/init.c **** 
+  50:board/mt62xx/init.c **** 	/* Turn on PLL for MCU, DSP and USB */
+  51:board/mt62xx/init.c **** 	writew(PLL_MPLLSEL_PLL | PLL_DPLLSEL | PLL_UPLLSEL, MTK_PLL_PLL);
+  45              		.loc 1 51 0
+  46 002c 7030A0E3 		mov	r3, #112	@ movhi
+  47 0030 B030C4E1 		strh	r3, [r4, #0]	@ movhi
+  52:board/mt62xx/init.c **** 
+  53:board/mt62xx/init.c **** 	/*
+  54:board/mt62xx/init.c **** 	 * Setup MCU clock register:
+  55:board/mt62xx/init.c **** 	 * ARMCLK = 208MHz, AHBx4CLK = 52MHz, AHBx8CLK = 104MHz
+  56:board/mt62xx/init.c **** 	 * we have to write to the read-only part (EMICLK) as well, otherwise
+  57:board/mt62xx/init.c **** 	 * the EMI won't work! (datasheet lies)
+  58:board/mt62xx/init.c **** 	 */
+  59:board/mt62xx/init.c **** 	writew(7 << MCUCLK_CON_AHBX8CLK_SHIFT |
+  48              		.loc 1 59 0
+  49 0034 08209FE5 		ldr	r2, .L2
+  50 0038 08309FE5 		ldr	r3, .L2+4
+  51 003c B821C3E1 		strh	r2, [r3, #24]	@ movhi
+  60:board/mt62xx/init.c **** 	       3 << MCUCLK_CON_AHBX4CLK_SHIFT |
+  61:board/mt62xx/init.c **** 	       15 << MCUCLK_CON_ARMCLK_SHIFT |
+  62:board/mt62xx/init.c **** 	       7 << MCUCLK_CON_EMICLK_SHIFT,
+  63:board/mt62xx/init.c **** 	       MTK_CONFG_MCUCLK_CON);
+  64:board/mt62xx/init.c **** }
+  52              		.loc 1 64 0
+  53 0040 1080BDE8 		ldmfd	sp!, {r4, pc}
+  54              	.L3:
+  55              		.align	2
+  56              	.L2:
+  57 0044 377F0000 		.word	32567
+  58 0048 00010180 		.word	-2147417856
+  59              		.cfi_endproc
+  60              	.LFE37:
+  62              		.section	.text.memory_init,"ax",%progbits
+  63              		.align	2
+  64              		.global	memory_init
+  66              	memory_init:
+  67              	.LFB38:
+  65:board/mt62xx/init.c **** 
+  66:board/mt62xx/init.c **** void memory_init(void)
+  67:board/mt62xx/init.c **** {
+  68              		.loc 1 67 0
+  69              		.cfi_startproc
+  70              		@ args = 0, pretend = 0, frame = 0
+  71              		@ frame_needed = 0, uses_anonymous_args = 0
+  68:board/mt62xx/init.c **** 	int i;
+  69:board/mt62xx/init.c **** 
+  70:board/mt62xx/init.c **** 	/* Initialization for Hynix RAM */
+  71:board/mt62xx/init.c **** 
+  72:board/mt62xx/init.c **** 	/* Configure DRAM controller */
+  73:board/mt62xx/init.c **** 	writel(0x0001000e, MTK_EMI_GEND);
+  72              		.loc 1 73 0
+  73 0000 88309FE5 		ldr	r3, .L7
+  67:board/mt62xx/init.c **** {
+  74              		.loc 1 67 0
+  75 0004 F0402DE9 		stmfd	sp!, {r4, r5, r6, r7, lr}
+  76              	.LCFI1:
+  77              		.cfi_def_cfa_offset 20
+  78              		.loc 1 73 0
+  79 0008 8154A0E3 		mov	r5, #-2130706432
+  80              		.cfi_offset 14, -4
+  81              		.cfi_offset 7, -8
+  82              		.cfi_offset 6, -12
+  83              		.cfi_offset 5, -16
+  84              		.cfi_offset 4, -20
+  85 000c 883085E5 		str	r3, [r5, #136]
+  74:board/mt62xx/init.c **** 	writel(0x00088a0a, MTK_EMI_GENA);
+  86              		.loc 1 74 0
+  87 0010 7C309FE5 		ldr	r3, .L7+4
+  88 0014 703085E5 		str	r3, [r5, #112]
+  75:board/mt62xx/init.c **** 	writel(0x00000280, MTK_EMI_GENB);
+  89              		.loc 1 75 0
+  90 0018 0A3DA0E3 		mov	r3, #640
+  91 001c 783085E5 		str	r3, [r5, #120]
+  76:board/mt62xx/init.c **** 	writel(0x52945294, MTK_EMI_GENC);
+  92              		.loc 1 76 0
+  93 0020 70309FE5 		ldr	r3, .L7+8
+  94 0024 803085E5 		str	r3, [r5, #128]
+  77:board/mt62xx/init.c **** 	writel(0x1c016605, MTK_EMI_CONL);
+  95              		.loc 1 77 0
+  96 0028 6C309FE5 		ldr	r3, .L7+12
+  97 002c 583085E5 		str	r3, [r5, #88]
+  78:board/mt62xx/init.c **** 	writel(0x00002828, MTK_EMI_CONM);
+  98              		.loc 1 78 0
+  99 0030 68309FE5 		ldr	r3, .L7+16
+ 100 0034 603085E5 		str	r3, [r5, #96]
+  79:board/mt62xx/init.c **** 	writel(0x02334000, MTK_EMI_CONI);
+ 101              		.loc 1 79 0
+ 102 0038 64309FE5 		ldr	r3, .L7+20
+ 103 003c 403085E5 		str	r3, [r5, #64]
+  80:board/mt62xx/init.c **** 	writel(0x16c12212, MTK_EMI_CONJ);
+ 104              		.loc 1 80 0
+ 105 0040 60309FE5 		ldr	r3, .L7+24
+ 106 0044 483085E5 		str	r3, [r5, #72]
+  81:board/mt62xx/init.c **** 	writel(0x032d0000, MTK_EMI_CONK);
+ 107              		.loc 1 81 0
+ 108 0048 5C309FE5 		ldr	r3, .L7+28
+  82:board/mt62xx/init.c **** 
+  83:board/mt62xx/init.c **** 	for (i = 0; i < 5; ++i) {
+  84:board/mt62xx/init.c **** 		/* Setup five single bits, one by one for DRAM init */
+  85:board/mt62xx/init.c **** 		writel((1 << (24 + i)) | (0x400013), MTK_EMI_CONN);
+  86:board/mt62xx/init.c **** 		delay_ms(1);
+  87:board/mt62xx/init.c **** 		writel(0x400013, MTK_EMI_CONN);
+ 109              		.loc 1 87 0
+ 110 004c 5C609FE5 		ldr	r6, .L7+32
+  81:board/mt62xx/init.c **** 	writel(0x032d0000, MTK_EMI_CONK);
+ 111              		.loc 1 81 0
+ 112 0050 503085E5 		str	r3, [r5, #80]
+ 113              	.LVL0:
+ 114 0054 1840A0E3 		mov	r4, #24
+  85:board/mt62xx/init.c **** 		writel((1 << (24 + i)) | (0x400013), MTK_EMI_CONN);
+ 115              		.loc 1 85 0
+ 116 0058 0170A0E3 		mov	r7, #1
+ 117              	.LVL1:
+ 118              	.L5:
+  85:board/mt62xx/init.c **** 		writel((1 << (24 + i)) | (0x400013), MTK_EMI_CONN);
+ 119              		.loc 1 85 0 is_stmt 0 discriminator 2
+ 120 005c 1734A0E1 		mov	r3, r7, asl r4
+ 121 0060 013583E3 		orr	r3, r3, #4194304
+ 122 0064 133083E3 		orr	r3, r3, #19
+ 123 0068 683085E5 		str	r3, [r5, #104]
+  86:board/mt62xx/init.c **** 		delay_ms(1);
+ 124              		.loc 1 86 0 is_stmt 1 discriminator 2
+ 125 006c 0100A0E3 		mov	r0, #1
+ 126 0070 FEFFFFEB 		bl	delay_ms
+  88:board/mt62xx/init.c **** 		delay_ms(1);
+ 127              		.loc 1 88 0 discriminator 2
+ 128 0074 014084E2 		add	r4, r4, #1
+  87:board/mt62xx/init.c **** 		writel(0x400013, MTK_EMI_CONN);
+ 129              		.loc 1 87 0 discriminator 2
+ 130 0078 686085E5 		str	r6, [r5, #104]
+ 131              		.loc 1 88 0 discriminator 2
+ 132 007c 0100A0E3 		mov	r0, #1
+ 133 0080 FEFFFFEB 		bl	delay_ms
+  83:board/mt62xx/init.c **** 	for (i = 0; i < 5; ++i) {
+ 134              		.loc 1 83 0 discriminator 2
+ 135 0084 1D0054E3 		cmp	r4, #29
+ 136 0088 F3FFFF1A 		bne	.L5
+  89:board/mt62xx/init.c **** 	}
+  90:board/mt62xx/init.c **** 
+  91:board/mt62xx/init.c **** #if 0
+  92:board/mt62xx/init.c **** 	/* Initialization for Toshiba RAM */
+  93:board/mt62xx/init.c **** 
+  94:board/mt62xx/init.c **** 	/* Configure DRAM controller */
+  95:board/mt62xx/init.c **** 	writel(0x0001000E, MTK_EMI_GEND);
+  96:board/mt62xx/init.c **** 	writel(0x00088E3A, MTK_EMI_GENA);
+  97:board/mt62xx/init.c **** 	writel(0x000000C0, MTK_EMI_GENB);
+  98:board/mt62xx/init.c **** 	writel(0x18C618C6, MTK_EMI_GENC);
+  99:board/mt62xx/init.c **** 	writel(0x18007505, MTK_EMI_CONL);
+ 100:board/mt62xx/init.c **** 	writel(0x00002828, MTK_EMI_CONM);
+ 101:board/mt62xx/init.c **** 	writel(0x00332000, MTK_EMI_CONI);
+ 102:board/mt62xx/init.c **** 	writel(0x3CD24431, MTK_EMI_CONJ);
+ 103:board/mt62xx/init.c **** 	writel(0x02000000, MTK_EMI_CONK);
+ 104:board/mt62xx/init.c **** 
+ 105:board/mt62xx/init.c **** 	for (i = 0; i < 5; ++i) {
+ 106:board/mt62xx/init.c **** 		/* Setup five single bits, one by one for DRAM init */
+ 107:board/mt62xx/init.c **** 		writel((1 << (24 + i)) | (0x500013), MTK_EMI_CONN);
+ 108:board/mt62xx/init.c **** 		delay_ms(1);
+ 109:board/mt62xx/init.c **** 		writel(0x500013, MTK_EMI_CONN);
+ 110:board/mt62xx/init.c **** 		delay_ms(1);
+ 111:board/mt62xx/init.c **** 	}
+ 112:board/mt62xx/init.c **** 
+ 113:board/mt62xx/init.c **** #endif
+ 114:board/mt62xx/init.c **** }
+ 137              		.loc 1 114 0
+ 138 008c F080BDE8 		ldmfd	sp!, {r4, r5, r6, r7, pc}
+ 139              	.L8:
+ 140              		.align	2
+ 141              	.L7:
+ 142 0090 0E000100 		.word	65550
+ 143 0094 0A8A0800 		.word	559626
+ 144 0098 94529452 		.word	1385452180
+ 145 009c 0566011C 		.word	469853701
+ 146 00a0 28280000 		.word	10280
+ 147 00a4 00403302 		.word	36913152
+ 148 00a8 1222C116 		.word	381755922
+ 149 00ac 00002D03 		.word	53280768
+ 150 00b0 13004000 		.word	4194323
+ 151              		.cfi_endproc
+ 152              	.LFE38:
+ 154              		.section	.text.board_init,"ax",%progbits
+ 155              		.align	2
+ 156              		.global	board_init
+ 158              	board_init:
+ 159              	.LFB39:
+ 115:board/mt62xx/init.c **** 
+ 116:board/mt62xx/init.c **** void board_init(int with_irq)
+ 117:board/mt62xx/init.c **** {
+ 160              		.loc 1 117 0
+ 161              		.cfi_startproc
+ 162              		@ args = 0, pretend = 0, frame = 0
+ 163              		@ frame_needed = 0, uses_anonymous_args = 0
+ 164              	.LVL2:
+ 118:board/mt62xx/init.c **** 	/* powerup the baseband */
+ 119:board/mt62xx/init.c **** 	writew(POWERKEY1_MAGIC, MTK_RTC_POWERKEY1);
+ 165              		.loc 1 119 0
+ 166 0000 64309FE5 		ldr	r3, .L10
+ 167 0004 64209FE5 		ldr	r2, .L10+4
+ 117:board/mt62xx/init.c **** {
+ 168              		.loc 1 117 0
+ 169 0008 30402DE9 		stmfd	sp!, {r4, r5, lr}
+ 170              	.LCFI2:
+ 171              		.cfi_def_cfa_offset 12
+ 172              		.loc 1 119 0
+ 173 000c B025C3E1 		strh	r2, [r3, #80]	@ movhi
+ 120:board/mt62xx/init.c **** 	writew(POWERKEY2_MAGIC, MTK_RTC_POWERKEY2);
+ 174              		.loc 1 120 0
+ 175 0010 5C209FE5 		ldr	r2, .L10+8
+ 176 0014 B425C3E1 		strh	r2, [r3, #84]	@ movhi
+ 121:board/mt62xx/init.c **** 	writew(BBPU_MAGIC | RTC_BBPU_WRITE_EN |
+ 177              		.loc 1 121 0
+ 178 0018 58209FE5 		ldr	r2, .L10+12
+ 122:board/mt62xx/init.c **** 	       RTC_BBPU_BBPU | RTC_BBPU_AUTO,
+ 123:board/mt62xx/init.c **** 	       MTK_RTC_BBPU);
+ 124:board/mt62xx/init.c **** 	writew(1, MTK_RTC_WRTGR);
+ 179              		.loc 1 124 0
+ 180 001c 0140A0E3 		mov	r4, #1
+ 181              		.cfi_offset 14, -4
+ 182              		.cfi_offset 5, -8
+ 183              		.cfi_offset 4, -12
+ 121:board/mt62xx/init.c **** 	writew(BBPU_MAGIC | RTC_BBPU_WRITE_EN |
+ 184              		.loc 1 121 0
+ 185 0020 B020C3E1 		strh	r2, [r3, #0]	@ movhi
+ 186              		.loc 1 124 0
+ 187 0024 B447C3E1 		strh	r4, [r3, #116]	@ movhi
+ 125:board/mt62xx/init.c **** 
+ 126:board/mt62xx/init.c **** 	/* disable watchdog timer */
+ 127:board/mt62xx/init.c **** 	writew(WDT_MODE_KEY, MTK_RGU_WDT_MODE);
+ 188              		.loc 1 127 0
+ 189 0028 4C309FE5 		ldr	r3, .L10+16
+ 190 002c 222CA0E3 		mov	r2, #8704	@ movhi
+ 191 0030 B020C3E1 		strh	r2, [r3, #0]	@ movhi
+ 117:board/mt62xx/init.c **** {
+ 192              		.loc 1 117 0
+ 193 0034 0050A0E1 		mov	r5, r0
+ 128:board/mt62xx/init.c **** 
+ 129:board/mt62xx/init.c **** 	pll_init();
+ 194              		.loc 1 129 0
+ 195 0038 FEFFFFEB 		bl	pll_init
+ 196              	.LVL3:
+ 130:board/mt62xx/init.c **** 	memory_init();
+ 197              		.loc 1 130 0
+ 198 003c FEFFFFEB 		bl	memory_init
+ 131:board/mt62xx/init.c **** 
+ 132:board/mt62xx/init.c **** 	/* Initialize UART */
+ 133:board/mt62xx/init.c **** 	sercomm_bind_uart(UART_MODEM);
+ 199              		.loc 1 133 0
+ 200 0040 0400A0E1 		mov	r0, r4
+ 201 0044 FEFFFFEB 		bl	sercomm_bind_uart
+ 134:board/mt62xx/init.c **** 	cons_bind_uart(UART_IRDA);
+ 202              		.loc 1 134 0
+ 203 0048 0000A0E3 		mov	r0, #0
+ 204 004c FEFFFFEB 		bl	cons_bind_uart
+ 135:board/mt62xx/init.c **** 	uart_init(UART_MODEM, with_irq);
+ 205              		.loc 1 135 0
+ 206 0050 FF1005E2 		and	r1, r5, #255
+ 207 0054 0400A0E1 		mov	r0, r4
+ 208 0058 FEFFFFEB 		bl	uart_init
+ 136:board/mt62xx/init.c **** 	uart_baudrate(UART_MODEM, UART_115200);
+ 209              		.loc 1 136 0
+ 210 005c 0400A0E1 		mov	r0, r4
+ 211 0060 0210A0E3 		mov	r1, #2
+ 137:board/mt62xx/init.c **** }
+ 212              		.loc 1 137 0
+ 213 0064 3040BDE8 		ldmfd	sp!, {r4, r5, lr}
+ 136:board/mt62xx/init.c **** 	uart_baudrate(UART_MODEM, UART_115200);
+ 214              		.loc 1 136 0
+ 215 0068 FEFFFFEA 		b	uart_baudrate
+ 216              	.L11:
+ 217              		.align	2
+ 218              	.L10:
+ 219 006c 00000C81 		.word	-2129920000
+ 220 0070 57A3FFFF 		.word	-23721
+ 221 0074 D2670000 		.word	26578
+ 222 0078 0E430000 		.word	17166
+ 223 007c 00000380 		.word	-2147287040
+ 224              		.cfi_endproc
+ 225              	.LFE39:
+ 227              		.text
+ 228              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 init.c
+     /tmp/ccFBQAgV.s:12     .text.pll_init:0000000000000000 $a
+     /tmp/ccFBQAgV.s:15     .text.pll_init:0000000000000000 pll_init
+     /tmp/ccFBQAgV.s:57     .text.pll_init:0000000000000044 $d
+     /tmp/ccFBQAgV.s:63     .text.memory_init:0000000000000000 $a
+     /tmp/ccFBQAgV.s:66     .text.memory_init:0000000000000000 memory_init
+     /tmp/ccFBQAgV.s:142    .text.memory_init:0000000000000090 $d
+     /tmp/ccFBQAgV.s:155    .text.board_init:0000000000000000 $a
+     /tmp/ccFBQAgV.s:158    .text.board_init:0000000000000000 board_init
+     /tmp/ccFBQAgV.s:219    .text.board_init:000000000000006c $d
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+delay_ms
+sercomm_bind_uart
+cons_bind_uart
+uart_init
+uart_baudrate

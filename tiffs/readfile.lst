@@ -1,0 +1,986 @@
+   1              		.file	"readfile.c"
+   9              	.Ltext0:
+  10              		.cfi_sections	.debug_frame
+  11              		.section	.text.find_endofchunk,"ax",%progbits
+  12              		.align	2
+  14              	find_endofchunk:
+  15              	.LFB2:
+  16              		.file 1 "tiffs/readfile.c"
+   1:tiffs/readfile.c **** /* TIFFS (TI Flash File System) reader implementation */
+   2:tiffs/readfile.c **** 
+   3:tiffs/readfile.c **** /*
+   4:tiffs/readfile.c ****  * This code was written by Mychaela Falconia <falcon@freecalypso.org>
+   5:tiffs/readfile.c ****  * who refuses to claim copyright on it and has released it as public domain
+   6:tiffs/readfile.c ****  * instead. NO rights reserved, all rights relinquished.
+   7:tiffs/readfile.c ****  *
+   8:tiffs/readfile.c ****  * Tweaked (coding style changes) by Vadim Yanitskiy <axilirator@gmail.com>
+   9:tiffs/readfile.c ****  *
+  10:tiffs/readfile.c ****  * This program is free software; you can redistribute it and/or modify
+  11:tiffs/readfile.c ****  * it under the terms of the GNU General Public License as published by
+  12:tiffs/readfile.c ****  * the Free Software Foundation; either version 2 of the License, or
+  13:tiffs/readfile.c ****  * (at your option) any later version.
+  14:tiffs/readfile.c ****  *
+  15:tiffs/readfile.c ****  * This program is distributed in the hope that it will be useful,
+  16:tiffs/readfile.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  17:tiffs/readfile.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  18:tiffs/readfile.c ****  * GNU General Public License for more details.
+  19:tiffs/readfile.c ****  *
+  20:tiffs/readfile.c ****  */
+  21:tiffs/readfile.c **** 
+  22:tiffs/readfile.c **** #include <stdio.h>
+  23:tiffs/readfile.c **** #include <stdint.h>
+  24:tiffs/readfile.c **** #include <string.h>
+  25:tiffs/readfile.c **** 
+  26:tiffs/readfile.c **** #include <tiffs.h>
+  27:tiffs/readfile.c **** #include "globals.h"
+  28:tiffs/readfile.c **** 
+  29:tiffs/readfile.c **** extern char *index();
+  30:tiffs/readfile.c **** 
+  31:tiffs/readfile.c **** #define	MAX_FN_COMPONENT	20
+  32:tiffs/readfile.c **** 
+  33:tiffs/readfile.c **** static unsigned find_named_child(unsigned start, const char *seekname)
+  34:tiffs/readfile.c **** {
+  35:tiffs/readfile.c **** 	struct tiffs_inode *irec;
+  36:tiffs/readfile.c **** 	unsigned ino;
+  37:tiffs/readfile.c **** 
+  38:tiffs/readfile.c **** 	for (ino = start; ino != 0xFFFF; ino = irec->sibling) {
+  39:tiffs/readfile.c **** 		irec = tiffs_active_index + ino;
+  40:tiffs/readfile.c **** 		if (!irec->type)
+  41:tiffs/readfile.c **** 			continue;
+  42:tiffs/readfile.c **** 		if (!strcmp((const char *) INODE_TO_DATAPTR(irec), seekname))
+  43:tiffs/readfile.c **** 			return ino;
+  44:tiffs/readfile.c **** 	}
+  45:tiffs/readfile.c **** 
+  46:tiffs/readfile.c **** 	return 0;
+  47:tiffs/readfile.c **** }
+  48:tiffs/readfile.c **** 
+  49:tiffs/readfile.c **** static int pathname_to_inode(const char *pathname)
+  50:tiffs/readfile.c **** {
+  51:tiffs/readfile.c **** 	char seekname[MAX_FN_COMPONENT + 1];
+  52:tiffs/readfile.c **** 	struct tiffs_inode *irec;
+  53:tiffs/readfile.c **** 	const char *cur, *next;
+  54:tiffs/readfile.c **** 	unsigned ino, namelen;
+  55:tiffs/readfile.c **** 
+  56:tiffs/readfile.c **** 	cur = pathname;
+  57:tiffs/readfile.c **** 	if (*cur == '/')
+  58:tiffs/readfile.c **** 		cur++;
+  59:tiffs/readfile.c **** 
+  60:tiffs/readfile.c **** 	for (ino = tiffs_root_ino; cur; cur = next) {
+  61:tiffs/readfile.c **** 		if (!*cur)
+  62:tiffs/readfile.c **** 			break;
+  63:tiffs/readfile.c **** 
+  64:tiffs/readfile.c **** 		next = index(cur, '/');
+  65:tiffs/readfile.c **** 		if (next == cur) {
+  66:tiffs/readfile.c **** 			puts("Malformed TIFFS pathname: multiple adjacent slashes\n");
+  67:tiffs/readfile.c **** 			return -1;
+  68:tiffs/readfile.c **** 		} else if (next) {
+  69:tiffs/readfile.c **** 			namelen = next - cur;
+  70:tiffs/readfile.c **** 			next++;
+  71:tiffs/readfile.c **** 		} else {
+  72:tiffs/readfile.c **** 			namelen = strlen(cur);
+  73:tiffs/readfile.c **** 		}
+  74:tiffs/readfile.c **** 
+  75:tiffs/readfile.c **** 		if (namelen > MAX_FN_COMPONENT) {
+  76:tiffs/readfile.c **** 			puts("Malformed TIFFS pathname: component name too long\n");
+  77:tiffs/readfile.c **** 			return -1;
+  78:tiffs/readfile.c **** 		}
+  79:tiffs/readfile.c **** 
+  80:tiffs/readfile.c **** 		memcpy(seekname, cur, namelen);
+  81:tiffs/readfile.c **** 		seekname[namelen] = '\0';
+  82:tiffs/readfile.c **** 
+  83:tiffs/readfile.c **** 		irec = tiffs_active_index + ino;
+  84:tiffs/readfile.c **** 		if (irec->type != TIFFS_OBJTYPE_DIR) {
+  85:tiffs/readfile.c **** 			/* printf("Error: non-terminal non-directory\n"); */
+  86:tiffs/readfile.c **** 			return 0;
+  87:tiffs/readfile.c **** 		}
+  88:tiffs/readfile.c **** 		ino = find_named_child(irec->descend, seekname);
+  89:tiffs/readfile.c **** 		if (!ino) {
+  90:tiffs/readfile.c **** 			/* printf("Error: pathname component not found\n"); */
+  91:tiffs/readfile.c **** 			return 0;
+  92:tiffs/readfile.c **** 		}
+  93:tiffs/readfile.c **** 	}
+  94:tiffs/readfile.c **** 
+  95:tiffs/readfile.c **** 	return ino;
+  96:tiffs/readfile.c **** }
+  97:tiffs/readfile.c **** 
+  98:tiffs/readfile.c **** static uint8_t *find_endofchunk(int ino)
+  99:tiffs/readfile.c **** {
+  17              		.loc 1 99 0
+  18              		.cfi_startproc
+  19              		@ args = 0, pretend = 0, frame = 0
+  20              		@ frame_needed = 0, uses_anonymous_args = 0
+  21              	.LVL0:
+ 100:tiffs/readfile.c **** 	struct tiffs_inode *irec;
+ 101:tiffs/readfile.c **** 	uint8_t *ptr;
+ 102:tiffs/readfile.c **** 	int i;
+ 103:tiffs/readfile.c **** 
+ 104:tiffs/readfile.c **** 	irec = tiffs_active_index + ino;
+  22              		.loc 1 104 0
+  23 0000 60209FE5 		ldr	r2, .L6
+  24 0004 002092E5 		ldr	r2, [r2, #0]
+  25 0008 0032A0E1 		mov	r3, r0, asl #4
+  99:tiffs/readfile.c **** {
+  26              		.loc 1 99 0
+  27 000c 0010A0E1 		mov	r1, r0
+  28              		.loc 1 104 0
+  29 0010 030082E0 		add	r0, r2, r3
+  30              	.LVL1:
+ 105:tiffs/readfile.c **** 	ptr = INODE_TO_DATAPTR(irec) + irec->len;
+  31              		.loc 1 105 0
+  32 0014 B33092E1 		ldrh	r3, [r2, r3]
+  33 0018 082090E5 		ldr	r2, [r0, #8]
+  34 001c 022283E0 		add	r2, r3, r2, asl #4
+  35 0020 44309FE5 		ldr	r3, .L6+4
+  99:tiffs/readfile.c **** {
+  36              		.loc 1 99 0
+  37 0024 10402DE9 		stmfd	sp!, {r4, lr}
+  38              	.LCFI0:
+  39              		.cfi_def_cfa_offset 8
+  40              		.loc 1 105 0
+  41 0028 003093E5 		ldr	r3, [r3, #0]
+  42 002c 032082E0 		add	r2, r2, r3
+  43              	.LVL2:
+  44 0030 013042E2 		sub	r3, r2, #1
+  98:tiffs/readfile.c **** static uint8_t *find_endofchunk(int ino)
+  45              		.loc 1 98 0
+  46 0034 112042E2 		sub	r2, r2, #17
+  47              	.LVL3:
+  48              	.L4:
+  49 0038 0340A0E1 		mov	r4, r3
+  50              		.cfi_offset 14, -4
+  51              		.cfi_offset 4, -8
+  52              	.LVL4:
+ 106:tiffs/readfile.c **** 
+ 107:tiffs/readfile.c **** 	for (i = 0; i < 16; i++) {
+ 108:tiffs/readfile.c **** 		ptr--;
+ 109:tiffs/readfile.c **** 		if (!*ptr)
+  53              		.loc 1 109 0
+  54 003c 010053E4 		ldrb	r0, [r3], #-1	@ zero_extendqisi2
+  55              	.LVL5:
+  56 0040 000050E3 		cmp	r0, #0
+  57 0044 0500000A 		beq	.L2
+ 110:tiffs/readfile.c **** 			return ptr;
+ 111:tiffs/readfile.c **** 		if (*ptr != 0xFF)
+  58              		.loc 1 111 0
+  59 0048 FF0050E3 		cmp	r0, #255
+  60 004c 0100001A 		bne	.L3
+ 107:tiffs/readfile.c **** 	for (i = 0; i < 16; i++) {
+  61              		.loc 1 107 0
+  62 0050 020053E1 		cmp	r3, r2
+  63 0054 F7FFFF1A 		bne	.L4
+  64              	.L3:
+ 112:tiffs/readfile.c **** 			break;
+ 113:tiffs/readfile.c **** 	}
+ 114:tiffs/readfile.c **** 
+ 115:tiffs/readfile.c **** 	printf("TIFFS error: inode #%x has no valid termination\n", ino);
+  65              		.loc 1 115 0
+  66 0058 10009FE5 		ldr	r0, .L6+8
+  67 005c FEFFFFEB 		bl	printf
+  68              	.LVL6:
+  69              	.L2:
+ 116:tiffs/readfile.c **** 	return ptr; /* XXX */
+ 117:tiffs/readfile.c **** }
+  70              		.loc 1 117 0
+  71 0060 0400A0E1 		mov	r0, r4
+  72 0064 1080BDE8 		ldmfd	sp!, {r4, pc}
+  73              	.L7:
+  74              		.align	2
+  75              	.L6:
+  76 0068 00000000 		.word	tiffs_active_index
+  77 006c 00000000 		.word	tiffs_base_addr
+  78 0070 00000000 		.word	.LC0
+  79              		.cfi_endproc
+  80              	.LFE2:
+  82              		.section	.text.tiffs_read_file_maxlen,"ax",%progbits
+  83              		.align	2
+  84              		.global	tiffs_read_file_maxlen
+  86              	tiffs_read_file_maxlen:
+  87              	.LFB5:
+ 118:tiffs/readfile.c **** 
+ 119:tiffs/readfile.c **** static int get_file_head(const char *pathname, uint8_t **startret,
+ 120:tiffs/readfile.c **** 			 size_t *sizeret, int *continue_ret)
+ 121:tiffs/readfile.c **** {
+ 122:tiffs/readfile.c **** 	struct tiffs_inode *irec;
+ 123:tiffs/readfile.c **** 	uint8_t *start, *end;
+ 124:tiffs/readfile.c **** 	int ino, cont, size;
+ 125:tiffs/readfile.c **** 
+ 126:tiffs/readfile.c **** 	ino = pathname_to_inode(pathname);
+ 127:tiffs/readfile.c **** 	if (ino <= 0)
+ 128:tiffs/readfile.c **** 		return ino;
+ 129:tiffs/readfile.c **** 
+ 130:tiffs/readfile.c **** 	irec = tiffs_active_index + ino;
+ 131:tiffs/readfile.c **** 	if (irec->type != TIFFS_OBJTYPE_FILE) {
+ 132:tiffs/readfile.c **** 		printf("TIFFS error: '%s' is not a regular file\n", pathname);
+ 133:tiffs/readfile.c **** 		return -1;
+ 134:tiffs/readfile.c **** 	}
+ 135:tiffs/readfile.c **** 
+ 136:tiffs/readfile.c **** 	start = INODE_TO_DATAPTR(irec);
+ 137:tiffs/readfile.c **** 	start += strlen((const char *) start) + 1;
+ 138:tiffs/readfile.c **** 	end = find_endofchunk(ino);
+ 139:tiffs/readfile.c **** 
+ 140:tiffs/readfile.c **** 	size = end - start;
+ 141:tiffs/readfile.c **** 	if (size < 0)
+ 142:tiffs/readfile.c **** 		size = 0;
+ 143:tiffs/readfile.c **** 
+ 144:tiffs/readfile.c **** 	cont = irec->descend;
+ 145:tiffs/readfile.c **** 	if (cont == 0xFFFF)
+ 146:tiffs/readfile.c **** 		cont = 0;
+ 147:tiffs/readfile.c **** 	if (startret)
+ 148:tiffs/readfile.c **** 		*startret = start;
+ 149:tiffs/readfile.c **** 	if (sizeret)
+ 150:tiffs/readfile.c **** 		*sizeret = size;
+ 151:tiffs/readfile.c **** 	if (continue_ret)
+ 152:tiffs/readfile.c **** 		*continue_ret = cont;
+ 153:tiffs/readfile.c **** 
+ 154:tiffs/readfile.c **** 	return 1;
+ 155:tiffs/readfile.c **** }
+ 156:tiffs/readfile.c **** 
+ 157:tiffs/readfile.c **** static int get_segment(int ino, uint8_t **startret,
+ 158:tiffs/readfile.c **** 		       size_t *sizeret, int *continue_ret)
+ 159:tiffs/readfile.c **** {
+ 160:tiffs/readfile.c **** 	struct tiffs_inode *irec;
+ 161:tiffs/readfile.c **** 	uint8_t *start, *end;
+ 162:tiffs/readfile.c **** 	int cont, size;
+ 163:tiffs/readfile.c **** 
+ 164:tiffs/readfile.c **** 	for (;;) {
+ 165:tiffs/readfile.c **** 		irec = tiffs_active_index + ino;
+ 166:tiffs/readfile.c **** 		if (irec->type)
+ 167:tiffs/readfile.c **** 			break;
+ 168:tiffs/readfile.c **** 		if (irec->sibling == 0xFFFF) {
+ 169:tiffs/readfile.c **** 			printf("TIFFS error: segment inode #%d: "
+ 170:tiffs/readfile.c **** 				"deleted and no sibling\n", ino);
+ 171:tiffs/readfile.c **** 			return -1;
+ 172:tiffs/readfile.c **** 		}
+ 173:tiffs/readfile.c **** 		ino = irec->sibling;
+ 174:tiffs/readfile.c **** 	}
+ 175:tiffs/readfile.c **** 
+ 176:tiffs/readfile.c **** 	if (irec->type != TIFFS_OBJTYPE_SEGMENT) {
+ 177:tiffs/readfile.c **** 		printf("TIFFS error: inode #%x is not a segment\n", ino);
+ 178:tiffs/readfile.c **** 		return -1;
+ 179:tiffs/readfile.c **** 	}
+ 180:tiffs/readfile.c **** 
+ 181:tiffs/readfile.c **** 	start = INODE_TO_DATAPTR(irec);
+ 182:tiffs/readfile.c **** 	end = find_endofchunk(ino);
+ 183:tiffs/readfile.c **** 
+ 184:tiffs/readfile.c **** 	size = end - start;
+ 185:tiffs/readfile.c **** 	if (size <= 0) {
+ 186:tiffs/readfile.c **** 		printf("TIFFS error: segment inode #%x has bad length\n", ino);
+ 187:tiffs/readfile.c **** 		return -1;
+ 188:tiffs/readfile.c **** 	}
+ 189:tiffs/readfile.c **** 
+ 190:tiffs/readfile.c **** 	cont = irec->descend;
+ 191:tiffs/readfile.c **** 	if (cont == 0xFFFF)
+ 192:tiffs/readfile.c **** 		cont = 0;
+ 193:tiffs/readfile.c **** 	if (startret)
+ 194:tiffs/readfile.c **** 		*startret = start;
+ 195:tiffs/readfile.c **** 	if (sizeret)
+ 196:tiffs/readfile.c **** 		*sizeret = size;
+ 197:tiffs/readfile.c **** 	if (continue_ret)
+ 198:tiffs/readfile.c **** 		*continue_ret = cont;
+ 199:tiffs/readfile.c **** 
+ 200:tiffs/readfile.c **** 	return 0;
+ 201:tiffs/readfile.c **** }
+ 202:tiffs/readfile.c **** 
+ 203:tiffs/readfile.c **** int tiffs_read_file_maxlen(const char *pathname, uint8_t *buf,
+ 204:tiffs/readfile.c **** 			   size_t maxlen, size_t *lenrtn)
+ 205:tiffs/readfile.c **** {
+  88              		.loc 1 205 0
+  89              		.cfi_startproc
+  90              		@ args = 0, pretend = 0, frame = 44
+  91              		@ frame_needed = 0, uses_anonymous_args = 0
+  92              	.LVL7:
+  93 0000 F04F2DE9 		stmfd	sp!, {r4, r5, r6, r7, r8, r9, sl, fp, lr}
+  94              	.LCFI1:
+  95              		.cfi_def_cfa_offset 36
+  96 0004 2CD04DE2 		sub	sp, sp, #44
+  97              	.LCFI2:
+  98              		.cfi_def_cfa_offset 80
+  99              		.loc 1 205 0
+ 100 0008 10308DE5 		str	r3, [sp, #16]
+ 206:tiffs/readfile.c **** 	size_t chunk_size, real_len, roomleft;
+ 207:tiffs/readfile.c **** 	uint8_t *chunk_start;
+ 208:tiffs/readfile.c **** 	int stat, cont;
+ 209:tiffs/readfile.c **** 
+ 210:tiffs/readfile.c **** 	if (!tiffs_init_done) {
+ 101              		.loc 1 210 0
+ 102 000c B4329FE5 		ldr	r3, .L50
+ 103              	.LVL8:
+ 104 0010 003093E5 		ldr	r3, [r3, #0]
+ 105 0014 000053E3 		cmp	r3, #0
+ 205:tiffs/readfile.c **** {
+ 106              		.loc 1 205 0
+ 107 0018 0040A0E1 		mov	r4, r0
+ 108              		.cfi_offset 14, -4
+ 109              		.cfi_offset 11, -8
+ 110              		.cfi_offset 10, -12
+ 111              		.cfi_offset 9, -16
+ 112              		.cfi_offset 8, -20
+ 113              		.cfi_offset 7, -24
+ 114              		.cfi_offset 6, -28
+ 115              		.cfi_offset 5, -32
+ 116              		.cfi_offset 4, -36
+ 117 001c 08108DE5 		str	r1, [sp, #8]
+ 118 0020 0C208DE5 		str	r2, [sp, #12]
+ 211:tiffs/readfile.c **** 		puts("TIFFS reader is not initialized\n");
+ 119              		.loc 1 211 0
+ 120 0024 A0029F05 		ldreq	r0, .L50+4
+ 121              	.LVL9:
+ 210:tiffs/readfile.c **** 	if (!tiffs_init_done) {
+ 122              		.loc 1 210 0
+ 123 0028 1E00000A 		beq	.L48
+ 124              	.LVL10:
+ 125              	.LBB16:
+ 126              	.LBB18:
+ 127              	.LBB19:
+ 128              	.LBB20:
+  57:tiffs/readfile.c **** 	if (*cur == '/')
+ 129              		.loc 1 57 0
+ 130 002c 0030D4E5 		ldrb	r3, [r4, #0]	@ zero_extendqisi2
+ 131 0030 2F0053E3 		cmp	r3, #47
+  60:tiffs/readfile.c **** 	for (ino = tiffs_root_ino; cur; cur = next) {
+ 132              		.loc 1 60 0
+ 133 0034 94329FE5 		ldr	r3, .L50+8
+  58:tiffs/readfile.c **** 		cur++;
+ 134              		.loc 1 58 0
+ 135 0038 01908402 		addeq	r9, r4, #1
+ 136              	.LVL11:
+  57:tiffs/readfile.c **** 	if (*cur == '/')
+ 137              		.loc 1 57 0
+ 138 003c 0490A011 		movne	r9, r4
+ 139              	.LVL12:
+  60:tiffs/readfile.c **** 	for (ino = tiffs_root_ino; cur; cur = next) {
+ 140              		.loc 1 60 0
+ 141 0040 005093E5 		ldr	r5, [r3, #0]
+ 142              	.LVL13:
+  80:tiffs/readfile.c **** 		memcpy(seekname, cur, namelen);
+ 143              		.loc 1 80 0
+ 144 0044 14808DE2 		add	r8, sp, #20
+  81:tiffs/readfile.c **** 		seekname[namelen] = '\0';
+ 145              		.loc 1 81 0
+ 146 0048 00B0A0E3 		mov	fp, #0
+ 147              	.LBB22:
+ 148              	.LBB23:
+  42:tiffs/readfile.c **** 		if (!strcmp((const char *) INODE_TO_DATAPTR(irec), seekname))
+ 149              		.loc 1 42 0
+ 150 004c 80A29FE5 		ldr	sl, .L50+12
+ 151 0050 0470A0E1 		mov	r7, r4
+ 152 0054 370000EA 		b	.L12
+ 153              	.LVL14:
+ 154              	.L23:
+ 155              	.LBE23:
+ 156              	.LBE22:
+  61:tiffs/readfile.c **** 		if (!*cur)
+ 157              		.loc 1 61 0
+ 158 0058 0030D9E5 		ldrb	r3, [r9, #0]	@ zero_extendqisi2
+ 159 005c 000053E3 		cmp	r3, #0
+ 160 0060 3600000A 		beq	.L13
+  64:tiffs/readfile.c **** 		next = index(cur, '/');
+ 161              		.loc 1 64 0
+ 162 0064 0900A0E1 		mov	r0, r9
+ 163 0068 2F10A0E3 		mov	r1, #47
+ 164 006c FEFFFFEB 		bl	index
+  65:tiffs/readfile.c **** 		if (next == cur) {
+ 165              		.loc 1 65 0
+ 166 0070 090050E1 		cmp	r0, r9
+  64:tiffs/readfile.c **** 		next = index(cur, '/');
+ 167              		.loc 1 64 0
+ 168 0074 0040A0E1 		mov	r4, r0
+ 169              	.LVL15:
+  65:tiffs/readfile.c **** 		if (next == cur) {
+ 170              		.loc 1 65 0
+  66:tiffs/readfile.c **** 			puts("Malformed TIFFS pathname: multiple adjacent slashes\n");
+ 171              		.loc 1 66 0
+ 172 0078 58029F05 		ldreq	r0, .L50+16
+ 173              	.LVL16:
+ 174 007c 0900000A 		beq	.L48
+ 175              	.L14:
+  68:tiffs/readfile.c **** 		} else if (next) {
+ 176              		.loc 1 68 0
+ 177 0080 000050E3 		cmp	r0, #0
+  69:tiffs/readfile.c **** 			namelen = next - cur;
+ 178              		.loc 1 69 0
+ 179 0084 00606910 		rsbne	r6, r9, r0
+ 180              	.LVL17:
+  70:tiffs/readfile.c **** 			next++;
+ 181              		.loc 1 70 0
+ 182 0088 01408012 		addne	r4, r0, #1
+ 183              	.LVL18:
+  68:tiffs/readfile.c **** 		} else if (next) {
+ 184              		.loc 1 68 0
+ 185 008c 0200001A 		bne	.L17
+  72:tiffs/readfile.c **** 			namelen = strlen(cur);
+ 186              		.loc 1 72 0
+ 187 0090 0900A0E1 		mov	r0, r9
+ 188              	.LVL19:
+ 189 0094 FEFFFFEB 		bl	strlen
+ 190 0098 0060A0E1 		mov	r6, r0
+ 191              	.LVL20:
+ 192              	.L17:
+  75:tiffs/readfile.c **** 		if (namelen > MAX_FN_COMPONENT) {
+ 193              		.loc 1 75 0
+ 194 009c 140056E3 		cmp	r6, #20
+ 195 00a0 0200009A 		bls	.L18
+  76:tiffs/readfile.c **** 			puts("Malformed TIFFS pathname: component name too long\n");
+ 196              		.loc 1 76 0
+ 197 00a4 30029FE5 		ldr	r0, .L50+20
+ 198              	.LVL21:
+ 199              	.L48:
+ 200 00a8 FEFFFFEB 		bl	puts
+ 201 00ac 5B0000EA 		b	.L46
+ 202              	.LVL22:
+ 203              	.L18:
+  80:tiffs/readfile.c **** 		memcpy(seekname, cur, namelen);
+ 204              		.loc 1 80 0
+ 205 00b0 0910A0E1 		mov	r1, r9
+ 206 00b4 0620A0E1 		mov	r2, r6
+ 207 00b8 0800A0E1 		mov	r0, r8
+ 208 00bc FEFFFFEB 		bl	memcpy
+  81:tiffs/readfile.c **** 		seekname[namelen] = '\0';
+ 209              		.loc 1 81 0
+ 210 00c0 2C308DE2 		add	r3, sp, #44
+ 211 00c4 066083E0 		add	r6, r3, r6
+ 212              	.LVL23:
+  83:tiffs/readfile.c **** 		irec = tiffs_active_index + ino;
+ 213              		.loc 1 83 0
+ 214 00c8 10329FE5 		ldr	r3, .L50+24
+ 215 00cc 009093E5 		ldr	r9, [r3, #0]
+ 216              	.LVL24:
+  81:tiffs/readfile.c **** 		seekname[namelen] = '\0';
+ 217              		.loc 1 81 0
+ 218 00d0 18B046E5 		strb	fp, [r6, #-24]
+  83:tiffs/readfile.c **** 		irec = tiffs_active_index + ino;
+ 219              		.loc 1 83 0
+ 220 00d4 055289E0 		add	r5, r9, r5, asl #4
+ 221              	.LVL25:
+  84:tiffs/readfile.c **** 		if (irec->type != TIFFS_OBJTYPE_DIR) {
+ 222              		.loc 1 84 0
+ 223 00d8 0330D5E5 		ldrb	r3, [r5, #3]	@ zero_extendqisi2
+ 224 00dc F20053E3 		cmp	r3, #242
+ 225 00e0 7400001A 		bne	.L38
+  88:tiffs/readfile.c **** 		ino = find_named_child(irec->descend, seekname);
+ 226              		.loc 1 88 0
+ 227 00e4 B450D5E1 		ldrh	r5, [r5, #4]
+ 228              	.LVL26:
+ 229 00e8 0B0000EA 		b	.L19
+ 230              	.LVL27:
+ 231              	.L22:
+ 232              	.LBB21:
+ 233              	.LBB24:
+  39:tiffs/readfile.c **** 		irec = tiffs_active_index + ino;
+ 234              		.loc 1 39 0
+ 235 00ec 056289E0 		add	r6, r9, r5, asl #4
+ 236              	.LVL28:
+  40:tiffs/readfile.c **** 		if (!irec->type)
+ 237              		.loc 1 40 0
+ 238 00f0 0330D6E5 		ldrb	r3, [r6, #3]	@ zero_extendqisi2
+ 239 00f4 000053E3 		cmp	r3, #0
+ 240 00f8 0600000A 		beq	.L20
+  42:tiffs/readfile.c **** 		if (!strcmp((const char *) INODE_TO_DATAPTR(irec), seekname))
+ 241              		.loc 1 42 0
+ 242 00fc 00309AE5 		ldr	r3, [sl, #0]
+ 243 0100 080096E5 		ldr	r0, [r6, #8]
+ 244 0104 0810A0E1 		mov	r1, r8
+ 245 0108 000283E0 		add	r0, r3, r0, asl #4
+ 246 010c FEFFFFEB 		bl	strcmp
+ 247 0110 000050E3 		cmp	r0, #0
+ 248 0114 0400000A 		beq	.L21
+ 249              	.L20:
+  38:tiffs/readfile.c **** 	for (ino = start; ino != 0xFFFF; ino = irec->sibling) {
+ 250              		.loc 1 38 0
+ 251 0118 B650D6E1 		ldrh	r5, [r6, #6]
+ 252              	.LVL29:
+ 253              	.L19:
+ 254 011c C0319FE5 		ldr	r3, .L50+28
+ 255 0120 030055E1 		cmp	r5, r3
+ 256 0124 F0FFFF1A 		bne	.L22
+ 257 0128 620000EA 		b	.L38
+ 258              	.LVL30:
+ 259              	.L21:
+ 260              	.LBE24:
+ 261              	.LBE21:
+  89:tiffs/readfile.c **** 		if (!ino) {
+ 262              		.loc 1 89 0
+ 263 012c 000055E3 		cmp	r5, #0
+ 264 0130 6200000A 		beq	.L39
+  60:tiffs/readfile.c **** 	for (ino = tiffs_root_ino; cur; cur = next) {
+ 265              		.loc 1 60 0
+ 266 0134 0490A0E1 		mov	r9, r4
+ 267              	.LVL31:
+ 268              	.L12:
+ 269 0138 000059E3 		cmp	r9, #0
+ 270 013c C5FFFF1A 		bne	.L23
+ 271              	.L13:
+ 272              	.LBE20:
+ 273              	.LBE19:
+ 127:tiffs/readfile.c **** 	if (ino <= 0)
+ 274              		.loc 1 127 0
+ 275 0140 000055E2 		subs	r0, r5, #0
+ 276 0144 0740A0E1 		mov	r4, r7
+ 277 0148 580000DA 		ble	.L10
+ 130:tiffs/readfile.c **** 	irec = tiffs_active_index + ino;
+ 278              		.loc 1 130 0
+ 279 014c 8CA19FE5 		ldr	sl, .L50+24
+ 280 0150 00809AE5 		ldr	r8, [sl, #0]
+ 281 0154 008288E0 		add	r8, r8, r0, asl #4
+ 282              	.LVL32:
+ 131:tiffs/readfile.c **** 	if (irec->type != TIFFS_OBJTYPE_FILE) {
+ 283              		.loc 1 131 0
+ 284 0158 0330D8E5 		ldrb	r3, [r8, #3]	@ zero_extendqisi2
+ 285 015c F10053E3 		cmp	r3, #241
+ 132:tiffs/readfile.c **** 		printf("TIFFS error: '%s' is not a regular file\n", pathname);
+ 286              		.loc 1 132 0
+ 287 0160 80019F15 		ldrne	r0, .L50+32
+ 131:tiffs/readfile.c **** 	if (irec->type != TIFFS_OBJTYPE_FILE) {
+ 288              		.loc 1 131 0
+ 289 0164 1500001A 		bne	.L49
+ 136:tiffs/readfile.c **** 	start = INODE_TO_DATAPTR(irec);
+ 290              		.loc 1 136 0
+ 291 0168 64919FE5 		ldr	r9, .L50+12
+ 292              	.LVL33:
+ 293 016c 087098E5 		ldr	r7, [r8, #8]
+ 294              	.LVL34:
+ 295 0170 003099E5 		ldr	r3, [r9, #0]
+ 296 0174 077283E0 		add	r7, r3, r7, asl #4
+ 297              	.LVL35:
+ 137:tiffs/readfile.c **** 	start += strlen((const char *) start) + 1;
+ 298              		.loc 1 137 0
+ 299 0178 0700A0E1 		mov	r0, r7
+ 300 017c FEFFFFEB 		bl	strlen
+ 301 0180 010080E2 		add	r0, r0, #1
+ 302 0184 007087E0 		add	r7, r7, r0
+ 303              	.LVL36:
+ 138:tiffs/readfile.c **** 	end = find_endofchunk(ino);
+ 304              		.loc 1 138 0
+ 305 0188 0500A0E1 		mov	r0, r5
+ 306 018c FEFFFFEB 		bl	find_endofchunk
+ 307              	.LVL37:
+ 145:tiffs/readfile.c **** 	if (cont == 0xFFFF)
+ 308              		.loc 1 145 0
+ 309 0190 4CB19FE5 		ldr	fp, .L50+28
+ 144:tiffs/readfile.c **** 	cont = irec->descend;
+ 310              		.loc 1 144 0
+ 311 0194 B450D8E1 		ldrh	r5, [r8, #4]
+ 312              	.LVL38:
+ 140:tiffs/readfile.c **** 	size = end - start;
+ 313              		.loc 1 140 0
+ 314 0198 000067E0 		rsb	r0, r7, r0
+ 315              	.LVL39:
+ 316              	.LBE18:
+ 317              	.LBE16:
+ 212:tiffs/readfile.c **** 		return -1;
+ 213:tiffs/readfile.c **** 	}
+ 214:tiffs/readfile.c **** 
+ 215:tiffs/readfile.c **** 	stat = get_file_head(pathname, &chunk_start, &chunk_size, &cont);
+ 216:tiffs/readfile.c **** 	if (stat <= 0)
+ 217:tiffs/readfile.c **** 		return stat;
+ 218:tiffs/readfile.c **** 	if (chunk_size > maxlen) {
+ 318              		.loc 1 218 0
+ 319 019c 0C309DE5 		ldr	r3, [sp, #12]
+ 320              	.LBB28:
+ 321              	.LBB17:
+ 146:tiffs/readfile.c **** 		cont = 0;
+ 322              		.loc 1 146 0
+ 323 01a0 0B0055E1 		cmp	r5, fp
+ 140:tiffs/readfile.c **** 	size = end - start;
+ 324              		.loc 1 140 0
+ 325 01a4 C06FC0E1 		bic	r6, r0, r0, asr #31
+ 326              	.LVL40:
+ 146:tiffs/readfile.c **** 		cont = 0;
+ 327              		.loc 1 146 0
+ 328 01a8 0050A003 		moveq	r5, #0
+ 329              	.LVL41:
+ 330              	.LBE17:
+ 331              	.LBE28:
+ 332              		.loc 1 218 0
+ 333 01ac 030056E1 		cmp	r6, r3
+ 334 01b0 0400009A 		bls	.L43
+ 335 01b4 000000EA 		b	.L27
+ 336              	.LVL42:
+ 337              	.L44:
+ 338 01b8 0A40A0E1 		mov	r4, sl
+ 339              	.LVL43:
+ 340              	.L27:
+ 219:tiffs/readfile.c **** toobig:		printf("TIFFS error: '%s' is bigger than the read buffer\n", pathname);
+ 341              		.loc 1 219 0
+ 342 01bc 28019FE5 		ldr	r0, .L50+36
+ 343              	.LVL44:
+ 344              	.L49:
+ 345 01c0 0410A0E1 		mov	r1, r4
+ 346 01c4 140000EA 		b	.L45
+ 347              	.LVL45:
+ 348              	.L43:
+ 220:tiffs/readfile.c **** 		return -1;
+ 221:tiffs/readfile.c **** 	}
+ 222:tiffs/readfile.c **** 
+ 223:tiffs/readfile.c **** 	real_len = chunk_size;
+ 224:tiffs/readfile.c **** 	memcpy(buf, chunk_start, chunk_size);
+ 349              		.loc 1 224 0
+ 350 01c8 0710A0E1 		mov	r1, r7
+ 351 01cc 08009DE5 		ldr	r0, [sp, #8]
+ 352 01d0 0620A0E1 		mov	r2, r6
+ 353 01d4 FEFFFFEB 		bl	memcpy
+ 225:tiffs/readfile.c **** 	buf += chunk_size;
+ 354              		.loc 1 225 0
+ 355 01d8 08309DE5 		ldr	r3, [sp, #8]
+ 356 01dc 068083E0 		add	r8, r3, r6
+ 357              	.LVL46:
+ 226:tiffs/readfile.c **** 	roomleft = maxlen - chunk_size;
+ 358              		.loc 1 226 0
+ 359 01e0 0C309DE5 		ldr	r3, [sp, #12]
+ 360 01e4 04A0A0E1 		mov	sl, r4
+ 361 01e8 037066E0 		rsb	r7, r6, r3
+ 362              	.LVL47:
+ 227:tiffs/readfile.c **** 	while (cont) {
+ 363              		.loc 1 227 0
+ 364 01ec 290000EA 		b	.L29
+ 365              	.LVL48:
+ 366              	.L36:
+ 367              	.LBB29:
+ 368              	.LBB30:
+ 165:tiffs/readfile.c **** 		irec = tiffs_active_index + ino;
+ 369              		.loc 1 165 0
+ 370 01f0 E8309FE5 		ldr	r3, .L50+24
+ 371 01f4 001093E5 		ldr	r1, [r3, #0]
+ 372              	.LVL49:
+ 373              	.L32:
+ 374 01f8 053281E0 		add	r3, r1, r5, asl #4
+ 375              	.LVL50:
+ 166:tiffs/readfile.c **** 		if (irec->type)
+ 376              		.loc 1 166 0
+ 377 01fc 0320D3E5 		ldrb	r2, [r3, #3]	@ zero_extendqisi2
+ 378 0200 000052E3 		cmp	r2, #0
+ 379 0204 0900001A 		bne	.L30
+ 168:tiffs/readfile.c **** 		if (irec->sibling == 0xFFFF) {
+ 380              		.loc 1 168 0
+ 381 0208 B630D3E1 		ldrh	r3, [r3, #6]
+ 382              	.LVL51:
+ 383 020c 0B0053E1 		cmp	r3, fp
+ 384 0210 0400001A 		bne	.L31
+ 169:tiffs/readfile.c **** 			printf("TIFFS error: segment inode #%d: "
+ 385              		.loc 1 169 0
+ 386 0214 D4009FE5 		ldr	r0, .L50+40
+ 387              	.L47:
+ 388 0218 0510A0E1 		mov	r1, r5
+ 389              	.LVL52:
+ 390              	.L45:
+ 391 021c FEFFFFEB 		bl	printf
+ 392              	.L46:
+ 393 0220 0000E0E3 		mvn	r0, #0
+ 394 0224 210000EA 		b	.L10
+ 395              	.LVL53:
+ 396              	.L31:
+ 173:tiffs/readfile.c **** 		ino = irec->sibling;
+ 397              		.loc 1 173 0
+ 398 0228 0350A0E1 		mov	r5, r3
+ 399              	.LVL54:
+ 400 022c F1FFFFEA 		b	.L32
+ 401              	.LVL55:
+ 402              	.L30:
+ 176:tiffs/readfile.c **** 	if (irec->type != TIFFS_OBJTYPE_SEGMENT) {
+ 403              		.loc 1 176 0
+ 404 0230 F40052E3 		cmp	r2, #244
+ 177:tiffs/readfile.c **** 		printf("TIFFS error: inode #%x is not a segment\n", ino);
+ 405              		.loc 1 177 0
+ 406 0234 B8009F15 		ldrne	r0, .L50+44
+ 407 0238 F6FFFF1A 		bne	.L47
+ 408              	.L33:
+ 181:tiffs/readfile.c **** 	start = INODE_TO_DATAPTR(irec);
+ 409              		.loc 1 181 0
+ 410 023c 081093E5 		ldr	r1, [r3, #8]
+ 411 0240 002099E5 		ldr	r2, [r9, #0]
+ 182:tiffs/readfile.c **** 	end = find_endofchunk(ino);
+ 412              		.loc 1 182 0
+ 413 0244 0500A0E1 		mov	r0, r5
+ 181:tiffs/readfile.c **** 	start = INODE_TO_DATAPTR(irec);
+ 414              		.loc 1 181 0
+ 415 0248 011282E0 		add	r1, r2, r1, asl #4
+ 416              	.LVL56:
+ 182:tiffs/readfile.c **** 	end = find_endofchunk(ino);
+ 417              		.loc 1 182 0
+ 418 024c 0A008DE8 		stmia	sp, {r1, r3}	@ phole stm
+ 419 0250 FEFFFFEB 		bl	find_endofchunk
+ 420              	.LVL57:
+ 184:tiffs/readfile.c **** 	size = end - start;
+ 421              		.loc 1 184 0
+ 422 0254 00109DE5 		ldr	r1, [sp, #0]
+ 423 0258 004061E0 		rsb	r4, r1, r0
+ 424              	.LVL58:
+ 185:tiffs/readfile.c **** 	if (size <= 0) {
+ 425              		.loc 1 185 0
+ 426 025c 000054E3 		cmp	r4, #0
+ 427 0260 04309DE5 		ldr	r3, [sp, #4]
+ 186:tiffs/readfile.c **** 		printf("TIFFS error: segment inode #%x has bad length\n", ino);
+ 428              		.loc 1 186 0
+ 429 0264 8C009FD5 		ldrle	r0, .L50+48
+ 430              	.LVL59:
+ 431 0268 EAFFFFDA 		ble	.L47
+ 432              	.LVL60:
+ 433              	.L34:
+ 190:tiffs/readfile.c **** 	cont = irec->descend;
+ 434              		.loc 1 190 0
+ 435 026c B450D3E1 		ldrh	r5, [r3, #4]
+ 436              	.LVL61:
+ 192:tiffs/readfile.c **** 		cont = 0;
+ 437              		.loc 1 192 0
+ 438 0270 0B0055E1 		cmp	r5, fp
+ 439 0274 0050A003 		moveq	r5, #0
+ 440              	.LVL62:
+ 441              	.LBE30:
+ 442              	.LBE29:
+ 228:tiffs/readfile.c **** 		stat = get_segment(cont, &chunk_start, &chunk_size, &cont);
+ 229:tiffs/readfile.c **** 		if (stat < 0)
+ 230:tiffs/readfile.c **** 			return stat;
+ 231:tiffs/readfile.c **** 		if (chunk_size > roomleft)
+ 443              		.loc 1 231 0
+ 444 0278 070054E1 		cmp	r4, r7
+ 445 027c CDFFFF8A 		bhi	.L44
+ 232:tiffs/readfile.c **** 			goto toobig;
+ 233:tiffs/readfile.c **** 
+ 234:tiffs/readfile.c **** 		real_len += chunk_size;
+ 235:tiffs/readfile.c **** 		memcpy(buf, chunk_start, chunk_size);
+ 446              		.loc 1 235 0
+ 447 0280 0800A0E1 		mov	r0, r8
+ 448              	.LVL63:
+ 449 0284 0420A0E1 		mov	r2, r4
+ 450 0288 FEFFFFEB 		bl	memcpy
+ 451              	.LVL64:
+ 234:tiffs/readfile.c **** 		real_len += chunk_size;
+ 452              		.loc 1 234 0
+ 453 028c 046086E0 		add	r6, r6, r4
+ 454              	.LVL65:
+ 236:tiffs/readfile.c **** 		buf += chunk_size;
+ 455              		.loc 1 236 0
+ 456 0290 048088E0 		add	r8, r8, r4
+ 457              	.LVL66:
+ 237:tiffs/readfile.c **** 		roomleft -= chunk_size;
+ 458              		.loc 1 237 0
+ 459 0294 077064E0 		rsb	r7, r4, r7
+ 460              	.LVL67:
+ 461              	.L29:
+ 227:tiffs/readfile.c **** 	while (cont) {
+ 462              		.loc 1 227 0 discriminator 1
+ 463 0298 000055E3 		cmp	r5, #0
+ 464 029c D3FFFF1A 		bne	.L36
+ 238:tiffs/readfile.c **** 	}
+ 239:tiffs/readfile.c **** 
+ 240:tiffs/readfile.c **** 	if (lenrtn)
+ 465              		.loc 1 240 0
+ 466 02a0 10309DE5 		ldr	r3, [sp, #16]
+ 467 02a4 000053E3 		cmp	r3, #0
+ 241:tiffs/readfile.c **** 		*lenrtn = real_len;
+ 468              		.loc 1 241 0
+ 469 02a8 00608315 		strne	r6, [r3, #0]
+ 242:tiffs/readfile.c **** 
+ 243:tiffs/readfile.c **** 	return 1;
+ 470              		.loc 1 243 0
+ 471 02ac 0100A0E3 		mov	r0, #1
+ 472              	.LVL68:
+ 473              	.L10:
+ 244:tiffs/readfile.c **** }
+ 474              		.loc 1 244 0
+ 475 02b0 2CD08DE2 		add	sp, sp, #44
+ 476 02b4 F08FBDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, r9, sl, fp, pc}
+ 477              	.LVL69:
+ 478              	.L38:
+ 479              	.LBB31:
+ 480              	.LBB27:
+ 481              	.LBB26:
+ 482              	.LBB25:
+  86:tiffs/readfile.c **** 			return 0;
+ 483              		.loc 1 86 0
+ 484 02b8 0000A0E3 		mov	r0, #0
+ 485 02bc FBFFFFEA 		b	.L10
+ 486              	.LVL70:
+ 487              	.L39:
+  91:tiffs/readfile.c **** 			return 0;
+ 488              		.loc 1 91 0
+ 489 02c0 0500A0E1 		mov	r0, r5
+ 490 02c4 F9FFFFEA 		b	.L10
+ 491              	.L51:
+ 492              		.align	2
+ 493              	.L50:
+ 494 02c8 00000000 		.word	tiffs_init_done
+ 495 02cc 31000000 		.word	.LC1
+ 496 02d0 00000000 		.word	tiffs_root_ino
+ 497 02d4 00000000 		.word	tiffs_base_addr
+ 498 02d8 52000000 		.word	.LC2
+ 499 02dc 87000000 		.word	.LC3
+ 500 02e0 00000000 		.word	tiffs_active_index
+ 501 02e4 FFFF0000 		.word	65535
+ 502 02e8 BA000000 		.word	.LC4
+ 503 02ec E3000000 		.word	.LC5
+ 504 02f0 15010000 		.word	.LC6
+ 505 02f4 4D010000 		.word	.LC7
+ 506 02f8 76010000 		.word	.LC8
+ 507              	.LBE25:
+ 508              	.LBE26:
+ 509              	.LBE27:
+ 510              	.LBE31:
+ 511              		.cfi_endproc
+ 512              	.LFE5:
+ 514              		.section	.text.tiffs_read_file_fixedlen,"ax",%progbits
+ 515              		.align	2
+ 516              		.global	tiffs_read_file_fixedlen
+ 518              	tiffs_read_file_fixedlen:
+ 519              	.LFB6:
+ 245:tiffs/readfile.c **** 
+ 246:tiffs/readfile.c **** int tiffs_read_file_fixedlen(const char *pathname, uint8_t *buf,
+ 247:tiffs/readfile.c **** 			     size_t expect_len)
+ 248:tiffs/readfile.c **** {
+ 520              		.loc 1 248 0
+ 521              		.cfi_startproc
+ 522              		@ args = 0, pretend = 0, frame = 4
+ 523              		@ frame_needed = 0, uses_anonymous_args = 0
+ 524              	.LVL71:
+ 525 0000 31402DE9 		stmfd	sp!, {r0, r4, r5, lr}
+ 526              	.LCFI3:
+ 527              		.cfi_def_cfa_offset 16
+ 249:tiffs/readfile.c **** 	size_t real_len;
+ 250:tiffs/readfile.c **** 	int rc;
+ 251:tiffs/readfile.c **** 
+ 252:tiffs/readfile.c **** 	rc = tiffs_read_file_maxlen(pathname, buf, expect_len, &real_len);
+ 528              		.loc 1 252 0
+ 529 0004 0D30A0E1 		mov	r3, sp
+ 248:tiffs/readfile.c **** {
+ 530              		.loc 1 248 0
+ 531 0008 0040A0E1 		mov	r4, r0
+ 532              		.cfi_offset 14, -4
+ 533              		.cfi_offset 5, -8
+ 534              		.cfi_offset 4, -12
+ 535              		.cfi_offset 0, -16
+ 536 000c 0250A0E1 		mov	r5, r2
+ 537              		.loc 1 252 0
+ 538 0010 FEFFFFEB 		bl	tiffs_read_file_maxlen
+ 539              	.LVL72:
+ 253:tiffs/readfile.c **** 	if (rc <= 0)
+ 540              		.loc 1 253 0
+ 541 0014 000050E3 		cmp	r0, #0
+ 542 0018 070000DA 		ble	.L53
+ 543              	.LVL73:
+ 254:tiffs/readfile.c **** 		return rc;
+ 255:tiffs/readfile.c **** 	if (real_len != expect_len) {
+ 544              		.loc 1 255 0
+ 545 001c 00309DE5 		ldr	r3, [sp, #0]
+ 546 0020 050053E1 		cmp	r3, r5
+ 256:tiffs/readfile.c **** 		printf("TIFFS error: '%s' has the wrong length\n", pathname);
+ 257:tiffs/readfile.c **** 		return -1;
+ 258:tiffs/readfile.c **** 	}
+ 259:tiffs/readfile.c **** 
+ 260:tiffs/readfile.c **** 	return 1;
+ 547              		.loc 1 260 0
+ 548 0024 0100A003 		moveq	r0, #1
+ 549              	.LVL74:
+ 255:tiffs/readfile.c **** 	if (real_len != expect_len) {
+ 550              		.loc 1 255 0
+ 551 0028 0300000A 		beq	.L53
+ 256:tiffs/readfile.c **** 		printf("TIFFS error: '%s' has the wrong length\n", pathname);
+ 552              		.loc 1 256 0
+ 553 002c 0C009FE5 		ldr	r0, .L55
+ 554 0030 0410A0E1 		mov	r1, r4
+ 555 0034 FEFFFFEB 		bl	printf
+ 257:tiffs/readfile.c **** 		return -1;
+ 556              		.loc 1 257 0
+ 557 0038 0000E0E3 		mvn	r0, #0
+ 558              	.L53:
+ 261:tiffs/readfile.c **** }
+ 559              		.loc 1 261 0
+ 560 003c 3880BDE8 		ldmfd	sp!, {r3, r4, r5, pc}
+ 561              	.L56:
+ 562              		.align	2
+ 563              	.L55:
+ 564 0040 A5010000 		.word	.LC9
+ 565              		.cfi_endproc
+ 566              	.LFE6:
+ 568              		.section	.rodata.str1.1,"aMS",%progbits,1
+ 569              	.LC0:
+ 570 0000 54494646 		.ascii	"TIFFS error: inode #%x has no valid termination\012"
+ 570      53206572 
+ 570      726F723A 
+ 570      20696E6F 
+ 570      64652023 
+ 571 0030 00       		.ascii	"\000"
+ 572              	.LC1:
+ 573 0031 54494646 		.ascii	"TIFFS reader is not initialized\012\000"
+ 573      53207265 
+ 573      61646572 
+ 573      20697320 
+ 573      6E6F7420 
+ 574              	.LC2:
+ 575 0052 4D616C66 		.ascii	"Malformed TIFFS pathname: multiple adjacent slashes"
+ 575      6F726D65 
+ 575      64205449 
+ 575      46465320 
+ 575      70617468 
+ 576 0085 0A00     		.ascii	"\012\000"
+ 577              	.LC3:
+ 578 0087 4D616C66 		.ascii	"Malformed TIFFS pathname: component name too long\012"
+ 578      6F726D65 
+ 578      64205449 
+ 578      46465320 
+ 578      70617468 
+ 579 00b9 00       		.ascii	"\000"
+ 580              	.LC4:
+ 581 00ba 54494646 		.ascii	"TIFFS error: '%s' is not a regular file\012\000"
+ 581      53206572 
+ 581      726F723A 
+ 581      20272573 
+ 581      27206973 
+ 582              	.LC5:
+ 583 00e3 54494646 		.ascii	"TIFFS error: '%s' is bigger than the read buffer\012"
+ 583      53206572 
+ 583      726F723A 
+ 583      20272573 
+ 583      27206973 
+ 584 0114 00       		.ascii	"\000"
+ 585              	.LC6:
+ 586 0115 54494646 		.ascii	"TIFFS error: segment inode #%d: deleted and no sibl"
+ 586      53206572 
+ 586      726F723A 
+ 586      20736567 
+ 586      6D656E74 
+ 587 0148 696E670A 		.ascii	"ing\012\000"
+ 587      00
+ 588              	.LC7:
+ 589 014d 54494646 		.ascii	"TIFFS error: inode #%x is not a segment\012\000"
+ 589      53206572 
+ 589      726F723A 
+ 589      20696E6F 
+ 589      64652023 
+ 590              	.LC8:
+ 591 0176 54494646 		.ascii	"TIFFS error: segment inode #%x has bad length\012\000"
+ 591      53206572 
+ 591      726F723A 
+ 591      20736567 
+ 591      6D656E74 
+ 592              	.LC9:
+ 593 01a5 54494646 		.ascii	"TIFFS error: '%s' has the wrong length\012\000"
+ 593      53206572 
+ 593      726F723A 
+ 593      20272573 
+ 593      27206861 
+ 594              		.text
+ 595              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 readfile.c
+     /tmp/cc2WM1OP.s:12     .text.find_endofchunk:0000000000000000 $a
+     /tmp/cc2WM1OP.s:14     .text.find_endofchunk:0000000000000000 find_endofchunk
+     /tmp/cc2WM1OP.s:76     .text.find_endofchunk:0000000000000068 $d
+     /tmp/cc2WM1OP.s:83     .text.tiffs_read_file_maxlen:0000000000000000 $a
+     /tmp/cc2WM1OP.s:86     .text.tiffs_read_file_maxlen:0000000000000000 tiffs_read_file_maxlen
+     /tmp/cc2WM1OP.s:494    .text.tiffs_read_file_maxlen:00000000000002c8 $d
+     /tmp/cc2WM1OP.s:515    .text.tiffs_read_file_fixedlen:0000000000000000 $a
+     /tmp/cc2WM1OP.s:518    .text.tiffs_read_file_fixedlen:0000000000000000 tiffs_read_file_fixedlen
+     /tmp/cc2WM1OP.s:564    .text.tiffs_read_file_fixedlen:0000000000000040 $d
+                     .debug_frame:0000000000000010 $d
+
+UNDEFINED SYMBOLS
+printf
+tiffs_active_index
+tiffs_base_addr
+index
+strlen
+puts
+memcpy
+strcmp
+tiffs_init_done
+tiffs_root_ino
